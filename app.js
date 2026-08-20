@@ -1,1306 +1,369 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "sg-tournament-ranking-demo-v6";
+  const SUPABASE_URL = "https://nxzrgbpaxukgjyzwupjp.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_TawTg_9H-hw2TDWFyHH3ow_PTPPfoND";
   const TEAM_COLOR_DEFS = [
-    { label: "Lime Green", hex: "#7CFC00" },
-    { label: "Cyan", hex: "#00DCEB" },
-    { label: "Dark Blue", hex: "#1E3A8A" },
-    { label: "Pink", hex: "#EC4899" },
-    { label: "Dark Green", hex: "#166534" },
-    { label: "White", hex: "#F8FAFC" },
-    { label: "Brown", hex: "#8B5E3C" },
-    { label: "Orange", hex: "#F97316" },
-    { label: "Yellow", hex: "#FACC15" },
-    { label: "Purple", hex: "#7E22CE" },
-    { label: "Magenta", hex: "#D946EF" },
-    { label: "Baby Blue", hex: "#7DD3FC" }
-  ];
-  const TEAM_COLORS = TEAM_COLOR_DEFS.map((item) => item.hex);
-  const TEAM_COLOR_BY_NAME = Object.fromEntries(
-    TEAM_COLOR_DEFS.map((item) => [item.label.toLocaleLowerCase("en"), item])
-  );
-  const EVENT_CONFIG = {
-    kill: { label: "Kill", points: 1 },
-    deathmatch: { label: "Deathmatch", points: 3 },
-    win: { label: "Sieg", points: 5 }
-  };
+    ["Lime Green", "#7CFC00"], ["Cyan", "#00DCEB"], ["Dark Blue", "#1E3A8A"],
+    ["Pink", "#EC4899"], ["Dark Green", "#166534"], ["White", "#F8FAFC"],
+    ["Brown", "#8B5E3C"], ["Orange", "#F97316"], ["Yellow", "#FACC15"],
+    ["Purple", "#7E22CE"], ["Magenta", "#D946EF"], ["Baby Blue", "#7DD3FC"]
+  ].map(([label, hex]) => ({ label, hex }));
+  const COLOR_BY_NAME = new Map(TEAM_COLOR_DEFS.map((color) => [color.label.toLowerCase(), color]));
+  const EVENT_CONFIG = { kill: { label: "Kill", points: 1 }, deathmatch: { label: "Deathmatch", points: 3 }, win: { label: "Sieg", points: 2 } };
   const MODE_LABELS = { 1: "Solo", 2: "Duo", 3: "Trio", 4: "Squad" };
-
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-  const uid = (prefix = "id") => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
-  const isoNow = () => new Date().toISOString();
+  const db = typeof window !== "undefined" ? window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-  function makeEvent(round, type, count = 1) {
-    return Array.from({ length: count }, () => ({
-      id: uid("event"),
-      round,
-      type,
-      points: EVENT_CONFIG[type].points,
-      createdAt: isoNow()
-    }));
-  }
-
-  function makePlayer(name, events = []) {
-    return { id: uid("player"), name, events };
-  }
-
-  function sampleState() {
-    const now = isoNow();
-    const duoTournament = {
-      id: uid("tournament"),
-      name: "Bloxdio Turnier 22.08.",
-      mode: 2,
-      currentRound: 3,
-      editingRound: 3,
-      createdAt: now,
-      updatedAt: now,
-      teams: [
-        {
-          id: uid("team"), name: "Lime Green", color: "#7CFC00",
-          players: [
-            makePlayer("Hübscher Mann", [...makeEvent(1, "kill", 2), ...makeEvent(1, "deathmatch"), ...makeEvent(2, "win"), ...makeEvent(3, "kill")]),
-            makePlayer("PixelRaven", [...makeEvent(1, "kill"), ...makeEvent(2, "deathmatch"), ...makeEvent(2, "kill", 2), ...makeEvent(3, "win")])
-          ]
-        },
-        {
-          id: uid("team"), name: "Cyan", color: "#00DCEB",
-          players: [
-            makePlayer("FoxByte", [...makeEvent(1, "deathmatch"), ...makeEvent(2, "kill", 3), ...makeEvent(3, "deathmatch")]),
-            makePlayer("SnowNova", [...makeEvent(1, "kill", 2), ...makeEvent(2, "win"), ...makeEvent(3, "kill")])
-          ]
-        },
-        {
-          id: uid("team"), name: "Dark Blue", color: "#1E3A8A",
-          players: [
-            makePlayer("CobwebKing", [...makeEvent(1, "kill"), ...makeEvent(2, "deathmatch"), ...makeEvent(3, "kill", 2)]),
-            makePlayer("BlockKnight", [...makeEvent(1, "win"), ...makeEvent(2, "kill"), ...makeEvent(3, "deathmatch")])
-          ]
-        }
-      ]
-    };
-
-    const soloTournament = {
-      id: uid("tournament"),
-      name: "Solo Open",
-      mode: 1,
-      currentRound: 2,
-      editingRound: 2,
-      createdAt: now,
-      updatedAt: now,
-      teams: [
-        { id: uid("solo"), name: "LavaLynx", color: "", players: [makePlayer("LavaLynx", [...makeEvent(1, "kill", 3), ...makeEvent(2, "win")])] },
-        { id: uid("solo"), name: "EnderEcho", color: "", players: [makePlayer("EnderEcho", [...makeEvent(1, "deathmatch"), ...makeEvent(2, "kill", 2)])] },
-        { id: uid("solo"), name: "MoonArcher", color: "", players: [makePlayer("MoonArcher", [...makeEvent(1, "kill"), ...makeEvent(2, "deathmatch")])] }
-      ]
-    };
-
-    return {
-      version: 6,
-      activeTournamentId: duoTournament.id,
-      updatedAt: now,
-      tournaments: [duoTournament, soloTournament]
-    };
-  }
-
-  let state = loadState();
-  let publicRankingView = "team";
-  let selectedTournamentMode = 0;
+  let state = { tournaments: [], activeTournamentId: null, updatedAt: null };
+  let rankingView = "team";
+  let selectedMode = 0;
   let activeHistoryPlayerId = null;
+  let isAdmin = false;
+  let loading = true;
+  let realtimeTimer = 0;
+  let writeBusy = false;
 
-  function loadState() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (parsed && Array.isArray(parsed.tournaments) && parsed.tournaments.length) return normalizeState(parsed);
-    } catch (error) {
-      console.warn("Turnierdaten konnten nicht geladen werden.", error);
-    }
-    const initial = sampleState();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
+  const getTournament = () => state.tournaments.find((item) => item.id === state.activeTournamentId) || state.tournaments[0] || null;
+  const allPlayers = (tournament) => tournament ? tournament.teams.flatMap((team) => team.players.map((player) => ({ player, team }))) : [];
+  const statsThrough = (player, round = Infinity) => player.events.filter((event) => event.round <= round).reduce((stats, event) => {
+    if (event.type === "kill") stats.kills += 1;
+    if (event.type === "deathmatch") stats.deathmatches += 1;
+    if (event.type === "win") stats.wins += 1;
+    stats.points += EVENT_CONFIG[event.type]?.points || 0;
+    return stats;
+  }, { kills: 0, deathmatches: 0, wins: 0, points: 0 });
+  const teamPoints = (team, round = Infinity) => team.players.reduce((sum, player) => sum + statsThrough(player, round).points, 0);
+  const teamLabel = (team) => team.players.map((player) => player.name).join(" + ") || team.name;
+
+  function friendlyError(error, fallback = "Die Aktion konnte nicht ausgeführt werden.") {
+    console.error(error);
+    if (/duplicate|unique/i.test(error?.message || "")) return "Dieser Name ist bereits vergeben.";
+    if (/limit|maximum|deathmatch|win/i.test(error?.message || "")) return "Das Rundenlimit für Deathmatch oder Sieg wurde erreicht.";
+    return fallback;
   }
 
-  function normalizeState(input) {
-    const tournaments = (input.tournaments || []).map((sourceTournament) => {
-      const currentRound = Math.max(1, Math.round(Number(sourceTournament.currentRound) || 1));
-      const editingRound = Math.min(
-        currentRound,
-        Math.max(1, Math.round(Number(sourceTournament.editingRound) || currentRound))
-      );
+  async function loadData({ quiet = false } = {}) {
+    if (!db) { loading = false; showPublicFailure("Supabase konnte nicht geladen werden. Bitte die Verbindung prüfen."); return; }
+    if (!quiet) { loading = true; renderPublic(); }
+    const [tournamentsResult, teamsResult, playersResult, eventsResult] = await Promise.all([
+      db.from("tournaments").select("*").order("created_at"),
+      db.from("teams").select("*").order("created_at"),
+      db.from("players").select("*").order("created_at"),
+      db.from("events").select("*").order("created_at")
+    ]);
+    const error = [tournamentsResult, teamsResult, playersResult, eventsResult].find((result) => result.error)?.error;
+    if (error) { loading = false; showPublicFailure("Die Live-Daten sind gerade nicht erreichbar. Bitte später erneut versuchen."); console.error(error); return; }
+    const oldActive = state.activeTournamentId;
+    const eventsByPlayer = new Map();
+    for (const event of eventsResult.data) {
+      const mapped = { id: event.id, round: event.round, type: event.type, points: event.points, createdAt: event.created_at };
+      eventsByPlayer.set(event.player_id, [...(eventsByPlayer.get(event.player_id) || []), mapped]);
+    }
+    const playersByTeam = new Map();
+    for (const player of playersResult.data) {
+      const mapped = { id: player.id, name: player.name, events: eventsByPlayer.get(player.id) || [] };
+      playersByTeam.set(player.team_id, [...(playersByTeam.get(player.team_id) || []), mapped]);
+    }
+    const teamsByTournament = new Map();
+    for (const team of teamsResult.data) {
+      const mapped = { id: team.id, name: team.name, color: team.color, players: playersByTeam.get(team.id) || [] };
+      teamsByTournament.set(team.tournament_id, [...(teamsByTournament.get(team.tournament_id) || []), mapped]);
+    }
+    const tournaments = tournamentsResult.data.map((item) => ({
+      id: item.id, name: item.name, mode: item.mode, currentRound: item.current_round,
+      editingRound: item.editing_round, createdAt: item.created_at, updatedAt: item.updated_at,
+      teams: teamsByTournament.get(item.id) || []
+    }));
+    state = { tournaments, activeTournamentId: tournaments.some((item) => item.id === oldActive) ? oldActive : tournaments[0]?.id || null, updatedAt: new Date().toISOString() };
+    loading = false;
+    if (getTournament()?.mode === 1) rankingView = "individual";
+    renderAll();
+  }
 
-      return {
-        id: sourceTournament.id || uid("tournament"),
-        name: String(sourceTournament.name || "Unbenanntes Turnier").trim(),
-        mode: Math.min(4, Math.max(1, Math.round(Number(sourceTournament.mode) || 1))),
-        currentRound,
-        editingRound,
-        createdAt: sourceTournament.createdAt || isoNow(),
-        updatedAt: sourceTournament.updatedAt || sourceTournament.createdAt || isoNow(),
-        teams: (sourceTournament.teams || []).map((team) => ({
-          id: team.id || uid("team"),
-          name: String(team.name || "Unbenannt").trim(),
-          color: team.color || "",
-          players: (team.players || []).map((player) => ({
-            id: player.id || uid("player"),
-            name: String(player.name || "Unbenannter Spieler").trim(),
-            events: (player.events || []).map((event) => ({
-              id: event.id || uid("event"),
-              round: Math.max(1, Math.round(Number(event.round) || 1)),
-              type: EVENT_CONFIG[event.type] ? event.type : "kill",
-              points: EVENT_CONFIG[event.type]?.points || 1,
-              createdAt: event.createdAt || isoNow()
-            }))
-          }))
-        }))
-      };
+  function subscribeRealtime() {
+    if (!db) return;
+    const reload = () => { clearTimeout(realtimeTimer); realtimeTimer = setTimeout(() => loadData({ quiet: true }), 300); };
+    const channel = db.channel("ranking-live");
+    ["tournaments", "teams", "players", "events"].forEach((table) => channel.on("postgres_changes", { event: "*", schema: "public", table }, reload));
+    channel.subscribe();
+  }
+
+  function setActiveTournament(id) {
+    if (!state.tournaments.some((item) => item.id === id)) return;
+    state.activeTournamentId = id;
+    rankingView = getTournament().mode === 1 ? "individual" : "team";
+    renderAll();
+  }
+
+  function rankMaps(tournament, round, individual) {
+    const entries = individual ? allPlayers(tournament) : tournament.teams;
+    const sorted = entries.slice().sort((a, b) => {
+      const ap = individual ? statsThrough(a.player, round).points : teamPoints(a, round);
+      const bp = individual ? statsThrough(b.player, round).points : teamPoints(b, round);
+      const an = individual ? a.player.name : teamLabel(a);
+      const bn = individual ? b.player.name : teamLabel(b);
+      return bp - ap || an.localeCompare(bn, "de");
     });
-
-    const activeTournamentId = tournaments.some((item) => item.id === input.activeTournamentId)
-      ? input.activeTournamentId
-      : tournaments[0].id;
-
-    return { version: 6, activeTournamentId, updatedAt: input.updatedAt || isoNow(), tournaments };
+    return new Map(sorted.map((entry, index) => [individual ? entry.player.id : entry.id, index + 1]));
   }
 
-  function persistState(message = "", touchTournament = true) {
-    state.updatedAt = isoNow();
-    if (touchTournament) {
-      const tournament = getActiveTournament();
-      if (tournament) tournament.updatedAt = state.updatedAt;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    renderAll();
-    if (message) showToast(message, "success");
+  function movement(current, previous, round) {
+    if (round <= 1) return '<span class="rank-movement empty"></span>';
+    if (current < previous) return '<span class="rank-movement up" aria-label="Aufgestiegen">▲</span>';
+    if (current > previous) return '<span class="rank-movement down" aria-label="Abgestiegen">▼</span>';
+    return '<span class="rank-movement same" aria-label="Unverändert">•</span>';
   }
 
-  function getActiveTournament() {
-    return state.tournaments.find((item) => item.id === state.activeTournamentId) || state.tournaments[0] || null;
-  }
-
-  function setActiveTournament(tournamentId) {
-    if (!state.tournaments.some((item) => item.id === tournamentId)) return;
-    state.activeTournamentId = tournamentId;
-    const tournament = getActiveTournament();
-    tournament.editingRound = Math.min(tournament.currentRound, Math.max(1, tournament.editingRound || tournament.currentRound));
-    publicRankingView = tournament.mode === 1 ? "individual" : "team";
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    renderAll();
-  }
-
-  function allPlayers(tournament) {
-    return tournament.teams.flatMap((team) => team.players.map((player) => ({ player, team })));
-  }
-
-  function playerStats(player) {
-    const stats = { kills: 0, deathmatches: 0, wins: 0, points: 0 };
-    for (const event of player.events) {
-      stats.points += EVENT_CONFIG[event.type]?.points || 0;
-      if (event.type === "kill") stats.kills += 1;
-      if (event.type === "deathmatch") stats.deathmatches += 1;
-      if (event.type === "win") stats.wins += 1;
-    }
-    return stats;
-  }
-
-  function playerStatsThroughRound(player, maxRound) {
-    const stats = { kills: 0, deathmatches: 0, wins: 0, points: 0 };
-    for (const event of player.events) {
-      if (event.round > maxRound) continue;
-      stats.points += EVENT_CONFIG[event.type]?.points || 0;
-      if (event.type === "kill") stats.kills += 1;
-      if (event.type === "deathmatch") stats.deathmatches += 1;
-      if (event.type === "win") stats.wins += 1;
-    }
-    return stats;
-  }
-
-  function teamPointsThroughRound(team, maxRound) {
-    return team.players.reduce((total, player) => total + playerStatsThroughRound(player, maxRound).points, 0);
-  }
-
-  function publicTeamLabel(team) {
-    return team.players.map((player) => player.name).join(" ♦ ");
-  }
-
-  function placementLabel(rank) {
-    if (rank === 1) return "#1";
-    if (rank === 2) return "2ND";
-    if (rank === 3) return "3RD";
-    return `${rank}TH`;
-  }
-
-  function teamRankMap(tournament, round) {
-    const ranked = tournament.teams.slice().sort((a, b) =>
-      teamPointsThroughRound(b, round) - teamPointsThroughRound(a, round) ||
-      publicTeamLabel(a).localeCompare(publicTeamLabel(b), "de")
-    );
-    return new Map(ranked.map((team, index) => [team.id, index + 1]));
-  }
-
-  function playerRankMap(tournament, round) {
-    const ranked = allPlayers(tournament).slice().sort((a, b) =>
-      playerStatsThroughRound(b.player, round).points - playerStatsThroughRound(a.player, round).points ||
-      a.player.name.localeCompare(b.player.name, "de")
-    );
-    return new Map(ranked.map(({ player }, index) => [player.id, index + 1]));
-  }
-
-  function movementMarkup(currentRank, previousRank, currentRound) {
-    if (currentRound <= 1 || !previousRank) return '<span class="rank-movement empty" aria-hidden="true"></span>';
-    if (currentRank < previousRank) {
-      return `<span class="rank-movement up" title="Seit der letzten Runde um ${previousRank - currentRank} Platz/Plätze gestiegen" aria-label="Aufgestiegen">▲</span>`;
-    }
-    if (currentRank > previousRank) {
-      return `<span class="rank-movement down" title="Seit der letzten Runde um ${currentRank - previousRank} Platz/Plätze gefallen" aria-label="Abgestiegen">▼</span>`;
-    }
-    return '<span class="rank-movement same" title="Platzierung unverändert" aria-label="Unverändert">•</span>';
-  }
-
-  function teamPoints(team) {
-    return team.players.reduce((total, player) => total + playerStats(player).points, 0);
-  }
-
-  function teamStats(team) {
-    return team.players.reduce((total, player) => {
-      const stats = playerStats(player);
-      total.kills += stats.kills;
-      total.deathmatches += stats.deathmatches;
-      total.wins += stats.wins;
-      total.points += stats.points;
-      return total;
-    }, { kills: 0, deathmatches: 0, wins: 0, points: 0 });
-  }
-
-  function roundStats(player, round) {
-    const events = player.events.filter((event) => event.round === round);
-    const kills = events.filter((event) => event.type === "kill").length;
-    const deathmatches = events.filter((event) => event.type === "deathmatch").length;
-    const wins = events.filter((event) => event.type === "win").length;
-    return {
-      kills,
-      deathmatches,
-      wins,
-      killPoints: kills,
-      deathmatchPoints: deathmatches * EVENT_CONFIG.deathmatch.points,
-      winPoints: wins * 5
-    };
-  }
-
-  function sortedTeams(tournament, filter = "") {
-    const term = filter.trim().toLocaleLowerCase("de");
-    return tournament.teams
-      .filter((team) => !term || `${team.name} ${publicTeamLabel(team)}`.toLocaleLowerCase("de").includes(term))
-      .sort((a, b) =>
-        teamPointsThroughRound(b, tournament.currentRound) - teamPointsThroughRound(a, tournament.currentRound) ||
-        publicTeamLabel(a).localeCompare(publicTeamLabel(b), "de")
-      );
-  }
-
-  function sortedPlayers(tournament, filter = "") {
-    const term = filter.trim().toLocaleLowerCase("de");
-    return allPlayers(tournament)
-      .filter(({ player, team }) => !term || `${player.name} ${team.name} ${publicTeamLabel(team)}`.toLocaleLowerCase("de").includes(term))
-      .sort((a, b) =>
-        playerStatsThroughRound(b.player, tournament.currentRound).points - playerStatsThroughRound(a.player, tournament.currentRound).points ||
-        a.player.name.localeCompare(b.player.name, "de")
-      );
-  }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-  function publicPlayerBoxMarkup(player, compact = false) {
-    return `
-      <div class="standing-player-box ${compact ? "compact-name" : ""}">
-        <strong>${escapeHtml(player.name)}</strong>
-      </div>`;
-  }
-
-  function publicTeamPlayersMarkup(players) {
-    return players
-      .map((player) => publicPlayerBoxMarkup(player, players.length >= 3))
-      .join('<span class="standing-plus" aria-hidden="true">+</span>');
-  }
-
-  function formatDateTime(value) {
-    try {
-      return new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-    } catch {
-      return "Unbekannter Zeitpunkt";
-    }
-  }
-
-  function route() {
-    const isAdmin = location.hash.toLowerCase() === "#admin";
-    document.body.classList.toggle("public-mode", !isAdmin);
-    document.body.classList.toggle("admin-mode", isAdmin);
-    $("#rankingView").hidden = isAdmin;
-    $("#adminView").hidden = !isAdmin;
-    $$(".admin-only").forEach((element) => { element.hidden = !isAdmin; });
-    $$('[data-nav]').forEach((link) => link.classList.toggle("active", link.dataset.nav === (isAdmin ? "admin" : "ranking")));
-    document.title = isAdmin ? "Survival Games – Admin-Panel" : "Turnier Rangliste";
-    closePopover();
-    renderAll();
-  }
-
-  function renderTournamentSelects() {
-    const options = state.tournaments.map((tournament) => `<option value="${tournament.id}" ${tournament.id === state.activeTournamentId ? "selected" : ""}>${escapeHtml(tournament.name)} · ${MODE_LABELS[tournament.mode]}</option>`).join("");
+  function renderAll() { renderSelects(); renderPublic(); if (isAdmin) renderAdmin(); }
+  function renderSelects() {
+    const options = state.tournaments.map((t) => `<option value="${t.id}" ${t.id === state.activeTournamentId ? "selected" : ""}>${escapeHtml(t.name)}</option>`).join("");
     $("#publicTournamentSelect").innerHTML = options;
     $("#adminTournamentSelect").innerHTML = options;
   }
 
-  function renderAll() {
-    renderTournamentSelects();
-    renderPublic();
-    renderAdmin();
+  function showPublicFailure(message) {
+    $("#publicRankingRows").innerHTML = `<div class="empty-state standings-empty"><h3>Verbindung fehlgeschlagen</h3><p>${escapeHtml(message)}</p></div>`;
+    $("#publicEmpty").hidden = true;
   }
 
   function renderPublic() {
-    const tournament = getActiveTournament();
-    if (!tournament) return;
-
-    if (tournament.mode === 1) publicRankingView = "individual";
+    if (loading) { $("#publicRankingRows").innerHTML = '<div class="empty-state standings-empty"><h3>Live-Daten werden geladen …</h3></div>'; return; }
+    const tournament = getTournament();
+    if (!tournament) {
+      $("#publicTournamentTitle").textContent = "Bloxdio Turnier 22.08.";
+      $("#publicRankingRows").innerHTML = ""; $("#publicEmpty").hidden = false; $("#publicRankingHead").hidden = true; return;
+    }
     $("#publicTournamentTitle").textContent = tournament.name;
-    $("#publicTournamentSubtitle").textContent = "";
-    $("#publicUpdatedAt").textContent = `UPDATED ${formatDateTime(tournament.updatedAt)}`;
-    $("#publicMode").textContent = MODE_LABELS[tournament.mode];
-    $("#publicModeBadge").textContent = MODE_LABELS[tournament.mode].toUpperCase();
+    $("#publicModeBadge").textContent = MODE_LABELS[tournament.mode];
     $("#publicRoundBadge").textContent = tournament.currentRound;
-    $("#publicGroupCountLabel").textContent = tournament.mode === 1 ? "Teilnehmer" : "Teams";
-    $("#publicGroupCount").textContent = tournament.teams.length;
-    $("#publicPlayerCount").textContent = allPlayers(tournament).length;
-    $("#publicCurrentRound").textContent = tournament.currentRound;
-
-    const toggle = $("#rankingViewToggle");
-    toggle.hidden = tournament.mode === 1;
-    $$('[data-ranking-view]', toggle).forEach((button) => button.classList.toggle("active", button.dataset.rankingView === publicRankingView));
-
-    const search = $("#publicSearch").value || "";
-    if (publicRankingView === "team" && tournament.mode > 1) renderPublicTeams(tournament, search);
-    else renderPublicIndividuals(tournament, search);
-  }
-
-  function renderPublicTeams(tournament, search) {
-    const teams = sortedTeams(tournament, search);
-    const currentRanks = teamRankMap(tournament, tournament.currentRound);
-    const previousRanks = tournament.currentRound > 1
-      ? teamRankMap(tournament, tournament.currentRound - 1)
-      : new Map();
-
-    $("#rankingHeading").textContent = "Teamwertung";
-    $("#publicRankingHead").innerHTML = "";
-    $("#publicRankingRows").innerHTML = teams.map((team) => {
-      const rank = currentRanks.get(team.id);
-      const points = teamPointsThroughRound(team, tournament.currentRound);
-
-      return `
-        <div class="standing-row team-size-${team.players.length}" role="row" data-detail-team-id="${team.id}">
-          <div class="standing-rank-box" role="cell">
-            ${movementMarkup(rank, previousRanks.get(team.id), tournament.currentRound)}
-            <span class="rank-number">${placementLabel(rank)}</span>
-          </div>
-
-          <div class="standing-team-boxes" role="cell">
-            ${publicTeamPlayersMarkup(team.players)}
-          </div>
-
-          <div class="standing-points-box" role="cell">
-            <strong>${points}</strong><span>PTS</span>
-          </div>
-        </div>`;
+    $("#publicUpdatedAt").textContent = tournament.updatedAt ? `Aktualisiert ${new Date(tournament.updatedAt).toLocaleString("de-DE")}` : "Live";
+    $$("[data-ranking-view]").forEach((button) => button.classList.toggle("active", button.dataset.rankingView === rankingView));
+    $$("[data-ranking-view='team']").forEach((button) => { button.disabled = tournament.mode === 1; });
+    const individual = rankingView === "individual" || tournament.mode === 1;
+    const currentRanks = rankMaps(tournament, tournament.currentRound, individual);
+    const previousRanks = rankMaps(tournament, Math.max(1, tournament.currentRound - 1), individual);
+    const entries = (individual ? allPlayers(tournament) : tournament.teams).slice().sort((a, b) => currentRanks.get(individual ? a.player.id : a.id) - currentRanks.get(individual ? b.player.id : b.id));
+    $("#publicRankingHead").hidden = entries.length === 0;
+    $("#publicRankingHead").innerHTML = '<span>PLATZ</span><span>SPIELER</span><span>PTS</span>';
+    $("#publicRankingRows").innerHTML = entries.map((entry) => {
+      const id = individual ? entry.player.id : entry.id;
+      const points = individual ? statsThrough(entry.player).points : teamPoints(entry);
+      const players = individual ? [entry.player] : entry.players;
+      const boxes = players.map((player) => `<span class="ranking-player-box">${escapeHtml(player.name)}</span>`).join('<span class="ranking-player-plus">+</span>');
+      return `<button class="ranking-row ranking-entry" data-team-id="${individual ? entry.team.id : entry.id}" data-player-id="${individual ? entry.player.id : ""}" type="button"><span class="ranking-place">${currentRanks.get(id)}${movement(currentRanks.get(id), previousRanks.get(id), tournament.currentRound)}</span><span class="ranking-player-stack">${boxes}</span><strong class="ranking-points">${points}<small>PTS</small></strong></button>`;
     }).join("");
-
-    updatePublicEmpty(teams.length);
-    $("#rowHint").textContent = "";
-  }
-
-  function renderPublicIndividuals(tournament, search) {
-    const players = sortedPlayers(tournament, search);
-    const currentRanks = playerRankMap(tournament, tournament.currentRound);
-    const previousRanks = tournament.currentRound > 1
-      ? playerRankMap(tournament, tournament.currentRound - 1)
-      : new Map();
-
-    $("#rankingHeading").textContent = "Einzelwertung";
-    $("#publicRankingHead").innerHTML = "";
-    $("#publicRankingRows").innerHTML = players.map(({ player, team }) => {
-      const stats = playerStatsThroughRound(player, tournament.currentRound);
-      const rank = currentRanks.get(player.id);
-
-      return `
-        <div class="standing-row solo-standing-row" role="row" data-detail-player-id="${player.id}" data-detail-team-id="${team.id}">
-          <div class="standing-rank-box" role="cell">
-            ${movementMarkup(rank, previousRanks.get(player.id), tournament.currentRound)}
-            <span class="rank-number">${placementLabel(rank)}</span>
-          </div>
-
-          <div class="standing-team-boxes single-player-box" role="cell">
-            ${publicPlayerBoxMarkup(player)}
-          </div>
-
-          <div class="standing-points-box" role="cell">
-            <strong>${stats.points}</strong><span>PTS</span>
-          </div>
-        </div>`;
-    }).join("");
-
-    updatePublicEmpty(players.length);
-    $("#rowHint").textContent = "";
-  }
-
-  function updatePublicEmpty(count) {
-    $("#publicEmpty").hidden = count !== 0;
-    $(".ranking-table").hidden = count === 0;
+    $("#publicEmpty").hidden = entries.length > 0;
   }
 
   function renderAdmin() {
-    const tournament = getActiveTournament();
-    if (!tournament) return;
-    const playerCount = allPlayers(tournament).length;
+    const tournament = getTournament();
+    if (!tournament) {
+      $("#adminMode").textContent = "–"; $("#adminGroups").innerHTML = ""; $("#adminEmpty").hidden = false; return;
+    }
     $("#adminMode").textContent = MODE_LABELS[tournament.mode];
-    $("#adminModeDescription").textContent = tournament.mode === 1 ? "Jeder Eintrag ist ein einzelner Spieler." : `Jeder neue Eintrag besteht automatisch aus ${tournament.mode} Spielern.`;
-    const editingRound = Math.min(tournament.currentRound, Math.max(1, tournament.editingRound || tournament.currentRound));
-    tournament.editingRound = editingRound;
+    $("#adminModeDescription").textContent = `${tournament.mode} Spieler pro Team`;
     $("#adminCurrentRound").textContent = tournament.currentRound;
-    $("#adminHeadRound").textContent = editingRound;
-    renderRoundEditor(tournament);
-    $("#adminParticipants").textContent = playerCount;
-    $("#adminTeamsSummary").textContent = tournament.mode === 1 ? `${tournament.teams.length} Einzelspieler` : `${tournament.teams.length} Teams`;
-    $("#deleteTournamentButton").disabled = state.tournaments.length <= 1;
-    $("#adminEmptyText").textContent = tournament.mode === 1 ? "Lege den ersten Einzelspieler an." : `Lege das erste ${MODE_LABELS[tournament.mode]}-Team an.`;
-
-    const term = $("#adminSearch").value.trim().toLocaleLowerCase("de");
-    const teams = tournament.teams.filter((team) => !term || `${team.name} ${team.players.map((player) => player.name).join(" ")}`.toLocaleLowerCase("de").includes(term));
-    const visiblePlayerCount = teams.reduce((sum, team) => sum + team.players.length, 0);
-    $("#adminResultCount").textContent = `${visiblePlayerCount} Spieler`;
-
-    $("#adminGroups").innerHTML = teams.map((team) => {
-      const teamStyle = tournament.mode > 1 ? `--team-color:${team.color}` : "";
-      const heading = tournament.mode > 1 ? `
-        <div class="admin-team-heading" style="${teamStyle}">
-          <div><strong>${escapeHtml(team.name)}</strong><small>${team.players.map((player) => escapeHtml(player.name)).join(" ♦ ")}</small></div>
-          <div class="team-heading-score">${teamPoints(team)} Punkte</div>
-        </div>` : "";
-      const rows = team.players.map((player) => renderAdminPlayerRow(tournament, team, player)).join("");
-      return `<section class="admin-team-group" data-team-id="${team.id}">${heading}${rows}</section>`;
+    $("#adminEditingRound").textContent = `Runde ${tournament.editingRound}`;
+    $("#adminHeadRound").textContent = tournament.editingRound;
+    $("#adminParticipants").textContent = allPlayers(tournament).length;
+    $("#adminTeamsSummary").textContent = `${tournament.teams.length} ${tournament.mode === 1 ? "Teilnehmer" : "Teams"}`;
+    $("#adminRoundTabs").innerHTML = Array.from({ length: tournament.currentRound }, (_, index) => `<button type="button" class="round-tab ${index + 1 === tournament.editingRound ? "active" : ""}" data-round="${index + 1}">R ${index + 1}<span data-delete-round="${index + 1}" title="Runde löschen">×</span></button>`).join("");
+    const filter = $("#adminSearch").value.trim().toLowerCase();
+    let count = 0;
+    $("#adminGroups").innerHTML = tournament.teams.map((team) => {
+      const rows = team.players.filter((player) => !filter || player.name.toLowerCase().includes(filter) || team.name.toLowerCase().includes(filter)).map((player) => {
+        count += 1; const total = statsThrough(player); const round = statsThrough({ events: player.events.filter((event) => event.round === tournament.editingRound) });
+        return `<article class="admin-player-row" data-player-id="${player.id}" data-team-id="${team.id}"><div><strong>${escapeHtml(player.name)}</strong><small>K ${total.kills} · DM ${total.deathmatches} · S ${total.wins}</small></div><span><i class="team-color-dot" style="background:${escapeHtml(team.color)}"></i>${escapeHtml(team.name)}</span><strong>${total.points} PTS</strong><span>K ${round.kills} · DM ${round.deathmatches} · S ${round.wins}</span><div class="admin-row-actions"><button data-event-type="kill" type="button">Kill +1</button><button data-event-type="deathmatch" type="button">DM +3</button><button data-event-type="win" type="button">Sieg +2</button><button data-history type="button">History</button><button data-delete-player type="button">×</button></div></article>`;
+      }).join("");
+      return rows ? `<section class="admin-team-group"><header><i style="background:${escapeHtml(team.color)}"></i>${escapeHtml(team.name)}<button data-delete-team="${team.id}" type="button">Team löschen</button></header>${rows}</section>` : "";
     }).join("");
-
-    $("#adminEmpty").hidden = teams.length !== 0;
+    $("#adminResultCount").textContent = `${count} Spieler`;
+    $("#adminEmpty").hidden = tournament.teams.length > 0;
   }
 
-  function renderRoundEditor(tournament) {
-    const editingRound = tournament.editingRound || tournament.currentRound;
-    $("#adminEditingRound").textContent = `Runde ${editingRound}`;
-    $("#roundEditingNote").textContent = editingRound === tournament.currentRound
-      ? "Du bearbeitest die aktuelle Runde."
-      : `Du bearbeitest nachträglich Runde ${editingRound}.`;
-
-    $("#adminRoundTabs").innerHTML = Array.from({ length: tournament.currentRound }, (_, index) => index + 1)
-      .map((round) => `
-        <div class="round-tab-wrap ${round === editingRound ? "active" : ""}">
-          <button class="round-tab ${round === editingRound ? "active" : ""} ${round === tournament.currentRound ? "current" : ""}" type="button" data-edit-round="${round}">
-            Runde ${round}${round === tournament.currentRound ? "<small>aktuell</small>" : ""}
-          </button>
-          <button
-            class="round-delete-button"
-            type="button"
-            data-delete-round="${round}"
-            title="${tournament.currentRound <= 1 ? "Mindestens eine Runde muss bestehen bleiben" : `Runde ${round} löschen`}"
-            aria-label="Runde ${round} löschen"
-            ${tournament.currentRound <= 1 ? "disabled" : ""}
-          >×</button>
-        </div>
-      `).join("");
-
-    $("#roundBackButton").disabled = editingRound <= 1;
-    $("#roundForwardButton").disabled = editingRound >= tournament.currentRound;
-    $("#jumpCurrentRoundButton").disabled = editingRound === tournament.currentRound;
-  }
-
-  function renderAdminPlayerRow(tournament, team, player) {
-    const stats = playerStats(player);
-    const current = roundStats(player, tournament.editingRound || tournament.currentRound);
-    const colorStyle = tournament.mode > 1 ? `--team-color:${team.color}` : "";
-    return `
-      <article class="admin-player-row" data-player-id="${player.id}" data-team-id="${team.id}" style="${colorStyle}">
-        <div class="admin-player">
-          <div>
-            <strong>${escapeHtml(player.name)}</strong>
-            <small>K ${stats.kills} · DM ${stats.deathmatches} · S ${stats.wins}</small>
-          </div>
-        </div>
-        <div class="admin-team-name">${tournament.mode === 1 ? '<span class="entity-sub">Solo</span>' : escapeHtml(team.name)}</div>
-        <div class="admin-points">${stats.points}</div>
-        <div class="round-action-cell">
-          <button class="event-button kill" type="button" data-event-type="kill">Kill +1${current.kills ? ` · ${current.kills}×` : ""}</button>
-          <button class="event-button dm" type="button" data-event-type="deathmatch">DM +3${current.deathmatches ? ` · ${current.deathmatches}×` : ""}</button>
-          <button class="event-button win" type="button" data-event-type="win">Sieg +5${current.wins ? ` · ${current.wins}×` : ""}</button>
-        </div>
-        <div class="row-actions">
-          <button class="mini-button" type="button" data-action="history" title="Historie anzeigen" aria-label="Historie anzeigen">↶</button>
-          <button class="mini-button delete" type="button" data-action="delete" title="Spieler oder Team löschen" aria-label="Löschen">×</button>
-        </div>
-      </article>`;
-  }
-
-  function renderDetail(teamId, focusPlayerId = "") {
-    const tournament = getActiveTournament();
-    const team = tournament.teams.find((item) => item.id === teamId);
-    if (!team) return;
-    const isSolo = tournament.mode === 1;
-    const players = focusPlayerId ? team.players.filter((player) => player.id === focusPlayerId) : team.players;
-    const total = focusPlayerId ? playerStats(players[0]).points : teamPoints(team);
-
-    $("#detailEyebrow").textContent = isSolo || focusPlayerId ? "Spielerprofil" : `${MODE_LABELS[tournament.mode]}-Profil`;
-    $("#detailModalTitle").textContent = focusPlayerId ? players[0].name : publicTeamLabel(team);
-    $("#detailPlayerNames").textContent = focusPlayerId
-      ? (isSolo ? "Solo-Turnier" : `Einzelwertung · ${publicTeamLabel(team)}`)
-      : `${MODE_LABELS[tournament.mode]} · ${team.players.length} Spieler`;
-    $("#detailTotalPoints").textContent = total;
-    $("#detailScoreGhost").textContent = total;
+  function renderDetail(teamId, playerId = "") {
+    const tournament = getTournament(); const team = tournament?.teams.find((item) => item.id === teamId); if (!team) return;
+    const players = playerId ? team.players.filter((player) => player.id === playerId) : team.players;
+    $("#detailModalTitle").textContent = players.map((player) => player.name).join(" + ");
+    $("#detailPlayerNames").textContent = `${MODE_LABELS[players.length] || "Einzel"} · ${players.length} Spieler`;
+    $("#detailTotalPoints").textContent = players.reduce((sum, player) => sum + statsThrough(player).points, 0);
     $("#detailRoundNumber").textContent = tournament.currentRound;
-    $("#detailPlayersGrid").innerHTML = players
-      .map((player) => renderPlayerProfileCard(tournament, player))
-      .join('<div class="detail-team-plus" aria-hidden="true">+</div>');
+    $("#detailPlayersGrid").innerHTML = players.map((player, index) => {
+      const stats = statsThrough(player);
+      const history = Array.from({ length: tournament.currentRound }, (_, r) => { const s = statsThrough({ events: player.events.filter((e) => e.round === r + 1) }); return `<li><b>Runde ${r + 1}</b><span>K ${s.kills} · DM ${s.deathmatches} · S ${s.wins} · ${s.points} PTS</span></li>`; }).join("");
+      return `${index ? '<span class="detail-player-plus">+</span>' : ""}<article class="detail-player-card"><h3>${escapeHtml(player.name)}</h3><strong>${stats.points} PTS</strong><div class="profile-stats"><span>KILLS <b>${stats.kills}</b></span><span>DM <b>${stats.deathmatches}</b></span><span>SIEGE <b>${stats.wins}</b></span></div><ul class="match-history">${history}</ul></article>`;
+    }).join("");
     openModal("detailModal");
   }
 
-  function renderPlayerProfileCard(tournament, player) {
-    const stats = playerStats(player);
-    const rounds = Array.from({ length: tournament.currentRound }, (_, index) => index + 1);
+  async function checkAdminSession(message = "") {
+    $("#adminAuthLoading").hidden = false; $("#adminLoginForm").hidden = true; $("#adminContent").hidden = true;
+    if (!db) { showLogin("Die Verbindung zum Login-Dienst konnte nicht hergestellt werden."); return; }
+    const { data: { session }, error } = await db.auth.getSession();
+    if (error || !session) { isAdmin = false; showLogin(message); return; }
+    const result = await db.rpc("is_admin");
+    if (result.error || result.data !== true) { await db.auth.signOut(); isAdmin = false; showLogin("Kein Admin-Zugriff"); return; }
+    isAdmin = true; $("#adminAuthLoading").hidden = true; $("#adminLoginForm").hidden = true; $("#adminContent").hidden = false; renderAdmin();
+  }
+  function showLogin(message = "") { $("#adminAuthLoading").hidden = true; $("#adminLoginForm").hidden = false; $("#adminContent").hidden = true; $("#adminLoginError").textContent = message; }
+  async function login(event) {
+    event.preventDefault(); if (!db) return showLogin("Die Verbindung zum Login-Dienst konnte nicht hergestellt werden."); const button = event.submitter; button.disabled = true; $("#adminLoginError").textContent = "";
+    const result = await db.auth.signInWithPassword({ email: $("#adminEmail").value.trim(), password: $("#adminPassword").value });
+    button.disabled = false; if (result.error) { showLogin("Anmeldung fehlgeschlagen. Bitte Zugangsdaten prüfen."); return; } await checkAdminSession();
+  }
+  async function logout() { await db.auth.signOut(); isAdmin = false; showLogin("Erfolgreich abgemeldet."); }
 
-    return `
-      <article class="player-profile-card">
-        <div class="detail-player-standing">
-          <div class="detail-player-name-box">
-            <strong>${escapeHtml(player.name)}</strong>
-          </div>
-          <div class="detail-player-points-box">
-            <strong>${stats.points}</strong><span>PTS</span>
-          </div>
-        </div>
-
-        <div class="profile-stat-grid">
-          <div class="profile-stat kill"><span>KILLS</span><strong>${stats.kills}</strong></div>
-          <div class="profile-stat dm"><span>DEATHMATCHES</span><strong>${stats.deathmatches}</strong></div>
-          <div class="profile-stat win"><span>WINS</span><strong>${stats.wins}</strong></div>
-        </div>
-
-        <div class="match-history">
-          <h3>MATCH HISTORY</h3>
-          <div class="round-history-list">
-            ${rounds.map((round) => {
-              const data = roundStats(player, round);
-              return `
-                <div class="round-history-row">
-                  <strong>ROUND ${round}</strong>
-                  <span>KILL <b>+${data.killPoints}</b></span>
-                  <span>DEATHMATCH <b>+${data.deathmatchPoints}</b></span>
-                  <span>WIN <b>+${data.winPoints}</b></span>
-                </div>`;
-            }).join("")}
-          </div>
-        </div>
-      </article>`;
+  function route() {
+    const admin = location.hash === "#admin";
+    $("#rankingView").hidden = admin; $("#adminView").hidden = !admin; $("#addButton").hidden = !admin || !isAdmin;
+    if (admin) checkAdminSession();
   }
 
-  function renderHistory() {
-    const tournament = getActiveTournament();
-    const pair = allPlayers(tournament).find(({ player }) => player.id === activeHistoryPlayerId);
-    if (!pair) return;
-    const { player, team } = pair;
-    const stats = playerStats(player);
-    $("#historyModalTitle").textContent = `Historie · ${player.name}`;
-
-    const roundBlocks = Array.from({ length: tournament.currentRound }, (_, index) => tournament.currentRound - index)
-      .map((round) => {
-        const events = player.events.filter((event) => event.round === round).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        const content = events.length ? events.map((event) => `
-          <div class="history-item">
-            <div><strong>${EVENT_CONFIG[event.type].label} +${EVENT_CONFIG[event.type].points}</strong><small>${escapeHtml(formatDateTime(event.createdAt))}</small></div>
-            <span class="history-delta">+${EVENT_CONFIG[event.type].points}</span>
-            <button class="history-remove" type="button" data-history-event-id="${event.id}">Eintrag entfernen</button>
-          </div>`).join("") : `<div class="history-empty">In dieser Runde gibt es noch keine Aktionen.</div>`;
-        return `<section class="history-round"><div class="history-round-heading">Runde ${round}</div>${content}</section>`;
-      }).join("");
-
-    $("#historyContent").innerHTML = `
-      <div class="history-summary">
-        <div><span>Spieler</span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(tournament.mode === 1 ? "Solo" : team.name)}</small></div>
-        <div><span>Aktueller Stand</span><strong class="history-total">${stats.points}</strong></div>
-      </div>${roundBlocks}`;
+  async function performWrite(action, success, button = null) {
+    if (writeBusy) return false; writeBusy = true; if (button) button.disabled = true;
+    try { const result = await action(); if (result?.error) throw result.error; await loadData({ quiet: true }); if (success) showToast(success); return true; }
+    catch (error) { showToast(friendlyError(error), "error"); return false; }
+    finally { writeBusy = false; if (button) button.disabled = false; }
   }
 
-  function togglePopover() { $("#addPopover").hidden = !$("#addPopover").hidden; }
-  function closePopover() { $("#addPopover").hidden = true; }
-  function openModal(id) { closePopover(); $("#" + id).hidden = false; document.body.style.overflow = "hidden"; }
-  function closeModal(id) {
-    $("#" + id).hidden = true;
-    if (!$$('.modal-backdrop').some((element) => !element.hidden)) document.body.style.overflow = "";
+  async function createTournament(event) {
+    event.preventDefault(); const name = $("#tournamentNameInput").value.trim(); if (!name || !selectedMode) return;
+    if (await performWrite(() => db.from("tournaments").insert({ name, mode: selectedMode, current_round: 1, editing_round: 1 }).select().single(), "Turnier erstellt.", event.submitter)) closeModal("tournamentModal");
   }
 
-  function resetTournamentForm() {
-    selectedTournamentMode = 0;
-    $("#tournamentForm").reset();
-    $("#saveTournamentButton").disabled = true;
-    $("#modeExplanation").textContent = "Wähle einen Modus aus.";
-    $$("#tournamentModePicker button").forEach((button) => button.classList.remove("active"));
+  async function createParticipant(event) {
+    event.preventDefault(); const tournament = getTournament(); if (!tournament) return;
+    const names = $$(".player-name-input").map((input) => input.value.trim());
+    if (names.length !== tournament.mode || names.some((name) => !name)) return showToast("Bitte alle Spielernamen ausfüllen.", "error");
+    const existing = allPlayers(tournament).map(({ player }) => player.name.toLowerCase());
+    if (new Set(names.map((name) => name.toLowerCase())).size !== names.length || names.some((name) => existing.includes(name.toLowerCase()))) return showToast("Spielernamen müssen eindeutig sein.", "error");
+    const color = tournament.mode === 1 ? { label: names[0], hex: "" } : COLOR_BY_NAME.get($("#teamNameInput").value.toLowerCase());
+    if (tournament.teams.some((team) => team.name.toLowerCase() === color.label.toLowerCase())) return showToast("Dieses Team existiert bereits.", "error");
+    const ok = await performWrite(async () => {
+      const teamResult = await db.from("teams").insert({ tournament_id: tournament.id, name: color.label, color: color.hex }).select().single(); if (teamResult.error) return teamResult;
+      return db.from("players").insert(names.map((name) => ({ tournament_id: tournament.id, team_id: teamResult.data.id, name })));
+    }, "Teilnehmer angelegt.", event.submitter);
+    if (ok) closeModal("participantModal");
   }
 
-  function chooseTournamentMode(mode) {
-    selectedTournamentMode = mode;
-    $$("#tournamentModePicker button").forEach((button) => button.classList.toggle("active", Number(button.dataset.mode) === mode));
-    $("#saveTournamentButton").disabled = false;
-    $("#modeExplanation").textContent = mode === 1
-      ? "Solo: Jeder neue Teilnehmer besteht aus genau einem Spieler. Die öffentliche Rangliste zeigt direkt die Einzelwertung."
-      : `${MODE_LABELS[mode]}: Jeder neue Teilnehmer ist automatisch ein Team mit genau ${mode} Spielern. Standardmäßig wird öffentlich die Teamwertung angezeigt.`;
+  async function addEvent(playerId, type, button) {
+    const tournament = getTournament(); await performWrite(() => db.from("events").insert({ player_id: playerId, round: tournament.editingRound, type, points: EVENT_CONFIG[type].points }), `${EVENT_CONFIG[type].label} eingetragen.`, button);
   }
-
-  function createTournament(event) {
-    event.preventDefault();
-    const name = $("#tournamentNameInput").value.trim();
-    if (!name || !selectedTournamentMode) return;
-    const now = isoNow();
-    const tournament = { id: uid("tournament"), name, mode: selectedTournamentMode, currentRound: 1, editingRound: 1, createdAt: now, updatedAt: now, teams: [] };
-    state.tournaments.push(tournament);
-    state.activeTournamentId = tournament.id;
-    publicRankingView = tournament.mode === 1 ? "individual" : "team";
-    closeModal("tournamentModal");
-    resetTournamentForm();
-    persistState(`${name} wurde als ${MODE_LABELS[tournament.mode]}-Turnier erstellt.`);
-  }
-
-  function getTeamColorDef(label) {
-    return TEAM_COLOR_BY_NAME[String(label || "").trim().toLocaleLowerCase("en")] || TEAM_COLOR_DEFS[0];
-  }
-
-  function syncTeamColorSelection() {
-    const selected = getTeamColorDef($("#teamNameInput").value);
-    $("#teamColorInput").value = selected.hex;
-    $("#teamColorValue").textContent = selected.label;
-    $("#teamColorSwatch").style.background = selected.hex;
-  }
-
-  function resetParticipantForm() {
-    const tournament = getActiveTournament();
-    if (!tournament) return;
-
-    $("#participantForm").reset();
-    const isTeam = tournament.mode > 1;
-
-    $("#teamOptions").hidden = !isTeam;
-    $("#playersStepNumber").textContent = isTeam ? "2" : "1";
-    $("#playersSectionTitle").textContent = isTeam ? `${MODE_LABELS[tournament.mode]}-Spieler eintragen` : "Spieler eintragen";
-    $("#playersSectionHint").textContent = `Genau ${tournament.mode} Spieler anlegen. Alle starten bei 0 Punkten.`;
-
-    if (isTeam) {
-      const used = new Set(tournament.teams.map((team) => team.name.toLocaleLowerCase("en")));
-      const firstFree = TEAM_COLOR_DEFS.find((item) => !used.has(item.label.toLocaleLowerCase("en"))) || TEAM_COLOR_DEFS[0];
-      $("#teamNameInput").value = firstFree.label;
-      syncTeamColorSelection();
-    }
-
-    renderPlayerFields(tournament.mode);
-  }
-
-  function renderPlayerFields(count) {
-    const container = $("#playerFields");
-    const template = $("#playerFieldTemplate");
-    container.innerHTML = "";
-
-    for (let index = 0; index < count; index += 1) {
-      const fragment = template.content.cloneNode(true);
-      $(".player-form-number", fragment).textContent = index + 1;
-      container.appendChild(fragment);
-    }
-  }
-
-  function createParticipant(event) {
-    event.preventDefault();
-
-    const tournament = getActiveTournament();
-    const names = $$(".player-name-input", $("#playerFields")).map((input) => input.value.trim());
-
-    if (names.some((name) => !name)) {
-      showToast("Bitte trage für jeden Spieler einen Namen ein.", "error");
-      return;
-    }
-
-    const players = names.map((name) => makePlayer(name, []));
-    let team;
-
-    if (tournament.mode === 1) {
-      team = { id: uid("solo"), name: names[0], color: "", players };
-    } else {
-      const selected = getTeamColorDef($("#teamNameInput").value);
-
-      if (tournament.teams.some((item) => item.name.toLocaleLowerCase("en") === selected.label.toLocaleLowerCase("en"))) {
-        showToast(`${selected.label} ist bereits als Teamfarbe vergeben.`, "error");
-        return;
-      }
-
-      team = {
-        id: uid("team"),
-        name: selected.label,
-        color: selected.hex,
-        players
-      };
-    }
-
-    tournament.teams.push(team);
-    closeModal("participantModal");
-
-    persistState(
-      tournament.mode === 1
-        ? `${names[0]} wurde mit 0 Punkten angelegt.`
-        : `${team.name} wurde mit ${players.length} Spielern angelegt.`
-    );
-  }
-
-  function addEvent(playerId, type) {
-    const tournament = getActiveTournament();
-    const pair = allPlayers(tournament).find(({ player }) => player.id === playerId);
-    if (!pair || !EVENT_CONFIG[type]) return;
-    const targetRound = tournament.editingRound || tournament.currentRound;
-    pair.player.events.push({ id: uid("event"), round: targetRound, type, points: EVENT_CONFIG[type].points, createdAt: isoNow() });
-    persistState(`${EVENT_CONFIG[type].label} (+${EVENT_CONFIG[type].points}) für ${pair.player.name} in Runde ${targetRound}.`);
-  }
-
-  function deleteAdminEntity(teamId, playerId) {
-    const tournament = getActiveTournament();
-    const team = tournament.teams.find((item) => item.id === teamId);
-    if (!team) return;
-
-    if (tournament.mode > 1) {
-      if (!confirm(`Soll das komplette Team „${team.name}“ inklusive aller Spieler und Statistiken gelöscht werden?`)) return;
-      tournament.teams = tournament.teams.filter((item) => item.id !== teamId);
-      persistState(`${team.name} wurde gelöscht.`);
-    } else {
-      const player = team.players.find((item) => item.id === playerId);
-      if (!player || !confirm(`Soll ${player.name} gelöscht werden?`)) return;
-      tournament.teams = tournament.teams.filter((item) => item.id !== teamId);
-      persistState(`${player.name} wurde gelöscht.`);
-    }
-  }
-
-  function setEditingRound(round) {
-    const tournament = getActiveTournament();
-    const next = Math.min(tournament.currentRound, Math.max(1, Math.round(Number(round) || 1)));
-    tournament.editingRound = next;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    renderAdmin();
-  }
-
-  function nextRound() {
-    const tournament = getActiveTournament();
-    const currentRound = tournament.currentRound;
-    if (!confirm(`Runde ${currentRound} beenden und Runde ${currentRound + 1} starten? Frühere Runden bleiben weiterhin bearbeitbar.`)) return;
-    tournament.currentRound += 1;
-    tournament.editingRound = tournament.currentRound;
-    persistState(`Runde ${currentRound} wurde beendet. Runde ${tournament.currentRound} ist jetzt aktiv und zur Bearbeitung ausgewählt.`);
-  }
-
-  function deleteRound(round) {
-    const tournament = getActiveTournament();
-    const targetRound = Math.max(1, Math.round(Number(round) || 1));
-
-    if (tournament.currentRound <= 1) {
-      showToast("Mindestens eine Runde muss bestehen bleiben.", "error");
-      return;
-    }
-
-    if (targetRound > tournament.currentRound) return;
-
-    if (!confirm(
-      `Runde ${targetRound} wirklich löschen? Alle Kills, Deathmatches und Siege dieser Runde werden entfernt. Spätere Runden rücken automatisch eine Nummer nach vorne.`
-    )) return;
-
-    for (const { player } of allPlayers(tournament)) {
-      player.events = player.events
-        .filter((event) => event.round !== targetRound)
-        .map((event) => ({
-          ...event,
-          round: event.round > targetRound ? event.round - 1 : event.round
-        }));
-    }
-
-    tournament.currentRound -= 1;
-
-    if (tournament.editingRound > targetRound) {
-      tournament.editingRound -= 1;
-    } else if (tournament.editingRound === targetRound) {
-      tournament.editingRound = Math.min(targetRound, tournament.currentRound);
-    }
-
-    tournament.editingRound = Math.max(1, Math.min(tournament.currentRound, tournament.editingRound));
-    persistState(`Runde ${targetRound} wurde gelöscht. Spätere Runden wurden neu nummeriert.`);
-  }
-
-  function removeHistoryEvent(eventId) {
-    const tournament = getActiveTournament();
-    const pair = allPlayers(tournament).find(({ player }) => player.id === activeHistoryPlayerId);
-    if (!pair) return;
-    const event = pair.player.events.find((item) => item.id === eventId);
-    if (!event) return;
-    pair.player.events = pair.player.events.filter((item) => item.id !== eventId);
-    persistState(`${EVENT_CONFIG[event.type].label} aus Runde ${event.round} wurde entfernt.`);
-    renderHistory();
-  }
-
-  function deleteTournament() {
-    if (state.tournaments.length <= 1) {
-      showToast("Mindestens ein Turnier muss bestehen bleiben.", "error");
-      return;
-    }
-    const tournament = getActiveTournament();
-    if (!confirm(`Soll das Turnier „${tournament.name}“ inklusive aller Teams und Statistiken gelöscht werden?`)) return;
-    state.tournaments = state.tournaments.filter((item) => item.id !== tournament.id);
-    state.activeTournamentId = state.tournaments[0].id;
-    publicRankingView = state.tournaments[0].mode === 1 ? "individual" : "team";
-    persistState(`${tournament.name} wurde gelöscht.`, false);
-  }
-
-  function importInstructions(tournament) {
-    const targetRound = tournament.editingRound || tournament.currentRound;
-
-    if (tournament.mode === 1) {
-      return `Importiert wird in Runde ${targetRound}.
-
-Solo-Beispiel:
-Lime Green: huebscherMann: k:3 dm:1 w:1
-
-Bedeutung:
-k:3 = 3 einzelne Kills = 3 × +1
-dm:1 = 1 Deathmatch = +3
-w:1 = 1 Sieg = +5
-/ = keine Aktion in dieser Runde
-
-Ein erneuter Import ersetzt für den genannten Spieler die Werte dieser Runde.`;
-    }
-
-    return `Importiert wird in Runde ${targetRound}.
-
-Erlaubte Teamfarben:
-${TEAM_COLOR_DEFS.map((item) => item.label).join(", ")}
-
-Beispiel:
-Lime Green: huebscherMann: k:3 dm:1 w:1, Muiiq: k:2 dm:1,
-Cyan: Laradic: k:1, bauerb: /,
-Dark Blue: dicmic: k:2, sismas: dm:1,
-
-Bedeutung:
-k:3 = drei separate Kill-Ereignisse = 3 × +1
-dm:1 = ein Deathmatch-Ereignis = +3
-w:1 = ein Sieg-Ereignis = +5
-/ = 0 Kills, 0 Deathmatches, 0 Siege
-
-Die Farbe dient nur als interne Team-Zuordnung. Sie erscheint nicht in der öffentlichen Rangliste.
-Ein erneuter Import ersetzt für die genannten Spieler die Werte der ausgewählten Runde.`;
-  }
+  async function setEditingRound(round) { const tournament = getTournament(); await performWrite(() => db.from("tournaments").update({ editing_round: round }).eq("id", tournament.id), `Runde ${round} ausgewählt.`); }
+  async function nextRound() { const t = getTournament(); await performWrite(() => db.from("tournaments").update({ current_round: t.currentRound + 1, editing_round: t.currentRound + 1 }).eq("id", t.id), "Neue Runde gestartet."); }
+  async function deleteRound(round) { const t = getTournament(); if (!confirm(`Runde ${round} wirklich vollständig löschen?`)) return; await performWrite(() => db.rpc("delete_tournament_round", { p_tournament_id: t.id, p_round: round }), "Runde gelöscht."); }
+  async function deleteTournament() { const t = getTournament(); if (!t || !confirm(`Turnier „${t.name}“ wirklich löschen?`)) return; await performWrite(() => db.from("tournaments").delete().eq("id", t.id), "Turnier gelöscht."); }
 
   function parseStatsTokenBlock(text) {
-    const source = String(text || "").trim();
-
-    if (!source || source === "/") {
-      return { kills: 0, deathmatches: 0, wins: 0 };
-    }
-
-    const result = { kills: 0, deathmatches: 0, wins: 0 };
-    const regex = /\b(k|dm|w)\s*:\s*(\d+)\b/gi;
-    let match;
-    let matched = false;
-
-    while ((match = regex.exec(source))) {
-      matched = true;
-      const count = Math.max(0, Math.round(Number(match[2]) || 0));
-      const key = match[1].toLowerCase();
-
-      if (key === "k") result.kills += count;
-      if (key === "dm") result.deathmatches += count;
-      if (key === "w") result.wins += count;
-    }
-
-    if (!matched) {
-      throw new Error(`Stats konnten nicht gelesen werden: „${source}“. Nutze k:X, dm:X, w:X oder /.`);
-    }
-
-    const rest = source
-      .replace(/\b(k|dm|w)\s*:\s*\d+\b/gi, "")
-      .replace(/[\/|+\-\s]/g, "")
-      .trim();
-
-    if (rest) {
-      throw new Error(`Unbekannter Stat-Ausdruck: „${source}“.`);
-    }
-
+    if (text.trim() === "/") return { k: 0, dm: 0, w: 0 };
+    const result = { k: 0, dm: 0, w: 0 }; const cleaned = text.trim();
+    const tokens = [...cleaned.matchAll(/\b(k|dm|w)\s*:\s*(-?\d+)\b/gi)];
+    if (!tokens.length || cleaned.replace(/\b(?:k|dm|w)\s*:\s*-?\d+\b/gi, "").trim()) throw new Error(`Ungültige Werte: ${text}`);
+    for (const token of tokens) { const key = token[1].toLowerCase(); if (key === "k") result.k += Number(token[2]); else result[key] += Number(token[2]); }
+    if (!Number.isInteger(result.k) || result.k < 0) throw new Error("Kills müssen mindestens 0 sein.");
+    if (![0, 1].includes(result.dm) || ![0, 1].includes(result.w)) throw new Error("dm und w dürfen pro Spieler nur 0 oder 1 sein.");
     return result;
   }
 
-  function parseRoundImport(text, tournament) {
-    const source = String(text || "").trim();
-    if (!source) throw new Error("Kein Import-Inhalt gefunden.");
-
-    const colorPattern = TEAM_COLOR_DEFS
-      .map((item) => item.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-      .sort((a, b) => b.length - a.length)
-      .join("|");
-
-    const headerRegex = new RegExp(`(?:^|[\\n;,])\\s*(${colorPattern})\\s*:`, "gi");
-    const matches = Array.from(source.matchAll(headerRegex));
-
-    if (!matches.length) {
-      throw new Error("Keine gültige Teamfarbe gefunden.");
+  function parseRoundImport(text) {
+    const colorPattern = TEAM_COLOR_DEFS.map((c) => c.label.replace(" ", "\\s+")).join("|");
+    const sectionRegex = new RegExp(`(?:^|\\n)\\s*(${colorPattern})\\s*:\\s*([\\s\\S]*?)(?=(?:\\n\\s*(?:${colorPattern})\\s*:)|$)`, "gi");
+    const sections = []; let match;
+    while ((match = sectionRegex.exec(text.replace(/\r/g, "")))) {
+      const color = COLOR_BY_NAME.get(match[1].replace(/\s+/g, " ").toLowerCase());
+      const players = []; const playerRegex = /(?:^|,)\s*([^,:\n]+?)\s*:\s*(\/|(?:(?:k|dm|w)\s*:\s*-?\d+\s*)+)\s*(?=,|$)/gi; let playerMatch;
+      while ((playerMatch = playerRegex.exec(match[2].trim().replace(/,+\s*$/, "")))) players.push({ name: playerMatch[1].trim(), ...parseStatsTokenBlock(playerMatch[2]) });
+      if (!players.length) throw new Error(`Keine gültigen Spieler für ${color.label}.`);
+      sections.push({ color: color.label, hex: color.hex, players });
     }
+    if (!sections.length) throw new Error("Keine gültigen Farbteams gefunden.");
+    const results = sections.flatMap((section) => section.players);
+    if (results.filter((player) => player.dm === 1).length > 4) throw new Error("Maximal 4 Spieler dürfen dm:1 erhalten.");
+    if (results.filter((player) => player.w === 1).length > 1) throw new Error("Maximal 1 Spieler darf w:1 erhalten.");
+    return sections;
+  }
 
-    const parsedTeams = [];
-
-    for (let index = 0; index < matches.length; index += 1) {
-      const match = matches[index];
-      const colorDef = getTeamColorDef(match[1]);
-      const contentStart = match.index + match[0].length;
-      const contentEnd = index + 1 < matches.length ? matches[index + 1].index : source.length;
-
-      let teamContent = source.slice(contentStart, contentEnd).trim();
-      teamContent = teamContent.replace(/^[,;\s]+|[,;\s]+$/g, "");
-
-      const rawPlayers = teamContent
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      const players = rawPlayers.map((segment) => {
-        const separator = segment.indexOf(":");
-
-        if (separator < 1) {
-          throw new Error(`Spielereintrag konnte nicht gelesen werden: „${segment}“.`);
-        }
-
-        const name = segment.slice(0, separator).trim();
-        const statsText = segment.slice(separator + 1).trim();
-
-        if (!name) throw new Error(`Ein Spielername fehlt bei ${colorDef.label}.`);
-
-        return {
-          name,
-          stats: parseStatsTokenBlock(statsText)
-        };
-      });
-
-      if (players.length !== tournament.mode) {
-        throw new Error(
-          `${colorDef.label} enthält ${players.length} Spieler. Im ${MODE_LABELS[tournament.mode]}-Turnier werden genau ${tournament.mode} benötigt.`
-        );
+  async function importParticipants(event) {
+    event.preventDefault(); let sections; try { sections = parseRoundImport($("#importText").value); } catch (error) { showToast(error.message, "error"); return; }
+    const tournament = getTournament(); const resolved = [];
+    const importedNames = sections.flatMap((section) => section.players.map((player) => player.name.toLowerCase()));
+    if (new Set(importedNames).size !== importedNames.length) return showToast("Jeder Spielername darf im Import nur einmal vorkommen.", "error");
+    for (const section of sections) {
+      const team = tournament.teams.find((item) => item.name.toLowerCase() === section.color.toLowerCase());
+      if (!team && section.players.length !== tournament.mode) return showToast(`${section.color} benötigt genau ${tournament.mode} Spieler.`, "error");
+      if (team) {
+        const existing = team.players.map((player) => player.name.toLowerCase()).sort();
+        const incoming = section.players.map((player) => player.name.toLowerCase()).sort();
+        if (existing.length !== incoming.length || existing.some((name, index) => name !== incoming[index])) return showToast(`Team ${section.color} passt nicht zu den importierten Spielern.`, "error");
       }
-
-      parsedTeams.push({
-        color: colorDef,
-        players
-      });
     }
-
-    const normalizedColors = parsedTeams.map((team) => team.color.label.toLocaleLowerCase("en"));
-    const duplicateColor = normalizedColors.find((value, index) => normalizedColors.indexOf(value) !== index);
-
-    if (duplicateColor) {
-      throw new Error(`Eine Teamfarbe kommt mehrfach vor: ${duplicateColor}.`);
-    }
-
-    return parsedTeams;
-  }
-
-  function replacePlayerRoundStats(player, round, stats) {
-    player.events = player.events.filter((event) => event.round !== round);
-    const now = isoNow();
-
-    for (let index = 0; index < stats.kills; index += 1) {
-      player.events.push({
-        id: uid("event"),
-        round,
-        type: "kill",
-        points: EVENT_CONFIG.kill.points,
-        createdAt: now
-      });
-    }
-
-    for (let index = 0; index < stats.deathmatches; index += 1) {
-      player.events.push({
-        id: uid("event"),
-        round,
-        type: "deathmatch",
-        points: EVENT_CONFIG.deathmatch.points,
-        createdAt: now
-      });
-    }
-
-    for (let index = 0; index < stats.wins; index += 1) {
-      player.events.push({
-        id: uid("event"),
-        round,
-        type: "win",
-        points: EVENT_CONFIG.win.points,
-        createdAt: now
-      });
-    }
-  }
-
-  function importParticipants(event) {
-    event.preventDefault();
-
-    const tournament = getActiveTournament();
-    const targetRound = tournament.editingRound || tournament.currentRound;
-
-    try {
-      const parsedTeams = parseRoundImport($("#importText").value, tournament);
-      let importedPlayers = 0;
-      let createdTeams = 0;
-
-      for (const parsedTeam of parsedTeams) {
-        let team;
-
-        if (tournament.mode === 1) {
-          const incoming = parsedTeam.players[0];
-
-          team = tournament.teams.find((item) =>
-            item.players.some((player) =>
-              player.name.toLocaleLowerCase("de") === incoming.name.toLocaleLowerCase("de")
-            )
-          );
-
-          if (!team) {
-            team = {
-              id: uid("solo"),
-              name: incoming.name,
-              color: "",
-              players: [makePlayer(incoming.name, [])]
-            };
-            tournament.teams.push(team);
-            createdTeams += 1;
-          }
-
-          replacePlayerRoundStats(team.players[0], targetRound, incoming.stats);
-          importedPlayers += 1;
-          continue;
-        }
-
-        team = tournament.teams.find((item) =>
-          item.name.toLocaleLowerCase("en") === parsedTeam.color.label.toLocaleLowerCase("en") ||
-          String(item.color).toLocaleLowerCase("en") === parsedTeam.color.hex.toLocaleLowerCase("en")
-        );
-
+    const ok = await performWrite(async () => {
+      for (const section of sections) {
+        let team = tournament.teams.find((item) => item.name.toLowerCase() === section.color.toLowerCase());
         if (!team) {
-          team = {
-            id: uid("team"),
-            name: parsedTeam.color.label,
-            color: parsedTeam.color.hex,
-            players: parsedTeam.players.map((entry) => makePlayer(entry.name, []))
-          };
-          tournament.teams.push(team);
-          createdTeams += 1;
+          const teamResult = await db.from("teams").insert({ tournament_id: tournament.id, name: section.color, color: section.hex }).select().single(); if (teamResult.error) return teamResult;
+          const playerResult = await db.from("players").insert(section.players.map((p) => ({ tournament_id: tournament.id, team_id: teamResult.data.id, name: p.name }))).select(); if (playerResult.error) return playerResult;
+          team = { id: teamResult.data.id, players: playerResult.data };
         }
-
-        team.name = parsedTeam.color.label;
-        team.color = parsedTeam.color.hex;
-
-        if (team.players.length !== tournament.mode) {
-          throw new Error(`${parsedTeam.color.label} hat im Admin-Panel nicht genau ${tournament.mode} Spieler.`);
-        }
-
-        const parsedNames = parsedTeam.players.map((entry) => entry.name.toLocaleLowerCase("de"));
-
-        for (const incoming of parsedTeam.players) {
-          let player = team.players.find(
-            (item) => item.name.toLocaleLowerCase("de") === incoming.name.toLocaleLowerCase("de")
-          );
-
-          if (!player) {
-            const freePlayer = team.players.find(
-              (candidate) => !parsedNames.includes(candidate.name.toLocaleLowerCase("de"))
-            );
-
-            if (!freePlayer) {
-              throw new Error(
-                `${incoming.name} wurde in ${parsedTeam.color.label} nicht gefunden und das Team hat keinen freien Spielerplatz.`
-              );
-            }
-
-            freePlayer.name = incoming.name;
-            player = freePlayer;
-          }
-
-          replacePlayerRoundStats(player, targetRound, incoming.stats);
-          importedPlayers += 1;
-        }
+        for (const input of section.players) { const player = team.players.find((p) => p.name.toLowerCase() === input.name.toLowerCase()); resolved.push({ player_id: player.id, k: input.k, dm: input.dm, w: input.w }); }
       }
-
-      closeModal("importModal");
-      $("#importForm").reset();
-
-      persistState(
-        `Runde ${targetRound}: Werte für ${importedPlayers} Spieler wurden übernommen.${createdTeams ? ` ${createdTeams} neue Team-/Teilnehmergruppen wurden angelegt.` : ""}`
-      );
-    } catch (error) {
-      showToast(error.message || "Import fehlgeschlagen.", "error");
-    }
+      return db.rpc("replace_round_results", { p_tournament_id: tournament.id, p_round: tournament.editingRound, p_results: resolved });
+    }, `Runde ${tournament.editingRound} importiert.`, event.submitter);
+    if (ok) closeModal("importModal");
   }
 
-  function exportJson() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `survival-games-turniere-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast("JSON-Export wurde erstellt.", "success");
+  function resetParticipantForm() {
+    const tournament = getTournament(); if (!tournament) return;
+    $("#teamOptions").hidden = tournament.mode === 1; $("#playerFields").innerHTML = "";
+    for (let i = 0; i < tournament.mode; i += 1) { const fragment = $("#playerFieldTemplate").content.cloneNode(true); fragment.querySelector(".player-form-number").textContent = i + 1; $("#playerFields").append(fragment); }
+    syncColor();
   }
-
-  function showToast(message, type = "success") {
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    $("#toastRegion").appendChild(toast);
-    window.setTimeout(() => toast.remove(), 3400);
-  }
-
-  function openParticipantModal() {
-    resetParticipantForm();
-    openModal("participantModal");
-  }
-
-  function openImportModal() {
-    const tournament = getActiveTournament();
-    const targetRound = tournament.editingRound || tournament.currentRound;
-
-    $("#importForm").reset();
-    $("#importRoundTarget").textContent = `Runde ${targetRound}`;
-    $("#importNote").textContent = importInstructions(tournament);
-    $("#importText").placeholder = importInstructions(tournament);
-    openModal("importModal");
-  }
+  function syncColor() { const color = COLOR_BY_NAME.get($("#teamNameInput").value.toLowerCase()) || TEAM_COLOR_DEFS[0]; $("#teamColorSwatch").style.background = color.hex; $("#teamColorValue").textContent = color.label; $("#teamColorInput").value = color.hex; }
+  function openModal(id) { $("#" + id).hidden = false; document.body.style.overflow = "hidden"; }
+  function closeModal(id) { $("#" + id).hidden = true; document.body.style.overflow = ""; }
+  function showToast(message, type = "success") { const toast = document.createElement("div"); toast.className = `toast ${type}`; toast.textContent = message; $("#toastRegion").append(toast); setTimeout(() => toast.remove(), 4000); }
+  function openImport() { const t = getTournament(); if (!t) return; $("#importRoundTarget").textContent = `Runde ${t.editingRound}`; $("#importNote").textContent = "k = Kill (+1), dm = Deathmatch (+3), w = Sieg (+2). Kein Kill-Limit; max. 4× dm und 1× w."; openModal("importModal"); }
+  function exportJson() { const blob = new Blob([JSON.stringify(getTournament(), null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "turnier-export.json"; link.click(); URL.revokeObjectURL(link.href); }
 
   function bindEvents() {
     window.addEventListener("hashchange", route);
-    window.addEventListener("storage", (event) => {
-      if (event.key === STORAGE_KEY) {
-        state = loadState();
-        renderAll();
-        showToast("Turnierdaten wurden in einem anderen Tab aktualisiert.");
-      }
-    });
-
-    $("#publicTournamentSelect").addEventListener("change", (event) => setActiveTournament(event.target.value));
-    $("#adminTournamentSelect").addEventListener("change", (event) => setActiveTournament(event.target.value));
-    $("#publicSearch").addEventListener("input", renderPublic);
-    $("#adminSearch").addEventListener("input", renderAdmin);
-
-    $("#rankingViewToggle").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-ranking-view]");
-      if (!button) return;
-      publicRankingView = button.dataset.rankingView;
-      renderPublic();
-    });
-
-    $("#publicRankingRows").addEventListener("click", (event) => {
-      const row = event.target.closest("[data-detail-team-id]");
-      if (!row) return;
-      renderDetail(row.dataset.detailTeamId, row.dataset.detailPlayerId || "");
-    });
-
-    $("#addButton").addEventListener("click", (event) => { event.stopPropagation(); togglePopover(); });
-    document.addEventListener("click", (event) => {
-      if (!$("#addPopover").contains(event.target) && event.target !== $("#addButton")) closePopover();
-    });
-
-    $("#addPopover").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-open]");
-      if (!button) return;
-      if (button.dataset.open === "tournament") { resetTournamentForm(); openModal("tournamentModal"); }
-      if (button.dataset.open === "participant") openParticipantModal();
-      if (button.dataset.open === "import") openImportModal();
-    });
-
-    $("#createTournamentButton").addEventListener("click", () => { resetTournamentForm(); openModal("tournamentModal"); });
-    $("#addParticipantButton").addEventListener("click", openParticipantModal);
-    $("#emptyAddButton").addEventListener("click", openParticipantModal);
-    $("#importButton").addEventListener("click", openImportModal);
-    $("#deleteTournamentButton").addEventListener("click", deleteTournament);
-    $("#nextRoundButton").addEventListener("click", nextRound);
-    $("#adminRoundTabs").addEventListener("click", (event) => {
-      const deleteButton = event.target.closest("[data-delete-round]");
-
-      if (deleteButton) {
-        event.stopPropagation();
-        deleteRound(Number(deleteButton.dataset.deleteRound));
-        return;
-      }
-
-      const button = event.target.closest("[data-edit-round]");
-      if (button) setEditingRound(Number(button.dataset.editRound));
-    });
-    $("#roundBackButton").addEventListener("click", () => {
-      const tournament = getActiveTournament();
-      setEditingRound((tournament.editingRound || tournament.currentRound) - 1);
-    });
-    $("#roundForwardButton").addEventListener("click", () => {
-      const tournament = getActiveTournament();
-      setEditingRound((tournament.editingRound || tournament.currentRound) + 1);
-    });
-    $("#jumpCurrentRoundButton").addEventListener("click", () => {
-      const tournament = getActiveTournament();
-      setEditingRound(tournament.currentRound);
-    });
-    $("#exportButton").addEventListener("click", exportJson);
-
-    $$("[data-close]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.close)));
-    $$(".modal-backdrop").forEach((backdrop) => backdrop.addEventListener("mousedown", (event) => { if (event.target === backdrop) closeModal(backdrop.id); }));
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        closePopover();
-        $$(".modal-backdrop").forEach((modal) => { if (!modal.hidden) closeModal(modal.id); });
-      }
-    });
-
-    $("#tournamentModePicker").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-mode]");
-      if (button) chooseTournamentMode(Number(button.dataset.mode));
-    });
+    $("#publicTournamentSelect").addEventListener("change", (e) => setActiveTournament(e.target.value));
+    $("#adminTournamentSelect").addEventListener("change", (e) => setActiveTournament(e.target.value));
+    $("#rankingViewToggle").addEventListener("click", (e) => { const button = e.target.closest("[data-ranking-view]"); if (button && !button.disabled) { rankingView = button.dataset.rankingView; renderPublic(); } });
+    $("#publicRankingRows").addEventListener("click", (e) => { const row = e.target.closest("[data-team-id]"); if (row) renderDetail(row.dataset.teamId, row.dataset.playerId); });
+    $("#adminLoginForm").addEventListener("submit", login); $("#logoutButton").addEventListener("click", logout);
+    $("#createTournamentButton").addEventListener("click", () => { selectedMode = 0; $("#tournamentForm").reset(); openModal("tournamentModal"); });
+    $("#tournamentModePicker").addEventListener("click", (e) => { const button = e.target.closest("[data-mode]"); if (!button) return; selectedMode = Number(button.dataset.mode); $$("[data-mode]").forEach((b) => b.classList.toggle("active", b === button)); $("#saveTournamentButton").disabled = false; $("#modeExplanation").textContent = `${MODE_LABELS[selectedMode]}: ${selectedMode} Spieler pro Team.`; });
     $("#tournamentForm").addEventListener("submit", createTournament);
-    $("#participantForm").addEventListener("submit", createParticipant);
-    $("#teamNameInput").addEventListener("change", syncTeamColorSelection);
-
-    $("#adminGroups").addEventListener("click", (event) => {
-      const row = event.target.closest("[data-player-id]");
-      if (!row) return;
-      const eventButton = event.target.closest("[data-event-type]");
-      const actionButton = event.target.closest("[data-action]");
-      if (eventButton) addEvent(row.dataset.playerId, eventButton.dataset.eventType);
-      if (actionButton?.dataset.action === "history") {
-        activeHistoryPlayerId = row.dataset.playerId;
-        renderHistory();
-        openModal("historyModal");
-      }
-      if (actionButton?.dataset.action === "delete") deleteAdminEntity(row.dataset.teamId, row.dataset.playerId);
-    });
-
-    $("#historyContent").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-history-event-id]");
-      if (button) removeHistoryEvent(button.dataset.historyEventId);
-    });
-
-    $("#importForm").addEventListener("submit", importParticipants);
-    $("#importFile").addEventListener("change", async (event) => {
-      const file = event.target.files?.[0];
-      if (file) $("#importText").value = await file.text();
-    });
+    const participant = () => { resetParticipantForm(); openModal("participantModal"); };
+    $("#addParticipantButton").addEventListener("click", participant); $("#emptyAddButton").addEventListener("click", participant); $("#participantForm").addEventListener("submit", createParticipant); $("#teamNameInput").addEventListener("change", syncColor);
+    $("#importButton").addEventListener("click", openImport); $("#importForm").addEventListener("submit", importParticipants);
+    $("#importFile").addEventListener("change", async (e) => { if (e.target.files[0]) $("#importText").value = await e.target.files[0].text(); });
+    $("#nextRoundButton").addEventListener("click", nextRound); $("#deleteTournamentButton").addEventListener("click", deleteTournament); $("#exportButton").addEventListener("click", exportJson);
+    $("#adminRoundTabs").addEventListener("click", (e) => { const del = e.target.closest("[data-delete-round]"); if (del) { e.stopPropagation(); deleteRound(Number(del.dataset.deleteRound)); return; } const tab = e.target.closest("[data-round]"); if (tab) setEditingRound(Number(tab.dataset.round)); });
+    $("#roundBackButton").addEventListener("click", () => { const t = getTournament(); if (t?.editingRound > 1) setEditingRound(t.editingRound - 1); });
+    $("#roundForwardButton").addEventListener("click", () => { const t = getTournament(); if (t?.editingRound < t.currentRound) setEditingRound(t.editingRound + 1); });
+    $("#jumpCurrentRoundButton").addEventListener("click", () => { const t = getTournament(); if (t) setEditingRound(t.currentRound); });
+    $("#adminSearch").addEventListener("input", renderAdmin);
+    $("#adminGroups").addEventListener("click", async (e) => { const row = e.target.closest("[data-player-id]"); const eventButton = e.target.closest("[data-event-type]"); if (row && eventButton) return addEvent(row.dataset.playerId, eventButton.dataset.eventType, eventButton); if (row && e.target.closest("[data-history]")) { activeHistoryPlayerId = row.dataset.playerId; renderHistory(); return; } if (row && e.target.closest("[data-delete-player]") && confirm("Spieler wirklich löschen?")) return performWrite(() => db.from("players").delete().eq("id", row.dataset.playerId), "Spieler gelöscht."); const teamButton = e.target.closest("[data-delete-team]"); if (teamButton && confirm("Team samt Spielern und Ergebnissen löschen?")) return performWrite(() => db.from("teams").delete().eq("id", teamButton.dataset.deleteTeam), "Team gelöscht."); });
+    $$("[data-close]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.close)));
+    $$(".modal-backdrop").forEach((backdrop) => backdrop.addEventListener("mousedown", (e) => { if (e.target === backdrop) closeModal(backdrop.id); }));
   }
 
-  bindEvents();
-  route();
+  function renderHistory() {
+    const found = allPlayers(getTournament()).find(({ player }) => player.id === activeHistoryPlayerId); if (!found) return;
+    $("#historyModalTitle").textContent = found.player.name;
+    $("#historyContent").innerHTML = found.player.events.length ? found.player.events.slice().reverse().map((event) => `<div class="history-row"><span>Runde ${event.round}: ${EVENT_CONFIG[event.type].label} +${EVENT_CONFIG[event.type].points}</span><button type="button" data-event-id="${event.id}">Löschen</button></div>`).join("") : "<p>Noch keine Events.</p>";
+    $("#historyContent").onclick = (e) => { const button = e.target.closest("[data-event-id]"); if (button) performWrite(() => db.from("events").delete().eq("id", button.dataset.eventId), "Event gelöscht.").then(() => renderHistory()); };
+    openModal("historyModal");
+  }
+
+  const importTestApi = { parseRoundImport, parseStatsTokenBlock };
+  if (typeof module !== "undefined" && module.exports) module.exports = importTestApi;
+  if (typeof document === "undefined") return;
+  window.__IMPORT_TEST_API__ = importTestApi;
+  bindEvents(); route(); loadData().then(subscribeRealtime);
 })();
