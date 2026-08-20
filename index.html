@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Survival-Games-Turniere mit Team- und Einzelwertung sowie lokalem Admin-Panel.">
+  <title>Survival Games – Turnierwertung</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="#ranking" aria-label="Zur Turnierwertung">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span><strong>Survival Games</strong><small>Bloxd.io Tournament Hub</small></span>
+      </a>
+
+      <nav class="main-nav" aria-label="Hauptnavigation">
+        <a href="#ranking" data-nav="ranking">Rangliste</a>
+        <a href="#admin" data-nav="admin">Admin-Panel</a>
+      </nav>
+
+      <div class="topbar-actions">
+        <span class="live-pill"><i></i> Lokal live</span>
+        <button class="icon-button admin-only" id="addButton" type="button" aria-label="Aktion hinzufügen" title="Aktion hinzufügen">+</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="rankingView" class="view standings-view">
+        <div class="standings-topline">
+          <label class="standings-tournament-select">
+            <span>Turnier</span>
+            <select id="publicTournamentSelect" aria-label="Öffentliches Turnier auswählen"></select>
+          </label>
+
+          <a class="standings-admin-link" href="#admin">Admin-Panel</a>
+        </div>
+
+        <header class="standings-title">
+          <p id="publicTournamentTitle">Survival Games Turnier</p>
+          <h1>TURNIER RANGLISTE</h1>
+          <div class="standings-title-meta">
+            <span id="publicModeBadge">Duo</span>
+            <span>RUNDE <b id="publicRoundBadge">1</b></span>
+            <span id="publicUpdatedAt">Noch nicht aktualisiert</span>
+          </div>
+        </header>
+
+        <div class="standings-controls">
+          <div class="segmented-control standings-view-toggle" id="rankingViewToggle" aria-label="Wertung auswählen">
+            <button type="button" data-ranking-view="team" class="active">Teamwertung</button>
+            <button type="button" data-ranking-view="individual">Einzelwertung</button>
+          </div>
+        </div>
+
+        <section class="standings-list" aria-label="Turnier-Rangliste">
+          <div class="ranking-table esports-board" role="table" aria-label="Survival Games Rangliste">
+            <div id="publicRankingHead" class="ranking-row ranking-head" role="row" hidden></div>
+            <div id="publicRankingRows"></div>
+          </div>
+
+          <div id="publicEmpty" class="empty-state standings-empty" hidden>
+            <h3>Noch keine Teilnehmer</h3>
+            <p>Im Admin-Panel können für dieses Turnier Teams oder Einzelspieler angelegt werden.</p>
+            <a class="button primary" href="#admin">Zum Admin-Panel</a>
+          </div>
+        </section>
+
+        <input id="publicSearch" type="hidden" value="">
+        <span id="publicTournamentSubtitle" hidden></span>
+        <span id="publicMode" hidden></span>
+        <span id="publicGroupCountLabel" hidden></span>
+        <span id="publicGroupCount" hidden></span>
+        <span id="publicPlayerCount" hidden></span>
+        <span id="publicCurrentRound" hidden></span>
+        <span id="rankingHeading" hidden></span>
+        <span id="rowHint" hidden></span>
+      </section>
+
+      <section id="adminView" class="view" hidden>
+        <div class="admin-hero">
+          <div>
+            <p class="eyebrow">Turnierverwaltung</p>
+            <h1>Admin-Panel</h1>
+            <p class="hero-copy">Turnier auswählen, Runde bearbeiten und Ergebnisse eintragen.</p>
+          </div>
+          <div class="admin-header-actions">
+            <label class="tournament-switch-card compact-switch">
+              <span>Aktives Turnier</span>
+              <select id="adminTournamentSelect" aria-label="Turnier im Admin-Panel auswählen"></select>
+            </label>
+            <button class="button primary" id="createTournamentButton" type="button">+ Neues Turnier</button>
+          </div>
+        </div>
+
+        <div class="admin-overview-grid">
+          <article class="overview-card">
+            <span>Turniermodus</span>
+            <strong id="adminMode">–</strong>
+            <small id="adminModeDescription">–</small>
+          </article>
+          <article class="overview-card current-round-card">
+            <span>Aktuelle Turnierrunde</span>
+            <strong>Runde <b id="adminCurrentRound">1</b></strong>
+            <small>Die zuletzt gestartete Runde des Turniers.</small>
+          </article>
+          <article class="overview-card">
+            <span>Teilnehmer</span>
+            <strong id="adminParticipants">0</strong>
+            <small id="adminTeamsSummary">0 Teams</small>
+          </article>
+          <article class="overview-card event-legend-card">
+            <span>Punkte-System</span>
+            <div class="event-legend">
+              <b class="kill-chip">Kill +1</b>
+              <b class="dm-chip">Deathmatch +3</b>
+              <b class="win-chip">Sieg +5</b>
+            </div>
+          </article>
+        </div>
+
+        <section class="round-editor panel" aria-label="Runde zur Bearbeitung auswählen">
+          <div class="round-editor-copy">
+            <span>Runde bearbeiten</span>
+            <strong id="adminEditingRound">Runde 1</strong>
+            <small id="roundEditingNote">Neue Punkte werden der ausgewählten Runde zugeordnet.</small>
+          </div>
+          <div class="round-editor-controls">
+            <button class="round-arrow" id="roundBackButton" type="button" aria-label="Vorherige Runde">←</button>
+            <div class="round-tabs" id="adminRoundTabs"></div>
+            <button class="round-arrow" id="roundForwardButton" type="button" aria-label="Nächste vorhandene Runde">→</button>
+          </div>
+          <button class="button subtle current-round-jump" id="jumpCurrentRoundButton" type="button">Zur aktuellen Runde</button>
+        </section>
+
+        <div class="admin-toolbar panel">
+          <div class="toolbar-left">
+            <label class="search-box admin-search">
+              <span class="sr-only">Admin-Liste durchsuchen</span>
+              <input id="adminSearch" type="search" placeholder="Spieler oder Team suchen …" autocomplete="off">
+            </label>
+            <span class="result-count" id="adminResultCount">0 Spieler</span>
+          </div>
+          <div class="toolbar-actions">
+            <button class="button subtle" id="exportButton" type="button">JSON exportieren</button>
+            <button class="button subtle" id="importButton" type="button">Importieren</button>
+            <button class="button subtle danger-text" id="deleteTournamentButton" type="button">Turnier löschen</button>
+            <button class="button primary" id="addParticipantButton" type="button">+ Teilnehmer</button>
+            <button class="button next-round" id="nextRoundButton" type="button">Nächste Runde starten →</button>
+          </div>
+        </div>
+
+        <section class="panel admin-panel">
+          <div class="admin-list-head">
+            <span>Spieler</span>
+            <span>Team</span>
+            <span>Gesamt</span>
+            <span>Bearbeitung: Runde <b id="adminHeadRound">1</b></span>
+            <span>Aktionen</span>
+          </div>
+          <div id="adminGroups"></div>
+          <div id="adminEmpty" class="empty-state compact" hidden>
+            <div class="empty-icon">+</div>
+            <h3>Dieses Turnier ist noch leer</h3>
+            <p id="adminEmptyText">Lege den ersten Teilnehmer an.</p>
+            <button class="button primary" id="emptyAddButton" type="button">Ersten Teilnehmer erstellen</button>
+          </div>
+        </section>
+
+        <div class="admin-tip">
+          <strong>Hinweis:</strong> Über die Rundenleiste kannst du ältere Runden bearbeiten oder mit dem kleinen × vollständig löschen. Imports überschreiben für die genannten Spieler nur die Werte der ausgewählten Runde.
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="popover" id="addPopover" hidden>
+    <button type="button" data-open="tournament">
+      <span class="popover-icon">◇</span>
+      <span><strong>Neues Turnier</strong><small>Solo, Duo, Trio oder Squad erstellen</small></span>
+    </button>
+    <button type="button" data-open="participant">
+      <span class="popover-icon">＋</span>
+      <span><strong>Teilnehmer hinzufügen</strong><small>Passend zum aktiven Turniermodus</small></span>
+    </button>
+    <button type="button" data-open="import">
+      <span class="popover-icon">⇩</span>
+      <span><strong>Rundendaten importieren</strong><small>Teamfarben, Kills, Deathmatch und Sieg aus Text</small></span>
+    </button>
+  </div>
+
+  <div class="modal-backdrop" id="tournamentModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="tournamentModalTitle">
+      <header class="modal-header">
+        <div><p class="eyebrow">Neue Wertung</p><h2 id="tournamentModalTitle">Turnier erstellen</h2></div>
+        <button class="modal-close" type="button" data-close="tournamentModal" aria-label="Schließen">×</button>
+      </header>
+      <form id="tournamentForm">
+        <div class="form-section">
+          <label>
+            <span>Turniername</span>
+            <input id="tournamentNameInput" type="text" maxlength="48" required placeholder="z. B. Bloxdio Turnier 22.08.">
+          </label>
+        </div>
+        <div class="form-section">
+          <div class="section-title">
+            <span>1</span>
+            <div><strong>Turniermodus auswählen</strong><small>Dieser Modus gilt anschließend für jeden Teilnehmer des Turniers.</small></div>
+          </div>
+          <div class="team-size-picker" id="tournamentModePicker">
+            <button type="button" data-mode="1"><strong>1</strong><span>Solo</span></button>
+            <button type="button" data-mode="2"><strong>2</strong><span>Duo</span></button>
+            <button type="button" data-mode="3"><strong>3</strong><span>Trio</span></button>
+            <button type="button" data-mode="4"><strong>4</strong><span>Squad</span></button>
+          </div>
+        </div>
+        <div class="mode-explanation" id="modeExplanation">Wähle einen Modus aus.</div>
+        <footer class="modal-footer">
+          <button class="button subtle" type="button" data-close="tournamentModal">Abbrechen</button>
+          <button class="button primary" id="saveTournamentButton" type="submit" disabled>Turnier erstellen</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="participantModal" hidden>
+    <section class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="participantModalTitle">
+      <header class="modal-header">
+        <div><p class="eyebrow">Neuer Teilnehmer</p><h2 id="participantModalTitle">Teilnehmer hinzufügen</h2></div>
+        <button class="modal-close" type="button" data-close="participantModal" aria-label="Schließen">×</button>
+      </header>
+      <form id="participantForm">
+        <div id="teamOptions" class="form-section" hidden>
+          <div class="section-title">
+            <span>1</span>
+            <div>
+              <strong>Interne Teamfarbe</strong>
+              <small>Diese Farbe ist nur im Admin-Panel und beim Import sichtbar – niemals in der öffentlichen Rangliste.</small>
+            </div>
+          </div>
+          <div class="form-grid two">
+            <label>
+              <span>Team-Farbe</span>
+              <select id="teamNameInput">
+                <option value="Lime Green">Lime Green</option>
+                <option value="Cyan">Cyan</option>
+                <option value="Dark Blue">Dark Blue</option>
+                <option value="Pink">Pink</option>
+                <option value="Dark Green">Dark Green</option>
+                <option value="White">White</option>
+                <option value="Brown">Brown</option>
+                <option value="Orange">Orange</option>
+                <option value="Yellow">Yellow</option>
+                <option value="Purple">Purple</option>
+                <option value="Magenta">Magenta</option>
+                <option value="Baby Blue">Baby Blue</option>
+              </select>
+            </label>
+            <div class="admin-color-preview" aria-label="Interne Teamfarbe">
+              <span>Vorschau</span>
+              <div><i id="teamColorSwatch"></i><b id="teamColorValue">Lime Green</b></div>
+              <input id="teamColorInput" type="hidden" value="#7CFC00">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="section-title">
+            <span id="playersStepNumber">1</span>
+            <div><strong id="playersSectionTitle">Spieler eintragen</strong><small id="playersSectionHint">Alle Spieler starten bei 0 Punkten.</small></div>
+          </div>
+          <div id="playerFields" class="player-fields"></div>
+        </div>
+
+        <footer class="modal-footer">
+          <button class="button subtle" type="button" data-close="participantModal">Abbrechen</button>
+          <button class="button primary" type="submit">Fertig</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="importModal" hidden>
+    <section class="modal import-results-modal" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+      <header class="modal-header">
+        <div>
+          <p class="eyebrow">Rundenergebnisse</p>
+          <h2 id="importModalTitle">Rundendaten importieren</h2>
+        </div>
+        <button class="modal-close" type="button" data-close="importModal" aria-label="Schließen">×</button>
+      </header>
+
+      <form id="importForm">
+        <div class="import-round-target">
+          Importziel: <strong id="importRoundTarget">Runde 1</strong>
+        </div>
+
+        <label class="drop-area">
+          <strong>Textdatei auswählen</strong>
+          <span>TXT oder CSV. Die Datei wird in die aktuell ausgewählte Runde geschrieben.</span>
+          <input id="importFile" type="file" accept=".txt,.csv,text/plain,text/csv">
+        </label>
+
+        <label class="textarea-label">
+          <span>Import-Inhalt</span>
+          <textarea id="importText" rows="12"></textarea>
+        </label>
+
+        <div class="import-note" id="importNote"></div>
+
+        <footer class="modal-footer">
+          <button class="button subtle" type="button" data-close="importModal">Abbrechen</button>
+          <button class="button primary" type="submit">Runde importieren</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal-backdrop detail-backdrop" id="detailModal" hidden>
+    <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+      <header class="detail-hero">
+        <div class="detail-title-block">
+          <p class="detail-kicker" id="detailEyebrow">TEAM DETAILS</p>
+          <h2 id="detailModalTitle">Spielername ♦ Spielername</h2>
+          <p id="detailPlayerNames">Duo · 2 Spieler</p>
+        </div>
+
+        <div class="detail-total">
+          <strong id="detailTotalPoints">0</strong>
+          <span>PTS</span>
+        </div>
+
+        <span id="detailScoreGhost" hidden>0</span>
+        <button class="modal-close detail-close" type="button" data-close="detailModal" aria-label="Schließen">×</button>
+      </header>
+
+      <div id="detailPlayersGrid" class="detail-players-grid"></div>
+
+      <footer class="detail-footer">
+        MATCH HISTORY · ROUND <b id="detailRoundNumber">1</b>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="historyModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+      <header class="modal-header">
+        <div><p class="eyebrow">Admin-Historie</p><h2 id="historyModalTitle">Spielerhistorie</h2></div>
+        <button class="modal-close" type="button" data-close="historyModal" aria-label="Schließen">×</button>
+      </header>
+      <div id="historyContent"></div>
+      <footer class="modal-footer"><button class="button primary" type="button" data-close="historyModal">Schließen</button></footer>
+    </section>
+  </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+
+  <template id="playerFieldTemplate">
+    <article class="player-form-card simple-player-form-card">
+      <div class="player-form-number"></div>
+      <label>
+        <span>Spielername</span>
+        <input type="text" class="player-name-input" maxlength="30" required placeholder="Bloxd.io Name">
+      </label>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
