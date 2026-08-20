@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Survival-Games-Turniere mit Team- und Einzelwertung sowie lokalem Admin-Panel.">
+  <meta name="description" content="Live-Rangliste des Bloxd.io Survival-Games-Turniers.">
   <title>Survival Games – Turnierwertung</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,11 +20,10 @@
 
       <nav class="main-nav" aria-label="Hauptnavigation">
         <a href="#ranking" data-nav="ranking">Rangliste</a>
-        <a href="#admin" data-nav="admin">Admin-Panel</a>
       </nav>
 
       <div class="topbar-actions">
-        <span class="live-pill"><i></i> Lokal live</span>
+        <span class="live-pill"><i></i> Live</span>
         <button class="icon-button admin-only" id="addButton" type="button" aria-label="Aktion hinzufügen" title="Aktion hinzufügen">+</button>
       </div>
     </header>
@@ -37,7 +36,6 @@
             <select id="publicTournamentSelect" aria-label="Öffentliches Turnier auswählen"></select>
           </label>
 
-          <a class="standings-admin-link" href="#admin">Admin-Panel</a>
         </div>
 
         <header class="standings-title">
@@ -65,8 +63,7 @@
 
           <div id="publicEmpty" class="empty-state standings-empty" hidden>
             <h3>Noch keine Teilnehmer</h3>
-            <p>Im Admin-Panel können für dieses Turnier Teams oder Einzelspieler angelegt werden.</p>
-            <a class="button primary" href="#admin">Zum Admin-Panel</a>
+            <p>Für dieses Turnier wurden noch keine Teilnehmer angelegt.</p>
           </div>
         </section>
 
@@ -82,6 +79,18 @@
       </section>
 
       <section id="adminView" class="view" hidden>
+        <section id="adminGate" class="admin-gate" aria-live="polite">
+          <div id="adminAuthLoading" class="auth-card"><h1>Admin</h1><p>Session wird geprüft …</p></div>
+          <form id="adminLoginForm" class="auth-card" hidden>
+            <h1>Admin-Login</h1>
+            <p>Bitte mit dem bestätigten Administratorkonto anmelden.</p>
+            <label><span>E-Mail</span><input id="adminEmail" type="email" autocomplete="username" required></label>
+            <label><span>Passwort</span><input id="adminPassword" type="password" autocomplete="current-password" required></label>
+            <button class="button primary" type="submit">Anmelden</button>
+            <p id="adminLoginError" class="form-error" role="alert"></p>
+          </form>
+        </section>
+        <div id="adminContent" hidden>
         <div class="admin-hero">
           <div>
             <p class="eyebrow">Turnierverwaltung</p>
@@ -94,6 +103,7 @@
               <select id="adminTournamentSelect" aria-label="Turnier im Admin-Panel auswählen"></select>
             </label>
             <button class="button primary" id="createTournamentButton" type="button">+ Neues Turnier</button>
+            <button class="button subtle" id="logoutButton" type="button">Abmelden</button>
           </div>
         </div>
 
@@ -118,7 +128,7 @@
             <div class="event-legend">
               <b class="kill-chip">Kill +1</b>
               <b class="dm-chip">Deathmatch +3</b>
-              <b class="win-chip">Sieg +5</b>
+              <b class="win-chip">Sieg +2</b>
             </div>
           </article>
         </div>
@@ -173,6 +183,7 @@
 
         <div class="admin-tip">
           <strong>Hinweis:</strong> Über die Rundenleiste kannst du ältere Runden bearbeiten oder mit dem kleinen × vollständig löschen. Imports überschreiben für die genannten Spieler nur die Werte der ausgewählten Runde.
+        </div>
         </div>
       </section>
     </main>
@@ -369,6 +380,7 @@
     </article>
   </template>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>

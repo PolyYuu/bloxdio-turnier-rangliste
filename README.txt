@@ -1,30 +1,35 @@
-SURVIVAL GAMES TURNIER-RANGLISTE – DEMO V6
+# Bloxd.io Turnier-Rangliste – Live-Version
 
-NEU
----
-- Standardturnier: „Bloxdio Turnier 22.08.“
-- Öffentliche Überschrift: „Turnier Rangliste“
-- Profilbilder komplett entfernt.
-- Deathmatch: +3 Punkte.
-- Admin-Panel neutral, hell und deutlich reduziert.
-- Einzelne Runden können direkt mit dem kleinen × gelöscht werden.
-- Beim Rundenlöschen werden die Events dieser Runde entfernt und spätere Runden neu nummeriert.
-- Importfarben:
-  Lime Green, Cyan, Dark Blue, Pink, Dark Green, White,
-  Brown, Orange, Yellow, Purple, Magenta, Baby Blue.
-- Farben sind nur interne Team-Zuordnung und erscheinen nicht öffentlich.
+Öffentliche Live-Rangliste für das Bloxd.io Survival-Games-Turnier:
+https://polyyuu.github.io/bloxdio-turnier-rangliste/
 
-IMPORTFORMAT
-------------
-Lime Green: huebscherMann: k:3 dm:1 w:1, Muiiq: k:2 dm:1,
-Cyan: Laradic: k:1, bauerb: /,
-Dark Blue: dicmic: k:2, sismas: dm:1,
+## Technik
 
-k:3  = 3 einzelne Kills = 3 × +1
-dm:1 = 1 Deathmatch = +3
-w:1  = 1 Sieg = +5
-/    = keine Events / 0 Punkte
+Die Anwendung ist eine statische Vanilla-HTML/CSS/JavaScript-Seite für GitHub Pages. Supabase ist die alleinige Datenquelle für Turniere, Teams, Spieler und Events. Änderungen werden per Supabase Realtime automatisch an bereits geöffnete Ranglisten übertragen; es gibt keine lokale Speicherung von Turnierdaten.
 
-Der Import schreibt in die im Admin-Panel aktuell ausgewählte Runde.
-Ein erneuter Import ersetzt für die genannten Spieler die Werte dieser Runde,
-damit keine doppelten Kills, Deathmatches oder Siege entstehen.
+Der Admin-Bereich ist über `index.html#admin` beziehungsweise `admin.html` erreichbar. Die Anmeldung verwendet Supabase Auth mit E-Mail und Passwort. Nach der Anmeldung wird die Berechtigung zusätzlich serverseitig mit `public.is_admin()` geprüft. Es gibt kein öffentliches Signup.
+
+## Punktesystem und Limits
+
+- Kill: **+1 Punkt**
+- Deathmatch: **+3 Punkte**
+- Sieg: **+2 Punkte**
+- Kills haben **kein Limit**.
+- Pro Runde sind höchstens vier Spieler mit einem Deathmatch-Ergebnis erlaubt.
+- Pro Runde ist höchstens ein Spieler mit einem Sieg erlaubt.
+- Pro Spieler und Runde sind jeweils höchstens ein Deathmatch und ein Sieg erlaubt.
+- Ein Sieg erzeugt nicht automatisch ein Deathmatch-Ergebnis.
+
+Der Textimport schreibt atomar über `replace_round_results`; komplette Runden werden atomar über `delete_tournament_round` gelöscht.
+
+## Sicherheit
+
+Im Browser steht absichtlich ausschließlich die öffentliche Supabase Project URL mit dem **Publishable Key**. Ein Publishable Key ist für Browser-Anwendungen vorgesehen und kein Geheimnis. Niemals einen `service_role` Key oder ein Admin-Passwort in dieses Repository oder in Frontend-Code eintragen. Schreibrechte werden ausschließlich durch Supabase Auth, RLS und `public.is_admin()` vergeben.
+
+## Lokale Nutzung
+
+Da keine Build-Schritte nötig sind, kann das Verzeichnis mit einem statischen Webserver geöffnet werden, zum Beispiel:
+
+```sh
+python3 -m http.server 8000
+```
