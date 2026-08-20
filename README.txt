@@ -15,9 +15,9 @@ Der Admin-Bereich ist über `index.html#admin` beziehungsweise `admin.html` erre
 - Deathmatch: **+3 Punkte**
 - Sieg: **+2 Punkte**
 - Kills haben **kein Limit**.
-- Pro Runde sind höchstens vier Spieler mit einem Deathmatch-Ergebnis erlaubt.
+- Beliebig viele Spieler dürfen pro Runde das Deathmatch erreichen.
 - Pro Runde ist höchstens ein Spieler mit einem Sieg erlaubt.
-- Pro Spieler und Runde sind jeweils höchstens ein Deathmatch und ein Sieg erlaubt.
+- Pro Spieler und Runde sind maximal ein Deathmatch-Ergebnis und ein Sieg erlaubt.
 - Ein Sieg erzeugt nicht automatisch ein Deathmatch-Ergebnis.
 
 Der Textimport schreibt atomar über `replace_round_results`; komplette Runden werden atomar über `delete_tournament_round` gelöscht.

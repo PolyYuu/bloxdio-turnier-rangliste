@@ -53,7 +53,7 @@
   function friendlyError(error, fallback = "Die Aktion konnte nicht ausgeführt werden.") {
     console.error(error);
     if (/duplicate|unique/i.test(error?.message || "")) return "Dieser Name ist bereits vergeben.";
-    if (/limit|maximum|deathmatch|win/i.test(error?.message || "")) return "Das Rundenlimit für Deathmatch oder Sieg wurde erreicht.";
+    if (/limit|maximum|deathmatch|win/i.test(error?.message || "")) return "Pro Runde ist maximal ein Sieger erlaubt; Deathmatch und Sieg dürfen pro Spieler nur 0 oder 1 sein.";
     return fallback;
   }
 
@@ -319,7 +319,6 @@
     }
     if (!sections.length) throw new Error("Keine gültigen Farbteams gefunden.");
     const results = sections.flatMap((section) => section.players);
-    if (results.filter((player) => player.dm === 1).length > 4) throw new Error("Maximal 4 Spieler dürfen dm:1 erhalten.");
     if (results.filter((player) => player.w === 1).length > 1) throw new Error("Maximal 1 Spieler darf w:1 erhalten.");
     return sections;
   }
@@ -343,9 +342,7 @@
       return team ? team.players.map((player) => player.id) : [];
     }));
     const unaffectedRoundEvents = allPlayers(tournament).flatMap(({ player }) => affectedExistingIds.has(player.id) ? [] : player.events.filter((item) => item.round === tournament.editingRound));
-    const dmTotal = new Set(unaffectedRoundEvents.filter((item) => item.type === "deathmatch").map((item) => item.id)).size + sections.flatMap((section) => section.players).filter((player) => player.dm).length;
     const winTotal = new Set(unaffectedRoundEvents.filter((item) => item.type === "win").map((item) => item.id)).size + sections.flatMap((section) => section.players).filter((player) => player.w).length;
-    if (dmTotal > 4) return showToast("Zusammen mit vorhandenen Rundendaten wären mehr als 4 Deathmatch-Spieler gesetzt.", "error");
     if (winTotal > 1) return showToast("Zusammen mit vorhandenen Rundendaten wäre mehr als 1 Sieger gesetzt.", "error");
     const ok = await performWrite(async () => {
       const createdTeamIds = [];
@@ -379,7 +376,7 @@
   function openModal(id) { $("#" + id).hidden = false; document.body.style.overflow = "hidden"; }
   function closeModal(id) { $("#" + id).hidden = true; document.body.style.overflow = ""; }
   function showToast(message, type = "success") { const toast = document.createElement("div"); toast.className = `toast ${type}`; toast.textContent = message; $("#toastRegion").append(toast); setTimeout(() => toast.remove(), 4000); }
-  function openImport() { const t = getTournament(); if (!t) return; $("#importRoundTarget").textContent = `Runde ${t.editingRound}`; $("#importNote").textContent = "k = Kill (+1), dm = Deathmatch (+3), w = Sieg (+2). Kein Kill-Limit; max. 4× dm und 1× w."; openModal("importModal"); }
+  function openImport() { const t = getTournament(); if (!t) return; $("#importRoundTarget").textContent = `Runde ${t.editingRound}`; $("#importNote").textContent = "k = Kill (+1), dm = Deathmatch (+3), w = Sieg (+2). Kein Kill-Limit; dm und w pro Spieler max. 1, pro Runde max. 1× w."; openModal("importModal"); }
   function exportJson() { const blob = new Blob([JSON.stringify(getTournament(), null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "turnier-export.json"; link.click(); URL.revokeObjectURL(link.href); }
 
   function bindEvents() {
