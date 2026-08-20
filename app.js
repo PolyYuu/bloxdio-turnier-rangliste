@@ -37,6 +37,18 @@
   }, { kills: 0, deathmatches: 0, wins: 0, points: 0 });
   const teamPoints = (team, round = Infinity) => team.players.reduce((sum, player) => sum + statsThrough(player, round).points, 0);
   const teamLabel = (team) => team.players.map((player) => player.name).join(" + ") || team.name;
+  function placementLabel(rank) {
+    if (rank === 1) return "#1";
+    if (rank === 2) return "2ND";
+    if (rank === 3) return "3RD";
+    return `${rank}TH`;
+  }
+  function playerBox(player, compact = false) {
+    return `<div class="standing-player-box ${compact ? "compact-name" : ""}"><strong>${escapeHtml(player.name)}</strong></div>`;
+  }
+  function teamPlayerBoxes(players) {
+    return players.map((player) => playerBox(player, players.length >= 3)).join('<span class="standing-plus" aria-hidden="true">+</span>');
+  }
 
   function friendlyError(error, fallback = "Die Aktion konnte nicht ausgeführt werden.") {
     console.error(error);
@@ -146,16 +158,22 @@
     const currentRanks = rankMaps(tournament, tournament.currentRound, individual);
     const previousRanks = rankMaps(tournament, Math.max(1, tournament.currentRound - 1), individual);
     const entries = (individual ? allPlayers(tournament) : tournament.teams).slice().sort((a, b) => currentRanks.get(individual ? a.player.id : a.id) - currentRanks.get(individual ? b.player.id : b.id));
-    $("#publicRankingHead").hidden = entries.length === 0;
-    $("#publicRankingHead").innerHTML = '<span>PLATZ</span><span>SPIELER</span><span>PTS</span>';
+    $("#rankingViewToggle").hidden = tournament.mode === 1;
+    $("#publicRankingHead").hidden = true;
+    $("#publicRankingHead").innerHTML = "";
     $("#publicRankingRows").innerHTML = entries.map((entry) => {
       const id = individual ? entry.player.id : entry.id;
       const points = individual ? statsThrough(entry.player).points : teamPoints(entry);
       const players = individual ? [entry.player] : entry.players;
-      const boxes = players.map((player) => `<span class="ranking-player-box">${escapeHtml(player.name)}</span>`).join('<span class="ranking-player-plus">+</span>');
-      return `<button class="ranking-row ranking-entry" data-team-id="${individual ? entry.team.id : entry.id}" data-player-id="${individual ? entry.player.id : ""}" type="button"><span class="ranking-place">${currentRanks.get(id)}${movement(currentRanks.get(id), previousRanks.get(id), tournament.currentRound)}</span><span class="ranking-player-stack">${boxes}</span><strong class="ranking-points">${points}<small>PTS</small></strong></button>`;
+      const rank = currentRanks.get(id);
+      return `<div class="standing-row ${individual ? "solo-standing-row" : `team-size-${players.length}`}" role="row" tabindex="0" data-detail-team-id="${individual ? entry.team.id : entry.id}" data-detail-player-id="${individual ? entry.player.id : ""}">
+        <div class="standing-rank-box" role="cell">${movement(rank, previousRanks.get(id), tournament.currentRound)}<span class="rank-number">${placementLabel(rank)}</span></div>
+        <div class="standing-team-boxes ${individual ? "single-player-box" : ""}" role="cell">${individual ? playerBox(players[0]) : teamPlayerBoxes(players)}</div>
+        <div class="standing-points-box" role="cell"><strong>${points}</strong><span>PTS</span></div>
+      </div>`;
     }).join("");
     $("#publicEmpty").hidden = entries.length > 0;
+    $(".ranking-table").hidden = entries.length === 0;
   }
 
   function renderAdmin() {
@@ -164,21 +182,25 @@
       $("#adminMode").textContent = "–"; $("#adminGroups").innerHTML = ""; $("#adminEmpty").hidden = false; return;
     }
     $("#adminMode").textContent = MODE_LABELS[tournament.mode];
-    $("#adminModeDescription").textContent = `${tournament.mode} Spieler pro Team`;
+    $("#adminModeDescription").textContent = tournament.mode === 1 ? "Jeder Eintrag ist ein einzelner Spieler." : `Jeder Eintrag besteht aus ${tournament.mode} Spielern.`;
     $("#adminCurrentRound").textContent = tournament.currentRound;
     $("#adminEditingRound").textContent = `Runde ${tournament.editingRound}`;
     $("#adminHeadRound").textContent = tournament.editingRound;
     $("#adminParticipants").textContent = allPlayers(tournament).length;
     $("#adminTeamsSummary").textContent = `${tournament.teams.length} ${tournament.mode === 1 ? "Teilnehmer" : "Teams"}`;
-    $("#adminRoundTabs").innerHTML = Array.from({ length: tournament.currentRound }, (_, index) => `<button type="button" class="round-tab ${index + 1 === tournament.editingRound ? "active" : ""}" data-round="${index + 1}">R ${index + 1}<span data-delete-round="${index + 1}" title="Runde löschen">×</span></button>`).join("");
+    $("#adminRoundTabs").innerHTML = Array.from({ length: tournament.currentRound }, (_, index) => index + 1).map((round) => `<div class="round-tab-wrap ${round === tournament.editingRound ? "active" : ""}"><button type="button" class="round-tab ${round === tournament.editingRound ? "active" : ""} ${round === tournament.currentRound ? "current" : ""}" data-round="${round}">Runde ${round}${round === tournament.currentRound ? "<small>aktuell</small>" : ""}</button><button class="round-delete-button" data-delete-round="${round}" type="button" ${tournament.currentRound <= 1 ? "disabled" : ""} aria-label="Runde löschen">×</button></div>`).join("");
+    $("#roundBackButton").disabled = tournament.editingRound <= 1;
+    $("#roundForwardButton").disabled = tournament.editingRound >= tournament.currentRound;
+    $("#jumpCurrentRoundButton").disabled = tournament.editingRound === tournament.currentRound;
     const filter = $("#adminSearch").value.trim().toLowerCase();
     let count = 0;
     $("#adminGroups").innerHTML = tournament.teams.map((team) => {
       const rows = team.players.filter((player) => !filter || player.name.toLowerCase().includes(filter) || team.name.toLowerCase().includes(filter)).map((player) => {
         count += 1; const total = statsThrough(player); const round = statsThrough({ events: player.events.filter((event) => event.round === tournament.editingRound) });
-        return `<article class="admin-player-row" data-player-id="${player.id}" data-team-id="${team.id}"><div><strong>${escapeHtml(player.name)}</strong><small>K ${total.kills} · DM ${total.deathmatches} · S ${total.wins}</small></div><span><i class="team-color-dot" style="background:${escapeHtml(team.color)}"></i>${escapeHtml(team.name)}</span><strong>${total.points} PTS</strong><span>K ${round.kills} · DM ${round.deathmatches} · S ${round.wins}</span><div class="admin-row-actions"><button data-event-type="kill" type="button">Kill +1</button><button data-event-type="deathmatch" type="button">DM +3</button><button data-event-type="win" type="button">Sieg +2</button><button data-history type="button">History</button><button data-delete-player type="button">×</button></div></article>`;
+        return `<article class="admin-player-row" data-player-id="${player.id}" data-team-id="${team.id}" style="--team-color:${escapeHtml(team.color)}"><div class="admin-player"><div><strong>${escapeHtml(player.name)}</strong><small>K ${total.kills} · DM ${total.deathmatches} · S ${total.wins}</small></div></div><div class="admin-team-name">${tournament.mode === 1 ? '<span class="entity-sub">Solo</span>' : escapeHtml(team.name)}</div><div class="admin-points">${total.points}</div><div class="round-action-cell"><button class="event-button kill" data-event-type="kill" type="button">Kill +1${round.kills ? ` · ${round.kills}×` : ""}</button><button class="event-button dm" data-event-type="deathmatch" type="button">DM +3${round.deathmatches ? ` · ${round.deathmatches}×` : ""}</button><button class="event-button win" data-event-type="win" type="button">Sieg +2${round.wins ? ` · ${round.wins}×` : ""}</button></div><div class="row-actions"><button class="mini-button" data-history type="button" title="Historie">↶</button><button class="mini-button delete" data-delete-player type="button" title="Löschen">×</button></div></article>`;
       }).join("");
-      return rows ? `<section class="admin-team-group"><header><i style="background:${escapeHtml(team.color)}"></i>${escapeHtml(team.name)}<button data-delete-team="${team.id}" type="button">Team löschen</button></header>${rows}</section>` : "";
+      const heading = tournament.mode > 1 ? `<div class="admin-team-heading" style="--team-color:${escapeHtml(team.color)}"><div><strong>${escapeHtml(team.name)}</strong><small>${team.players.map((player) => escapeHtml(player.name)).join(" + ")}</small></div><div class="team-heading-score">${teamPoints(team)} Punkte <button class="mini-button delete" data-delete-team="${team.id}" type="button" title="Team löschen">×</button></div></div>` : "";
+      return rows ? `<section class="admin-team-group" data-team-id="${team.id}">${heading}${rows}</section>` : "";
     }).join("");
     $("#adminResultCount").textContent = `${count} Spieler`;
     $("#adminEmpty").hidden = tournament.teams.length > 0;
@@ -187,28 +209,34 @@
   function renderDetail(teamId, playerId = "") {
     const tournament = getTournament(); const team = tournament?.teams.find((item) => item.id === teamId); if (!team) return;
     const players = playerId ? team.players.filter((player) => player.id === playerId) : team.players;
+    const total = players.reduce((sum, player) => sum + statsThrough(player).points, 0);
+    $("#detailEyebrow").textContent = playerId || tournament.mode === 1 ? "SPIELERPROFIL" : `${MODE_LABELS[tournament.mode].toUpperCase()}-PROFIL`;
     $("#detailModalTitle").textContent = players.map((player) => player.name).join(" + ");
-    $("#detailPlayerNames").textContent = `${MODE_LABELS[players.length] || "Einzel"} · ${players.length} Spieler`;
-    $("#detailTotalPoints").textContent = players.reduce((sum, player) => sum + statsThrough(player).points, 0);
+    $("#detailPlayerNames").textContent = playerId ? `Einzelwertung · ${teamLabel(team)}` : `${MODE_LABELS[tournament.mode]} · ${players.length} Spieler`;
+    $("#detailTotalPoints").textContent = total;
+    $("#detailScoreGhost").textContent = total;
     $("#detailRoundNumber").textContent = tournament.currentRound;
     $("#detailPlayersGrid").innerHTML = players.map((player, index) => {
       const stats = statsThrough(player);
-      const history = Array.from({ length: tournament.currentRound }, (_, r) => { const s = statsThrough({ events: player.events.filter((e) => e.round === r + 1) }); return `<li><b>Runde ${r + 1}</b><span>K ${s.kills} · DM ${s.deathmatches} · S ${s.wins} · ${s.points} PTS</span></li>`; }).join("");
-      return `${index ? '<span class="detail-player-plus">+</span>' : ""}<article class="detail-player-card"><h3>${escapeHtml(player.name)}</h3><strong>${stats.points} PTS</strong><div class="profile-stats"><span>KILLS <b>${stats.kills}</b></span><span>DM <b>${stats.deathmatches}</b></span><span>SIEGE <b>${stats.wins}</b></span></div><ul class="match-history">${history}</ul></article>`;
+      const history = Array.from({ length: tournament.currentRound }, (_, r) => { const s = statsThrough({ events: player.events.filter((e) => e.round === r + 1) }); return `<div class="round-history-row"><strong>ROUND ${r + 1}</strong><span>KILL <b>+${s.kills}</b></span><span>DEATHMATCH <b>+${s.deathmatches * 3}</b></span><span>WIN <b>+${s.wins * 2}</b></span></div>`; }).join("");
+      return `${index ? '<div class="detail-team-plus" aria-hidden="true">+</div>' : ""}<article class="player-profile-card">
+        <div class="detail-player-standing"><div class="detail-player-name-box"><strong>${escapeHtml(player.name)}</strong></div><div class="detail-player-points-box"><strong>${stats.points}</strong><span>PTS</span></div></div>
+        <div class="profile-stat-grid"><div class="profile-stat kill"><span>KILLS</span><strong>${stats.kills}</strong></div><div class="profile-stat dm"><span>DEATHMATCHES</span><strong>${stats.deathmatches}</strong></div><div class="profile-stat win"><span>WINS</span><strong>${stats.wins}</strong></div></div>
+        <div class="match-history"><h3>MATCH HISTORY</h3><div class="round-history-list">${history}</div></div></article>`;
     }).join("");
     openModal("detailModal");
   }
 
   async function checkAdminSession(message = "") {
-    $("#adminAuthLoading").hidden = false; $("#adminLoginForm").hidden = true; $("#adminContent").hidden = true;
+    $("#adminGate").hidden = false; $("#adminAuthLoading").hidden = false; $("#adminLoginForm").hidden = true; $("#adminContent").hidden = true;
     if (!db) { showLogin("Die Verbindung zum Login-Dienst konnte nicht hergestellt werden."); return; }
     const { data: { session }, error } = await db.auth.getSession();
     if (error || !session) { isAdmin = false; showLogin(message); return; }
     const result = await db.rpc("is_admin");
     if (result.error || result.data !== true) { await db.auth.signOut(); isAdmin = false; showLogin("Kein Admin-Zugriff"); return; }
-    isAdmin = true; $("#adminAuthLoading").hidden = true; $("#adminLoginForm").hidden = true; $("#adminContent").hidden = false; renderAdmin();
+    isAdmin = true; $("#adminGate").hidden = true; $("#adminAuthLoading").hidden = true; $("#adminLoginForm").hidden = true; $("#adminContent").hidden = false; $("#addButton").hidden = false; renderAdmin();
   }
-  function showLogin(message = "") { $("#adminAuthLoading").hidden = true; $("#adminLoginForm").hidden = false; $("#adminContent").hidden = true; $("#adminLoginError").textContent = message; }
+  function showLogin(message = "") { $("#adminGate").hidden = false; $("#adminAuthLoading").hidden = true; $("#adminLoginForm").hidden = false; $("#adminContent").hidden = true; $("#addButton").hidden = true; $("#adminLoginError").textContent = message; }
   async function login(event) {
     event.preventDefault(); if (!db) return showLogin("Die Verbindung zum Login-Dienst konnte nicht hergestellt werden."); const button = event.submitter; button.disabled = true; $("#adminLoginError").textContent = "";
     const result = await db.auth.signInWithPassword({ email: $("#adminEmail").value.trim(), password: $("#adminPassword").value });
@@ -217,8 +245,11 @@
   async function logout() { await db.auth.signOut(); isAdmin = false; showLogin("Erfolgreich abgemeldet."); }
 
   function route() {
-    const admin = location.hash === "#admin";
+    const admin = location.hash.toLowerCase() === "#admin";
+    document.body.classList.toggle("public-mode", !admin);
+    document.body.classList.toggle("admin-mode", admin);
     $("#rankingView").hidden = admin; $("#adminView").hidden = !admin; $("#addButton").hidden = !admin || !isAdmin;
+    document.title = admin ? "Survival Games – Admin-Panel" : "Turnier Rangliste";
     if (admin) checkAdminSession();
   }
 
@@ -275,7 +306,14 @@
     while ((match = sectionRegex.exec(text.replace(/\r/g, "")))) {
       const color = COLOR_BY_NAME.get(match[1].replace(/\s+/g, " ").toLowerCase());
       const players = []; const playerRegex = /(?:^|,)\s*([^,:\n]+?)\s*:\s*(\/|(?:(?:k|dm|w)\s*:\s*-?\d+\s*)+)\s*(?=,|$)/gi; let playerMatch;
-      while ((playerMatch = playerRegex.exec(match[2].trim().replace(/,+\s*$/, "")))) players.push({ name: playerMatch[1].trim(), ...parseStatsTokenBlock(playerMatch[2]) });
+      const sectionText = match[2].trim().replace(/,+\s*$/, "");
+      const covered = Array(sectionText.length).fill(false);
+      while ((playerMatch = playerRegex.exec(sectionText))) {
+        players.push({ name: playerMatch[1].trim(), ...parseStatsTokenBlock(playerMatch[2]) });
+        for (let index = playerMatch.index; index < playerRegex.lastIndex; index += 1) covered[index] = true;
+      }
+      const unparsed = [...sectionText].filter((character, index) => !covered[index] && !/[\s,]/.test(character)).join("");
+      if (unparsed) throw new Error(`Ungültiger Importinhalt bei ${color.label}.`);
       if (!players.length) throw new Error(`Keine gültigen Spieler für ${color.label}.`);
       sections.push({ color: color.label, hex: color.hex, players });
     }
@@ -300,17 +338,33 @@
         if (existing.length !== incoming.length || existing.some((name, index) => name !== incoming[index])) return showToast(`Team ${section.color} passt nicht zu den importierten Spielern.`, "error");
       }
     }
+    const affectedExistingIds = new Set(sections.flatMap((section) => {
+      const team = tournament.teams.find((item) => item.name.toLowerCase() === section.color.toLowerCase());
+      return team ? team.players.map((player) => player.id) : [];
+    }));
+    const unaffectedRoundEvents = allPlayers(tournament).flatMap(({ player }) => affectedExistingIds.has(player.id) ? [] : player.events.filter((item) => item.round === tournament.editingRound));
+    const dmTotal = new Set(unaffectedRoundEvents.filter((item) => item.type === "deathmatch").map((item) => item.id)).size + sections.flatMap((section) => section.players).filter((player) => player.dm).length;
+    const winTotal = new Set(unaffectedRoundEvents.filter((item) => item.type === "win").map((item) => item.id)).size + sections.flatMap((section) => section.players).filter((player) => player.w).length;
+    if (dmTotal > 4) return showToast("Zusammen mit vorhandenen Rundendaten wären mehr als 4 Deathmatch-Spieler gesetzt.", "error");
+    if (winTotal > 1) return showToast("Zusammen mit vorhandenen Rundendaten wäre mehr als 1 Sieger gesetzt.", "error");
     const ok = await performWrite(async () => {
+      const createdTeamIds = [];
+      const rollbackCreatedTeams = async () => {
+        if (createdTeamIds.length) await db.from("teams").delete().in("id", createdTeamIds);
+      };
       for (const section of sections) {
         let team = tournament.teams.find((item) => item.name.toLowerCase() === section.color.toLowerCase());
         if (!team) {
-          const teamResult = await db.from("teams").insert({ tournament_id: tournament.id, name: section.color, color: section.hex }).select().single(); if (teamResult.error) return teamResult;
-          const playerResult = await db.from("players").insert(section.players.map((p) => ({ tournament_id: tournament.id, team_id: teamResult.data.id, name: p.name }))).select(); if (playerResult.error) return playerResult;
+          const teamResult = await db.from("teams").insert({ tournament_id: tournament.id, name: section.color, color: section.hex }).select().single(); if (teamResult.error) { await rollbackCreatedTeams(); return teamResult; }
+          createdTeamIds.push(teamResult.data.id);
+          const playerResult = await db.from("players").insert(section.players.map((p) => ({ tournament_id: tournament.id, team_id: teamResult.data.id, name: p.name }))).select(); if (playerResult.error) { await rollbackCreatedTeams(); return playerResult; }
           team = { id: teamResult.data.id, players: playerResult.data };
         }
         for (const input of section.players) { const player = team.players.find((p) => p.name.toLowerCase() === input.name.toLowerCase()); resolved.push({ player_id: player.id, k: input.k, dm: input.dm, w: input.w }); }
       }
-      return db.rpc("replace_round_results", { p_tournament_id: tournament.id, p_round: tournament.editingRound, p_results: resolved });
+      const rpcResult = await db.rpc("replace_round_results", { p_tournament_id: tournament.id, p_round: tournament.editingRound, p_results: resolved });
+      if (rpcResult.error) await rollbackCreatedTeams();
+      return rpcResult;
     }, `Runde ${tournament.editingRound} importiert.`, event.submitter);
     if (ok) closeModal("importModal");
   }
@@ -333,7 +387,9 @@
     $("#publicTournamentSelect").addEventListener("change", (e) => setActiveTournament(e.target.value));
     $("#adminTournamentSelect").addEventListener("change", (e) => setActiveTournament(e.target.value));
     $("#rankingViewToggle").addEventListener("click", (e) => { const button = e.target.closest("[data-ranking-view]"); if (button && !button.disabled) { rankingView = button.dataset.rankingView; renderPublic(); } });
-    $("#publicRankingRows").addEventListener("click", (e) => { const row = e.target.closest("[data-team-id]"); if (row) renderDetail(row.dataset.teamId, row.dataset.playerId); });
+    const openRankingDetail = (row) => renderDetail(row.dataset.detailTeamId, row.dataset.detailPlayerId);
+    $("#publicRankingRows").addEventListener("click", (e) => { const row = e.target.closest("[data-detail-team-id]"); if (row) openRankingDetail(row); });
+    $("#publicRankingRows").addEventListener("keydown", (e) => { const row = e.target.closest("[data-detail-team-id]"); if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openRankingDetail(row); } });
     $("#adminLoginForm").addEventListener("submit", login); $("#logoutButton").addEventListener("click", logout);
     $("#createTournamentButton").addEventListener("click", () => { selectedMode = 0; $("#tournamentForm").reset(); openModal("tournamentModal"); });
     $("#tournamentModePicker").addEventListener("click", (e) => { const button = e.target.closest("[data-mode]"); if (!button) return; selectedMode = Number(button.dataset.mode); $$("[data-mode]").forEach((b) => b.classList.toggle("active", b === button)); $("#saveTournamentButton").disabled = false; $("#modeExplanation").textContent = `${MODE_LABELS[selectedMode]}: ${selectedMode} Spieler pro Team.`; });
@@ -348,7 +404,7 @@
     $("#roundForwardButton").addEventListener("click", () => { const t = getTournament(); if (t?.editingRound < t.currentRound) setEditingRound(t.editingRound + 1); });
     $("#jumpCurrentRoundButton").addEventListener("click", () => { const t = getTournament(); if (t) setEditingRound(t.currentRound); });
     $("#adminSearch").addEventListener("input", renderAdmin);
-    $("#adminGroups").addEventListener("click", async (e) => { const row = e.target.closest("[data-player-id]"); const eventButton = e.target.closest("[data-event-type]"); if (row && eventButton) return addEvent(row.dataset.playerId, eventButton.dataset.eventType, eventButton); if (row && e.target.closest("[data-history]")) { activeHistoryPlayerId = row.dataset.playerId; renderHistory(); return; } if (row && e.target.closest("[data-delete-player]") && confirm("Spieler wirklich löschen?")) return performWrite(() => db.from("players").delete().eq("id", row.dataset.playerId), "Spieler gelöscht."); const teamButton = e.target.closest("[data-delete-team]"); if (teamButton && confirm("Team samt Spielern und Ergebnissen löschen?")) return performWrite(() => db.from("teams").delete().eq("id", teamButton.dataset.deleteTeam), "Team gelöscht."); });
+    $("#adminGroups").addEventListener("click", async (e) => { const row = e.target.closest("[data-player-id]"); const eventButton = e.target.closest("[data-event-type]"); if (row && eventButton) return addEvent(row.dataset.playerId, eventButton.dataset.eventType, eventButton); if (row && e.target.closest("[data-history]")) { activeHistoryPlayerId = row.dataset.playerId; renderHistory(); return; } if (row && e.target.closest("[data-delete-player]")) { const tournament = getTournament(); const prompt = tournament.mode === 1 ? "Solo-Teilnehmer wirklich löschen?" : `Komplettes ${MODE_LABELS[tournament.mode]}-Team samt Spielern und Ergebnissen löschen?`; if (confirm(prompt)) return performWrite(() => db.from("teams").delete().eq("id", row.dataset.teamId), tournament.mode === 1 ? "Teilnehmer gelöscht." : "Team gelöscht."); } const teamButton = e.target.closest("[data-delete-team]"); if (teamButton && confirm("Team samt Spielern und Ergebnissen löschen?")) return performWrite(() => db.from("teams").delete().eq("id", teamButton.dataset.deleteTeam), "Team gelöscht."); });
     $$("[data-close]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.close)));
     $$(".modal-backdrop").forEach((backdrop) => backdrop.addEventListener("mousedown", (e) => { if (e.target === backdrop) closeModal(backdrop.id); }));
   }
@@ -361,7 +417,7 @@
     openModal("historyModal");
   }
 
-  const importTestApi = { parseRoundImport, parseStatsTokenBlock };
+  const importTestApi = { parseRoundImport, parseStatsTokenBlock, placementLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = importTestApi;
   if (typeof document === "undefined") return;
   window.__IMPORT_TEST_API__ = importTestApi;
