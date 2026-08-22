@@ -119,7 +119,16 @@
       const bn = individual ? b.player.name : teamLabel(b);
       return bp - ap || an.localeCompare(bn, "de");
     });
-    return new Map(sorted.map((entry, index) => [individual ? entry.player.id : entry.id, index + 1]));
+    const ranks = new Map();
+    let previousPoints;
+    let rank = 0;
+    sorted.forEach((entry, index) => {
+      const points = individual ? statsThrough(entry.player, round).points : teamPoints(entry, round);
+      if (index === 0 || points !== previousPoints) rank = index + 1;
+      ranks.set(individual ? entry.player.id : entry.id, rank);
+      previousPoints = points;
+    });
+    return ranks;
   }
 
   function movement(current, previous, round) {
@@ -157,7 +166,13 @@
     const individual = rankingView === "individual" || tournament.mode === 1;
     const currentRanks = rankMaps(tournament, tournament.currentRound, individual);
     const previousRanks = rankMaps(tournament, Math.max(1, tournament.currentRound - 1), individual);
-    const entries = (individual ? allPlayers(tournament) : tournament.teams).slice().sort((a, b) => currentRanks.get(individual ? a.player.id : a.id) - currentRanks.get(individual ? b.player.id : b.id));
+    const entries = (individual ? allPlayers(tournament) : tournament.teams).slice().sort((a, b) => {
+      const ap = individual ? statsThrough(a.player, tournament.currentRound).points : teamPoints(a, tournament.currentRound);
+      const bp = individual ? statsThrough(b.player, tournament.currentRound).points : teamPoints(b, tournament.currentRound);
+      const an = individual ? a.player.name : teamLabel(a);
+      const bn = individual ? b.player.name : teamLabel(b);
+      return bp - ap || an.localeCompare(bn, "de");
+    });
     $("#rankingViewToggle").hidden = tournament.mode === 1;
     $("#publicRankingHead").hidden = true;
     $("#publicRankingHead").innerHTML = "";
@@ -414,7 +429,7 @@
     openModal("historyModal");
   }
 
-  const importTestApi = { parseRoundImport, parseStatsTokenBlock, placementLabel };
+  const importTestApi = { parseRoundImport, parseStatsTokenBlock, placementLabel, rankMaps, movement };
   if (typeof module !== "undefined" && module.exports) module.exports = importTestApi;
   if (typeof document === "undefined") return;
   window.__IMPORT_TEST_API__ = importTestApi;
