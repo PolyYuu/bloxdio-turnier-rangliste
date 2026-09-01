@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090718">
+  <title>Survival Games Competitive Hub — V2 Klick-Dummy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Pixelify+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="v2.css">
+</head>
+<body>
+  <div class="world-bg" aria-hidden="true">
+    <svg class="world-art" viewBox="0 0 1600 920" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#0a061b"/>
+          <stop offset=".5" stop-color="#2e0a61"/>
+          <stop offset="1" stop-color="#0a0718"/>
+        </linearGradient>
+        <radialGradient id="portal" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#d33aff" stop-opacity=".75"/>
+          <stop offset=".42" stop-color="#6f24e8" stop-opacity=".35"/>
+          <stop offset="1" stop-color="#0d0620" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="mountain" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#25104f"/>
+          <stop offset="1" stop-color="#0b0819"/>
+        </linearGradient>
+        <linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#75fff6"/>
+          <stop offset=".45" stop-color="#1ed7e9"/>
+          <stop offset="1" stop-color="#5a38ff"/>
+        </linearGradient>
+        <filter id="glow"><feGaussianBlur stdDeviation="14"/></filter>
+      </defs>
+      <rect width="1600" height="920" fill="url(#sky)"/>
+      <ellipse cx="810" cy="255" rx="470" ry="270" fill="url(#portal)" filter="url(#glow)"/>
+      <g opacity=".35" fill="#7f31dc">
+        <rect x="110" y="128" width="15" height="15"/><rect x="205" y="86" width="9" height="9"/>
+        <rect x="1370" y="140" width="13" height="13"/><rect x="1500" y="100" width="8" height="8"/>
+        <rect x="1120" y="62" width="8" height="8"/><rect x="420" y="170" width="7" height="7"/>
+      </g>
+      <g opacity=".5">
+        <polygon points="0,530 170,400 320,465 420,380 560,470 710,392 850,500 1010,400 1160,475 1290,390 1460,460 1600,405 1600,920 0,920" fill="url(#mountain)"/>
+        <polygon points="0,620 210,510 365,570 500,485 665,610 795,515 960,590 1110,490 1260,570 1440,500 1600,565 1600,920 0,920" fill="#0a0716"/>
+      </g>
+      <g opacity=".8">
+        <rect x="125" y="325" width="35" height="168" fill="#120d28"/>
+        <rect x="88" y="370" width="110" height="26" fill="#120d28"/>
+        <rect x="136" y="280" width="12" height="50" fill="#1fd3df"/>
+        <polygon points="142,240 160,280 124,280" fill="url(#crystal)"/>
+        <rect x="1450" y="330" width="30" height="160" fill="#120d28"/>
+        <rect x="1405" y="372" width="120" height="25" fill="#120d28"/>
+        <rect x="1461" y="286" width="10" height="49" fill="#7a33ff"/>
+        <polygon points="1466,250 1484,286 1448,286" fill="#b049ff"/>
+      </g>
+      <g opacity=".34" stroke="#a751ff" stroke-width="3" fill="none">
+        <path d="M310 345h85v-80h46v-56h55"/>
+        <path d="M1190 350h-95v-72h-46v-60h-54"/>
+      </g>
+      <g opacity=".2" fill="#1bf0e6">
+        <rect x="50" y="690" width="45" height="45" transform="rotate(18 72 712)"/>
+        <rect x="1490" y="680" width="52" height="52" transform="rotate(-15 1516 706)"/>
+        <rect x="138" y="770" width="22" height="22"/><rect x="1410" y="805" width="26" height="26"/>
+      </g>
+    </svg>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#overview" data-nav="overview">
+      <span class="brand-cube"><i></i></span>
+      <span>
+        <strong>Survival Games</strong>
+        <small>Bloxd.io Competitive Hub</small>
+      </span>
+    </a>
+
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#overview" data-nav="overview">Übersicht</a>
+      <a href="#ranking" data-nav="ranking">Rangliste</a>
+      <a href="#cup" data-nav="cup">Cup</a>
+      <a href="#profile" data-nav="profile">Profil</a>
+    </nav>
+
+    <div class="top-actions">
+      <button class="notification-button" id="notificationButton" type="button" aria-label="Benachrichtigungen">
+        <span>3</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      </button>
+      <button class="account-chip" id="accountChip" type="button">
+        <span class="account-rank-mini" id="headerRankIcon"></span>
+        <span><b>Stalker_Curry</b><small>Demo-Profil</small></span>
+        <span class="chev">⌄</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="app">
+    <section class="view active" data-view="overview">
+      <div class="hero compact-hero">
+        <div>
+          <p class="kicker">SURVIVAL GAMES</p>
+          <h1>COMPETITIVE HUB</h1>
+          <p class="hero-copy">Deine Cups, dein Rang und dein Fortschritt — alles an einem Ort.</p>
+        </div>
+        <button class="primary-cta" data-open-registration type="button">
+          <span>Zum nächsten Cup anmelden</span><b>↗</b>
+        </button>
+      </div>
+
+      <div class="overview-grid">
+        <section class="panel overview-ranking">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">TURNIERÜBERGREIFEND</span>
+              <h2>RANGLISTE</h2>
+            </div>
+            <a href="#ranking" data-nav="ranking" class="text-link">Alle Spieler →</a>
+          </div>
+          <div class="ranking-preview" id="overviewRanking"></div>
+        </section>
+
+        <section class="panel my-rank-card">
+          <div class="rank-card-header">
+            <div><span class="eyebrow">DEIN RANG</span><h2>MEISTER</h2></div>
+            <span class="global-position">#3 GLOBAL</span>
+          </div>
+          <div class="rank-visual-wrap">
+            <img id="overviewRankIcon" alt="Meister Rangicon">
+            <div class="rank-rating">
+              <strong>1.887</strong><small>RATING</small>
+            </div>
+          </div>
+          <div class="progress-copy"><span>Fortschritt zu Großmeister</span><strong>113 Punkte</strong></div>
+          <div class="progress"><i style="--p:54.8%"></i></div>
+          <div class="progress-labels"><span>1750</span><span>2000</span></div>
+          <a class="secondary-cta" href="#profile" data-nav="profile">Profil ansehen</a>
+        </section>
+
+        <section class="panel next-cup-card">
+          <div class="panel-heading">
+            <div><span class="eyebrow">ANMELDUNGEN OFFEN</span><h2>NÄCHSTER CUP</h2></div>
+            <span class="status-pill live">OFFEN</span>
+          </div>
+          <div class="cup-feature">
+            <div class="cup-symbol">SG</div>
+            <div>
+              <h3>SG CUP #2</h3>
+              <p>18. Oktober 2026 · 20:00 Uhr</p>
+              <div class="cup-meta"><span>DUO</span><span>8 RUNDEN</span><span>9 / 12 TEAMS</span></div>
+            </div>
+          </div>
+          <button class="primary-cta wide" data-open-registration type="button">Team anmelden <b>→</b></button>
+          <p class="small-note">Einladung senden → Mate bestätigt → Team ist angemeldet.</p>
+        </section>
+
+        <section class="panel last-cup-card">
+          <div class="panel-heading">
+            <div><span class="eyebrow">LETZTER CUP</span><h2>BLOXDIO TURNIER 22.08.</h2></div>
+            <a href="#cup" data-nav="cup" class="text-link">Details →</a>
+          </div>
+          <div class="cup-result-list">
+            <div><b>1</b><span>SuesserSuessling + Stalker_Curry</span><strong>56 P</strong></div>
+            <div><b>2</b><span>Haarglatzfall123 + Haarsytem123</span><strong>52 P</strong></div>
+            <div><b>3</b><span>Fruechtebox + rgyray</span><strong>44 P</strong></div>
+          </div>
+        </section>
+
+        <section class="panel update-preview">
+          <div class="panel-heading">
+            <div><span class="eyebrow">LIVE NACH JEDER RUNDE</span><h2>RANKED UPDATE</h2></div>
+            <button class="ghost-button" id="openRankUpdate" type="button">Demo öffnen</button>
+          </div>
+          <div class="update-preview-content">
+            <img id="updatePreviewIcon" alt="Meister Rangicon">
+            <div class="delta-block"><span>RUNDE 81</span><strong>+24</strong><small>Rating</small></div>
+            <div class="update-progress">
+              <div class="progress-copy"><span>1872 → 1896</span><strong>+24</strong></div>
+              <div class="progress"><i style="--p:58.4%"></i></div>
+              <p>Team #2 · 8 SG-Punkte · Gegnerstärke hoch</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="feature-strip">
+        <article><span>◈</span><div><strong>Faire Wertung</strong><p>Gegnerstärke, Platzierung und SG-Punkte.</p></div></article>
+        <article><span>ϟ</span><div><strong>Live nach jeder Runde</strong><p>Rating-Update ohne Seiten-Refresh.</p></div></article>
+        <article><span>◎</span><div><strong>Cup-Anmeldung</strong><p>Mate einladen, bestätigen und gemeinsam antreten.</p></div></article>
+        <article><span>⌁</span><div><strong>Karriere & Stats</strong><p>Rating-Verlauf, Peak, Cups und Form.</p></div></article>
+      </div>
+    </section>
+
+    <section class="view" data-view="ranking">
+      <div class="hero">
+        <div>
+          <p class="kicker">TURNIERÜBERGREIFEND</p>
+          <h1>RANGLISTE</h1>
+          <p class="hero-copy">Die permanente Einzelrangliste. Teams können sich von Cup zu Cup ändern — dein Rating bleibt.</p>
+        </div>
+        <div class="hero-stat"><span>SEASON 1</span><strong>18</strong><small>aktive Spieler</small></div>
+      </div>
+
+      <section class="panel leaderboard-panel">
+        <div class="leaderboard-toolbar">
+          <div class="leaderboard-tabs">
+            <button class="active" type="button">Gesamtrangliste</button>
+            <button type="button">Form</button>
+            <button type="button">Stats</button>
+          </div>
+          <label class="search">
+            <span>⌕</span><input id="rankingSearch" type="search" placeholder="Spieler suchen …">
+          </label>
+        </div>
+        <div class="leaderboard-head"><span>#</span><span>SPIELER</span><span>RANG</span><span>RATING</span><span>TREND</span><span>PEAK</span></div>
+        <div id="fullRanking" class="leaderboard-list"></div>
+      </section>
+    </section>
+
+    <section class="view" data-view="cup">
+      <div class="hero">
+        <div>
+          <p class="kicker">TEMPORÄRE TURNIERWERTUNG</p>
+          <h1>CUP</h1>
+          <p class="hero-copy">Jeder Cup hat seine eigenen Teams und Punkte. Das Ranked-Rating wird separat spielerbezogen geführt.</p>
+        </div>
+        <label class="cup-select">
+          <span>Cup auswählen</span>
+          <select id="cupSelect">
+            <option value="past">Bloxdio Turnier 22.08. · abgeschlossen</option>
+            <option value="next">SG Cup #2 · Anmeldung offen</option>
+          </select>
+        </label>
+      </div>
+
+      <section id="pastCup" class="cup-layout">
+        <div class="panel cup-main">
+          <div class="cup-header">
+            <div>
+              <span class="status-pill ended">ABGESCHLOSSEN</span>
+              <h2>Bloxdio Turnier 22.08.</h2>
+              <p>DUO · 8 RUNDEN · 18 SPIELER</p>
+            </div>
+            <div class="cup-round">8<span>/ 8</span><small>RUNDEN</small></div>
+          </div>
+          <div class="subtabs" id="cupTabs">
+            <button class="active" data-cup-tab="team" type="button">Teamwertung</button>
+            <button data-cup-tab="individual" type="button">Einzelwertung</button>
+            <button data-cup-tab="rounds" type="button">Runden</button>
+          </div>
+          <div class="cup-tab active" data-cup-content="team" id="teamStandings"></div>
+          <div class="cup-tab" data-cup-content="individual" id="individualStandings"></div>
+          <div class="cup-tab" data-cup-content="rounds" id="roundStandings"></div>
+        </div>
+
+        <aside class="cup-side">
+          <section class="panel cup-summary">
+            <span class="eyebrow">CUP-SIEGER</span>
+            <div class="winner-number">#1</div>
+            <h3>SuesserSuessling<br>+ Stalker_Curry</h3>
+            <strong>56 Punkte</strong>
+          </section>
+          <section class="panel cup-archive">
+            <div class="panel-heading"><div><span class="eyebrow">ARCHIV</span><h2>VERGANGENE CUPS</h2></div></div>
+            <button type="button"><b>22.08.</b><span>Bloxdio Turnier</span><strong>9 Teams</strong></button>
+            <button type="button" disabled><b>—</b><span>Weitere Cups erscheinen hier</span><strong>—</strong></button>
+          </section>
+        </aside>
+      </section>
+
+      <section id="nextCup" class="cup-layout" hidden>
+        <div class="panel signup-hero">
+          <span class="status-pill live">ANMELDUNGEN OFFEN</span>
+          <p class="kicker">SG CUP #2</p>
+          <h2>BAUE DEIN TEAM.</h2>
+          <p>Duo · 8 Runden · 18. Oktober 2026 · 20:00 Uhr</p>
+          <div class="signup-count"><strong>18</strong><span>/ 24 Spieler angemeldet</span></div>
+          <button class="primary-cta" data-open-registration type="button">Zum Cup anmelden <b>→</b></button>
+        </div>
+        <aside class="panel signup-rules">
+          <span class="eyebrow">SO FUNKTIONIERT'S</span>
+          <ol>
+            <li><b>1</b><span>Teampartner auswählen.</span></li>
+            <li><b>2</b><span>Partner erhält eine Anfrage.</span></li>
+            <li><b>3</b><span>Nach Bestätigung ist das Team angemeldet.</span></li>
+          </ol>
+        </aside>
+      </section>
+    </section>
+
+    <section class="view" data-view="profile">
+      <div class="profile-hero panel">
+        <div class="profile-copy">
+          <span class="eyebrow">SPIELERPROFIL</span>
+          <h1>STALKER_CURRY</h1>
+          <div class="profile-badges"><span>#3 GLOBAL</span><span>120 RANKED GAMES</span><span>15 CUPS</span></div>
+        </div>
+        <div class="profile-rank">
+          <img id="profileRankIcon" alt="Meister Rangicon">
+          <div><span>MEISTER</span><strong>1.887</strong><small>Peak: 1.942</small></div>
+        </div>
+      </div>
+
+      <div class="profile-grid">
+        <section class="panel profile-progress-card">
+          <div class="panel-heading"><div><span class="eyebrow">FORTSCHRITT</span><h2>BIS GROSSMEISTER</h2></div><strong class="accent-number">113</strong></div>
+          <div class="progress large"><i style="--p:54.8%"></i></div>
+          <div class="progress-labels"><span>1750 MEISTER</span><span>2000 GROSSMEISTER</span></div>
+        </section>
+
+        <section class="panel profile-stats">
+          <div><span>Ø SG-PUNKTE</span><strong>5,7</strong></div>
+          <div><span>KILLS</span><strong>182</strong></div>
+          <div><span>TOP 3 RUNDEN</span><strong>46%</strong></div>
+          <div><span>BESTE SERIE</span><strong>+94</strong></div>
+        </section>
+
+        <section class="panel rating-chart-card">
+          <div class="panel-heading"><div><span class="eyebrow">KARRIERE</span><h2>RATING-VERLAUF</h2></div><span class="status-pill">120 GAMES</span></div>
+          <svg class="rating-chart" viewBox="0 0 900 280" role="img" aria-label="Demo Rating Verlauf">
+            <defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22e7e1" stop-opacity=".34"/><stop offset="1" stop-color="#22e7e1" stop-opacity="0"/></linearGradient></defs>
+            <g class="chart-grid"><path d="M30 45H875M30 105H875M30 165H875M30 225H875"/></g>
+            <path class="chart-area" d="M30 235 C105 212 150 220 208 190 S310 145 370 160 S470 92 525 113 S640 55 700 80 S810 52 875 64 L875 260 L30 260Z"/>
+            <path class="chart-line" d="M30 235 C105 212 150 220 208 190 S310 145 370 160 S470 92 525 113 S640 55 700 80 S810 52 875 64"/>
+          </svg>
+        </section>
+
+        <section class="panel recent-rating">
+          <div class="panel-heading"><div><span class="eyebrow">LETZTE FORM</span><h2>RATING UPDATES</h2></div><button class="ghost-button" id="profileRankUpdate" type="button">Update-Demo</button></div>
+          <div class="form-row"><span>Runde 81</span><strong class="positive">+24</strong><small>Team #2 · 8 P</small></div>
+          <div class="form-row"><span>Runde 80</span><strong class="negative">−13</strong><small>Team #7 · 2 P</small></div>
+          <div class="form-row"><span>Runde 79</span><strong class="positive">+31</strong><small>Team #1 · 12 P</small></div>
+          <div class="form-row"><span>Runde 78</span><strong class="positive">+8</strong><small>Team #4 · 6 P</small></div>
+        </section>
+
+        <section class="panel profile-settings">
+          <div class="panel-heading"><div><span class="eyebrow">ACCOUNT</span><h2>PROFIL</h2></div></div>
+          <label><span>Bloxd.io Name</span><input value="Stalker_Curry"></label>
+          <p class="small-note">Der angezeigte Name soll deinem Bloxd.io Namen entsprechen. Profilbilder sind im Klick-Dummy bewusst deaktiviert.</p>
+          <button class="secondary-cta" type="button">Änderung speichern</button>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="popover notifications" id="notifications" hidden>
+    <strong>BENACHRICHTIGUNGEN</strong>
+    <button type="button"><span class="dot"></span><b>SG Cup #2</b><small>Anmeldungen sind jetzt offen.</small></button>
+    <button type="button"><span class="dot"></span><b>Runde 81</b><small>Dein Rating-Update ist verfügbar.</small></button>
+    <button type="button"><span class="dot"></span><b>Party</b><small>SuesserSuessling hat deine Anfrage angenommen.</small></button>
+  </div>
+
+  <div class="modal-backdrop" id="registrationModal" hidden>
+    <section class="modal registration-modal" role="dialog" aria-modal="true" aria-labelledby="registrationTitle">
+      <button class="modal-close" data-close-modal type="button">×</button>
+      <span class="eyebrow">SG CUP #2 · DUO</span>
+      <h2 id="registrationTitle">TEAM ANMELDEN</h2>
+      <p>Wähle deinen Teampartner. Die Anmeldung wird erst bestätigt, wenn dein Mate die Anfrage angenommen hat.</p>
+      <div class="party-builder">
+        <div class="party-slot confirmed"><span>1</span><div><b>Stalker_Curry</b><small>Du</small></div><strong>✓</strong></div>
+        <div class="party-plus">+</div>
+        <div class="party-slot" id="mateSlot"><span>2</span><div><b id="mateName">Teampartner auswählen</b><small id="mateState">Noch keine Anfrage</small></div><strong id="mateStatus">…</strong></div>
+      </div>
+      <label class="mate-select"><span>Teampartner</span>
+        <select id="mateSelect">
+          <option value="">Spieler auswählen …</option>
+          <option>SuesserSuessling</option><option>Strebaer</option><option>Meinii</option><option>Haarglatzfall123</option><option>Fruechtebox</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button class="secondary-cta" data-close-modal type="button">Abbrechen</button>
+        <button class="primary-cta" id="sendInvite" type="button">Anfrage senden</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="rank-overlay" id="rankOverlay" hidden>
+    <div class="rank-overlay-bg"></div>
+    <section class="rank-update-card">
+      <button class="modal-close light" id="closeRankOverlay" type="button">×</button>
+      <p class="kicker">RANKED UPDATE · RUNDE 81</p>
+      <h2>DEIN FORTSCHRITT</h2>
+      <img id="overlayRankIcon" alt="Meister Rangicon">
+      <div class="overlay-rank-name">MEISTER</div>
+      <div class="overlay-rating"><span id="ratingBefore">1.872</span><b>→</b><span id="ratingAfter">1.896</span></div>
+      <div class="overlay-delta">+24</div>
+      <div class="overlay-progress-label"><span>MEISTER · 1750</span><strong>58%</strong><span>GM · 2000</span></div>
+      <div class="progress overlay-progress"><i id="overlayProgressBar"></i></div>
+      <div class="overlay-summary">
+        <div><span>Teamplatzierung</span><strong>#2</strong></div>
+        <div><span>SG-Punkte</span><strong>8</strong></div>
+        <div><span>Gegnerstärke</span><strong>HOCH</strong></div>
+        <div><span>Final</span><strong class="positive">+24</strong></div>
+      </div>
+      <button class="details-toggle" id="detailsToggle" type="button">Warum +24? <span>⌄</span></button>
+      <div class="rating-breakdown" id="ratingBreakdown" hidden>
+        <div><span>Rundenleistung</span><b>+29</b></div>
+        <div><span>Gegnerstärke</span><b>+4</b></div>
+        <div><span>Individuelle Aufteilung</span><b>−6</b></div>
+        <div><span>Meister-Multiplikator</span><b>×0,90</b></div>
+        <div class="total"><span>Finale Änderung</span><b>+24</b></div>
+      </div>
+      <button class="primary-cta overlay-continue" id="overlayContinue" type="button">Weiter</button>
+    </section>
+  </div>
+
+  <script src="v2.js"></script>
+</body>
+</html>
