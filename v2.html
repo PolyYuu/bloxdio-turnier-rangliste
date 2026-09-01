@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Survival Games Competitive Hub – Klick-Dummy V2">
+  <title>Survival Games – Competitive Hub V2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Pixelify+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="v2.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <i class="ambient-block b1"></i><i class="ambient-block b2"></i><i class="ambient-block b3"></i>
+    <i class="ambient-block b4"></i><i class="ambient-block b5"></i><i class="ambient-block b6"></i>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="#overview" data-route="overview" aria-label="Zur Übersicht">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-copy"><strong>bloxd.io</strong><small>Survival Games</small></span>
+    </a>
+
+    <nav class="primary-nav" aria-label="Hauptnavigation">
+      <a href="#overview" data-route="overview" class="active">Übersicht</a>
+      <a href="#ranking" data-route="ranking">Rangliste</a>
+      <a href="#cup" data-route="cup">Cup</a>
+      <a href="#profile" data-route="profile">Profil</a>
+    </nav>
+
+    <div class="header-actions">
+      <button class="ghost-button" id="loginDemoButton" type="button">Anmelden</button>
+      <button class="cta-button" type="button" data-route="cup">Zum nächsten Cup <span>→</span></button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="page active" data-page="overview">
+      <section class="hero hero-overview">
+        <div class="hero-copy">
+          <span class="hero-kicker">Bloxd.io Tournament Hub</span>
+          <h1>Survival Games</h1>
+          <p>Deine Cups. Dein Rang. Deine Competitive-Historie.</p>
+        </div>
+        <div class="hero-chip-row">
+          <span class="status-chip"><i></i> Saison 1 aktiv</span>
+          <span class="status-chip muted">24 Spieler</span>
+        </div>
+      </section>
+
+      <div class="overview-grid">
+        <section class="panel leaderboard-preview">
+          <header class="panel-header">
+            <div><span class="eyebrow">Turnierübergreifend</span><h2>Rangliste</h2></div>
+            <button class="text-button" type="button" data-route="ranking">Alle ansehen →</button>
+          </header>
+          <div class="table-head compact">
+            <span>#</span><span>Spieler</span><span>Rang</span><span>Rating</span><span>Trend</span>
+          </div>
+          <div id="overviewRankingRows" class="ranking-list compact-list"></div>
+        </section>
+
+        <section class="panel my-rank-card">
+          <header class="panel-header tight">
+            <div><span class="eyebrow">Dein Rang</span><h2>Competitive</h2></div>
+            <button class="icon-only" type="button" data-route="profile" aria-label="Profil öffnen">↗</button>
+          </header>
+          <div class="my-rank-main">
+            <div class="rank-halo"><img id="overviewRankIcon" alt="Meister Rangicon"></div>
+            <div class="rank-copy"><span class="rank-name">Meister</span><strong id="overviewRating">1908</strong><small>Rating</small></div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-meta"><span>Fortschritt zu Großmeister</span><b id="overviewProgressLabel">63%</b></div>
+            <div class="rank-progress"><i id="overviewProgressBar"></i></div>
+            <div class="progress-scale"><span>1750</span><span>Noch 92</span><span>2000</span></div>
+          </div>
+          <button class="secondary-button wide" id="showRoundUpdateButton" type="button">Runden-Update ansehen</button>
+        </section>
+
+        <section class="panel next-cup-card">
+          <header class="panel-header tight">
+            <div><span class="eyebrow">Anmeldungen offen</span><h2>Nächster Cup</h2></div>
+            <span class="mode-tag">DUO</span>
+          </header>
+          <div class="cup-title-row"><div class="cup-gem">◆</div><div><strong>SG Cup #2</strong><span>18. Oktober 2026 · 20:00</span></div></div>
+          <div class="cup-stats"><span><b>8</b> Runden</span><span><b>18/24</b> Spieler</span><span><b>Duo</b> Modus</span></div>
+          <button class="cta-button wide" type="button" data-open-register>Zum Cup anmelden <span>→</span></button>
+          <p class="microcopy">Mit Mate anmelden – die Teilnahme wird erst nach Annahme bestätigt.</p>
+        </section>
+
+        <section class="panel last-cup-card">
+          <header class="panel-header tight">
+            <div><span class="eyebrow">Letzter Cup</span><h2>Bloxdio Turnier 22.08.</h2></div>
+            <button class="text-button" type="button" data-route="cup">Details →</button>
+          </header>
+          <div class="last-cup-result"><div><span>Dein Team</span><strong>#1</strong></div><div><span>Turnierpunkte</span><strong>56</strong></div><div><span>Rating</span><strong class="positive">+94</strong></div></div>
+          <div class="mini-form"><span>+28</span><span>+21</span><span>+25</span><span>+8</span><span>+11</span><span class="negative">−24</span><span>+23</span><span class="negative">−1</span></div>
+        </section>
+      </div>
+
+      <section class="feature-strip">
+        <article><i>◇</i><div><strong>Faire Wertung</strong><span>Rating aus Platzierung, Gegnerstärke und Leistung.</span></div></article>
+        <article><i>ϟ</i><div><strong>Live nach jeder Runde</strong><span>Dein Rating-Update erscheint sofort nach dem Import.</span></div></article>
+        <article><i>◎</i><div><strong>Cup-Anmeldung</strong><span>Mate einladen, bestätigen und gemeinsam anmelden.</span></div></article>
+        <article><i>▥</i><div><strong>Karriere & Stats</strong><span>Peak, Form, Historie und Fortschritt auf einen Blick.</span></div></article>
+      </section>
+    </section>
+
+    <section class="page" data-page="ranking">
+      <section class="hero compact-hero">
+        <div class="hero-copy"><span class="hero-kicker">Competitive Ranking</span><h1>Rangliste</h1><p>Turnierübergreifende Einzelrangliste aller Spieler.</p></div>
+        <div class="season-select"><span>Saison</span><strong>Saison 1</strong><small>2026</small></div>
+      </section>
+
+      <section class="panel full-ranking-panel">
+        <header class="panel-header">
+          <div><span class="eyebrow">Alle Spieler</span><h2>Globales Ranking</h2></div>
+          <div class="ranking-toolbar"><input id="rankingSearch" type="search" placeholder="Spieler suchen …"><select id="rankFilter"><option value="all">Alle Ränge</option><option>Großmeister</option><option>Meister</option><option>Diamant</option><option>Emerald</option><option>Gold</option><option>Eisen</option><option>Holz</option></select></div>
+        </header>
+        <div class="table-head full"><span>#</span><span>Spieler</span><span>Rang</span><span>Rating</span><span>Peak</span><span>Games</span><span>Form</span></div>
+        <div id="fullRankingRows" class="ranking-list"></div>
+      </section>
+    </section>
+
+    <section class="page" data-page="cup">
+      <section class="hero compact-hero cup-hero">
+        <div class="hero-copy"><span class="hero-kicker">Temporäre Turnierwertung</span><h1>Cup</h1><p>Jeder Cup hat eigene Teams, Runden und Ergebnisse.</p></div>
+        <div class="cup-selector"><span>Ausgewählter Cup</span><select id="cupSelect"><option value="past">Bloxdio Turnier 22.08.</option><option value="upcoming">SG Cup #2 · 18.10.</option></select></div>
+      </section>
+
+      <div id="pastCupView">
+        <div class="cup-tabs"><button class="active" data-cup-tab="teams">Teamwertung</button><button data-cup-tab="individual">Einzelwertung</button><button data-cup-tab="rounds">Runden</button></div>
+        <section class="panel cup-board">
+          <header class="panel-header"><div><span class="eyebrow">Abgeschlossen · 8 Runden</span><h2>Bloxdio Turnier 22.08.</h2></div><div class="cup-meta"><span>DUO</span><span>18 Spieler</span></div></header>
+          <div id="cupTeamsTab" class="cup-tab-content active"><div class="cup-table-head"><span>#</span><span>Team</span><span>Punkte</span></div><div id="cupTeamRows"></div></div>
+          <div id="cupIndividualTab" class="cup-tab-content"><div class="cup-table-head"><span>#</span><span>Spieler</span><span>Punkte</span></div><div id="cupIndividualRows"></div></div>
+          <div id="cupRoundsTab" class="cup-tab-content"><div class="round-picker" id="roundPicker"></div><div class="round-summary" id="roundSummary"></div></div>
+        </section>
+      </div>
+
+      <div id="upcomingCupView" hidden>
+        <div class="upcoming-grid">
+          <section class="panel registration-hero">
+            <span class="eyebrow">Anmeldungen offen</span><h2>SG Cup #2</h2><p>18. Oktober 2026 · 20:00 · Duo · 8 Runden</p>
+            <div class="registration-meter"><div><b>18</b><span>von 24 Spielern</span></div><div class="meter"><i style="width:75%"></i></div></div>
+            <button class="cta-button wide" type="button" data-open-register>Team anmelden →</button>
+          </section>
+          <section class="panel rules-card"><span class="eyebrow">Ablauf</span><h2>So funktioniert die Anmeldung</h2><ol><li>Mate auswählen und Anfrage senden.</li><li>Dein Mate muss die Teilnahme bestätigen.</li><li>Erst danach ist euer Team verbindlich angemeldet.</li><li>Jeder Spieler kann bis zum Anmeldeschluss absagen.</li></ol></section>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" data-page="profile">
+      <section class="profile-hero panel">
+        <div class="profile-identity"><div class="monogram">SC</div><div><span class="eyebrow">Spielerprofil</span><h1>Stalker_Curry</h1><p>Bloxd.io Name · #2 global</p></div></div>
+        <button class="ghost-button" id="renameButton" type="button">Bloxd.io Name ändern</button>
+      </section>
+
+      <div class="profile-grid">
+        <section class="panel profile-rank-card">
+          <div class="profile-rank-icon"><img id="profileRankIcon" alt="Meister Rangicon"></div>
+          <div class="profile-rank-copy"><span>Aktueller Rang</span><h2>Meister</h2><strong>1908</strong><small>Peak: 1942</small></div>
+          <div class="progress-wrap profile-progress"><div class="progress-meta"><span>Zu Großmeister</span><b>63%</b></div><div class="rank-progress"><i style="width:63.2%"></i></div><div class="progress-scale"><span>1750</span><span>92 Rating fehlen</span><span>2000</span></div></div>
+          <button class="secondary-button wide" id="profileRoundUpdateButton" type="button">Demo: Runden-Update</button>
+        </section>
+
+        <section class="panel stats-panel"><header class="panel-header tight"><div><span class="eyebrow">Karriere</span><h2>Statistiken</h2></div></header><div class="stat-grid"><div><span>Ranked Games</span><strong>80</strong></div><div><span>Cups</span><strong>10</strong></div><div><span>Ø Punkte / Runde</span><strong>5,9</strong></div><div><span>Kills</span><strong>143</strong></div><div><span>Cup-Siege</span><strong>3</strong></div><div><span>Top 3</span><strong>70%</strong></div></div></section>
+
+        <section class="panel history-panel"><header class="panel-header tight"><div><span class="eyebrow">Rating</span><h2>Verlauf</h2></div><span class="mode-tag">Letzte 40 Games</span></header><div class="chart" aria-label="Demo Rating Verlauf"><svg viewBox="0 0 700 220" preserveAspectRatio="none"><defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#31f0d1" stop-opacity=".38"/><stop offset="100%" stop-color="#31f0d1" stop-opacity="0"/></linearGradient></defs><path class="area" d="M0 190 L40 178 L75 182 L110 150 L145 156 L185 132 L220 121 L260 128 L300 104 L340 90 L380 96 L420 62 L460 72 L500 48 L540 55 L580 28 L620 36 L660 20 L700 27 L700 220 L0 220 Z"/><path class="line" d="M0 190 L40 178 L75 182 L110 150 L145 156 L185 132 L220 121 L260 128 L300 104 L340 90 L380 96 L420 62 L460 72 L500 48 L540 55 L580 28 L620 36 L660 20 L700 27"/></svg><div class="chart-labels"><span>1750</span><span>1800</span><span>1850</span><span>1900</span></div></div></section>
+
+        <section class="panel recent-updates"><header class="panel-header tight"><div><span class="eyebrow">Form</span><h2>Letzte Updates</h2></div></header><div class="update-list"><div><span>Runde 80</span><strong class="positive">+23</strong></div><div><span>Runde 79</span><strong class="negative">−11</strong></div><div><span>Runde 78</span><strong class="positive">+31</strong></div><div><span>Runde 77</span><strong class="positive">+8</strong></div><div><span>Runde 76</span><strong class="negative">−14</strong></div></div></section>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="roundUpdateModal" hidden>
+    <section class="rank-update-modal" role="dialog" aria-modal="true" aria-labelledby="rankUpdateTitle">
+      <button class="modal-close" type="button" data-close-modal="roundUpdateModal" aria-label="Schließen">×</button>
+      <span class="update-kicker">Ranked Update · Runde 81</span>
+      <h2 id="rankUpdateTitle">Dein Fortschritt</h2>
+      <div class="update-rank-icon"><img id="updateRankIcon" alt="Meister Rangicon"></div>
+      <span class="update-rank-name">Meister</span>
+      <div class="rating-change"><span id="ratingBefore">1908</span><i>→</i><strong id="ratingAfter">1935</strong></div>
+      <div class="delta positive">+27 Rating</div>
+      <div class="progress-wrap update-progress"><div class="progress-meta"><span>Fortschritt zu Großmeister</span><b>74%</b></div><div class="rank-progress"><i id="animatedUpdateBar"></i></div><div class="progress-scale"><span>1750</span><span>65 fehlen</span><span>2000</span></div></div>
+      <div class="factor-grid"><div><span>Teamplatzierung</span><strong>#2</strong></div><div><span>Gegnerstärke</span><strong>Hoch</strong></div><div><span>Teampunkte</span><strong>9</strong></div><div><span>Individuell</span><strong>+2</strong></div></div>
+      <button class="cta-button wide" type="button" data-close-modal="roundUpdateModal">Weiter</button>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="registerModal" hidden>
+    <section class="register-modal" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
+      <button class="modal-close" type="button" data-close-modal="registerModal" aria-label="Schließen">×</button>
+      <span class="eyebrow">SG Cup #2 · Duo</span><h2 id="registerTitle">Team anmelden</h2><p>Wähle deinen Mate. Dein Team ist erst bestätigt, wenn die Anfrage angenommen wurde.</p>
+      <div class="party-member self"><span>1</span><div><strong>Stalker_Curry</strong><small>Du</small></div><b>✓</b></div>
+      <label class="mate-field"><span>Spieler 2</span><select id="mateSelect"><option value="">Mate auswählen …</option><option>SuesserSuessling</option><option>Meinii</option><option>Strebaer</option><option>Haarglatzfall123</option></select></label>
+      <div class="party-member pending" id="matePreview" hidden><span>2</span><div><strong id="mateName">SuesserSuessling</strong><small>Anfrage noch nicht gesendet</small></div><b>…</b></div>
+      <button class="cta-button wide" id="sendInviteButton" type="button" disabled>Anfrage senden</button>
+      <div class="invite-success" id="inviteSuccess" hidden><strong>Anfrage gesendet</strong><span>Die Anmeldung wird bestätigt, sobald dein Mate akzeptiert.</span></div>
+    </section>
+  </div>
+
+  <script src="v2.js"></script>
+</body>
+</html>
