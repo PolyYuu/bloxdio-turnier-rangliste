@@ -1,1 +1,1 @@
-(()=>{const c=document.createElement('link');c.rel='stylesheet';c.href='v2-overrides.css';document.head.appendChild(c);const s=document.createElement('script');s.src='v2-enhanced.js';document.body.appendChild(s);})();
+(()=>{const c=document.createElement('link');c.rel='stylesheet';c.href='v2-overrides.css';document.head.appendChild(c);const load=src=>new Promise((ok,fail)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=fail;document.body.appendChild(s)});load('v2-data.js').then(()=>load('v2-i18n.js')).then(()=>load('v2-enhanced.js'));})();
