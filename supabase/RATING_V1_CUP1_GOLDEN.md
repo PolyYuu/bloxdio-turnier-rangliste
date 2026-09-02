@@ -11,29 +11,34 @@ Final rating changes after 8 rounds:
 
 | Player | Delta | Final |
 |---|---:|---:|
-| Stalker_Curry | +185 | 1285 |
-| SuesserSuessling | +180 | 1280 |
-| Fruechtebox | +109 | 1209 |
-| rgyray | +107 | 1207 |
-| Haarglatzfall123 | +106 | 1206 |
-| Haarsytem123 | +105 | 1205 |
-| Strebaer | +95 | 1195 |
-| Meinii | +87 | 1187 |
-| mino_o | +16 | 1116 |
-| Holynazmoly | +12 | 1112 |
-| KleinerWurm | -52 | 1048 |
-| FetteEule | -58 | 1042 |
-| SchlanzGurke | -70 | 1030 |
-| 000Nemo000 | -74 | 1026 |
-| LordLudes58 | -96 | 1004 |
-| Mysterykiller12 | -96 | 1004 |
-| luj00 | -125 | 975 |
-| JuanDaLan | -127 | 973 |
+| Stalker_Curry | +187 | 1287 |
+| SuesserSuessling | +179 | 1279 |
+| Haarglatzfall123 | +109 | 1209 |
+| Haarsytem123 | +109 | 1209 |
+| Fruechtebox | +108 | 1208 |
+| rgyray | +105 | 1205 |
+| Strebaer | +94 | 1194 |
+| Meinii | +86 | 1186 |
+| mino_o | +14 | 1114 |
+| Holynazmoly | +11 | 1111 |
+| KleinerWurm | -47 | 1053 |
+| FetteEule | -53 | 1047 |
+| SchlanzGurke | -67 | 1033 |
+| 000Nemo000 | -69 | 1031 |
+| LordLudes58 | -90 | 1010 |
+| Mysterykiller12 | -93 | 1007 |
+| luj00 | -118 | 982 |
+| JuanDaLan | -120 | 980 |
 
-Team-average deltas are approximately:
-1. Orange +182.5
-2. Dark Green +105.5
-3. Pink +108.0 by individual average but the point-weight calibration is intentionally very close; this dataset remains a regression check for future tuning
-4. Yellow +91.0
+Team-average deltas:
+1. Orange +183.0
+2. Dark Green +109.0
+3. Pink +106.5
+4. Yellow +90.0
+5. Lime Green +12.5
+6. Dark Blue -50.0
+7. Cyan -68.0
+8. Brown -91.5
+9. White -119.0
 
 Important: this file records calibration output, not live player ratings.
