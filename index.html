@@ -618,6 +618,22 @@ body:before{z-index:-4;opacity:.44}
     @media(max-width:700px){.v3-rating-graph{height:220px;padding-left:38px}.v3-rating-ylabels{width:31px;font-size:7px}.v3-rating-xlabels{left:44px}}
   </style>
 
+
+<style id="hub-ranked-transition-fixes">
+  .profile-demo-actions,#showRoundUpdateButton,#placementDemoButton,#rankUpDemoButton,#profileRoundUpdateButton{display:none!important}
+  .v3-history-toggle{cursor:pointer;border:1px solid rgba(132,91,230,.34);color:#c8bddb;background:#26124d}
+  .v3-history-toggle:disabled{opacity:.45;cursor:default}
+  .v3-form-chips{display:flex;align-items:center;gap:5px}.v3-form-chips i{min-width:7px!important;width:7px!important;height:7px!important;padding:0!important;border-radius:50%!important;font-size:0!important}.v3-form-chips i.win{background:var(--green)!important}.v3-form-chips i.loss{background:var(--red)!important}.v3-form-chips i.draw{background:#73698a!important}
+  .v3-real-ranking-row .player-with-avatar{display:flex;align-items:center;gap:10px}.v3-real-ranking-row .list-avatar{width:34px;height:34px;border-radius:6px;flex:0 0 34px}.compact-list .v3-real-ranking-row .rank-cell img{width:34px;height:34px}.compact-list .v3-real-ranking-row .trend{text-align:left}
+  .placement-connector.arriving:after{animation:placementLineFill 2.08s cubic-bezier(.2,.7,.2,1) .58s forwards!important}
+  .placement-node.arriving{animation:placementNodeArrive .92s cubic-bezier(.2,1.45,.35,1) 2.58s forwards!important}
+  .placement-node.arriving b{animation:placementCheckAppear .5s ease 2.87s forwards!important}
+  #placementModal.placement-ranked-complete .unranked-badge-wrap{animation:v3PlacementRankReveal 1.2s cubic-bezier(.2,1.1,.3,1) both}
+  #placementModal.placement-ranked-complete .placement-rank-name{color:#fff;text-shadow:0 0 28px rgba(56,240,219,.38)}
+  @keyframes v3PlacementRankReveal{0%{opacity:.15;transform:scale(.72)}65%{opacity:1;transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+  .rank-update-modal.rank-up{animation-duration:2.33s!important;animation-delay:3.67s!important}.rank-update-modal.rank-up .rankup-flare{animation-duration:2.5s!important;animation-delay:3.67s!important}.rank-update-modal.rank-up .update-rank-icon{animation-duration:3s!important;animation-delay:3.42s!important}
+</style>
+
 </head>
 <body>
   <div class="wallpaper" aria-hidden="true"></div>
@@ -1123,17 +1139,28 @@ function applyLanguage(lang){
   document.querySelector("#rankingSearch").placeholder=t("ranking.search");
   renderRankFilter();renderOverviewRanking();renderFullRanking();renderCupTeams();renderCupIndividual();showRound(Number(document.querySelector("#roundPicker .active")?.dataset.round||1));renderRegistrations();renderProfile();renderOverviewRank();renderAdmin();
 }
-function openRankUpdate(rankUp=false){
+function openRankUpdate(payload={}){
+  const legacy=typeof payload==='boolean';
+  const before=legacy?(payload?1988:1908):Number(payload.before??payload.ratingBefore);
+  const after=legacy?(payload?2015:1935):Number(payload.after??payload.ratingAfter);
+  if(!Number.isFinite(before)||!Number.isFinite(after))return;
   const modal=document.querySelector("#roundUpdateModal"),card=document.querySelector("#rankUpdateCard"),icon=document.querySelector("#updateRankIcon"),bar=document.querySelector("#animatedUpdateBar"),message=document.querySelector("#rankUpMessage");
-  card.classList.toggle("rank-up",rankUp);message.hidden=true;
-  const before=rankUp?1988:1908,after=rankUp?2015:1935,oldKey=getRankKey(before),newKey=getRankKey(after),oldB=getBounds(before),newB=getBounds(after),beforePct=pct(before,oldB),afterPct=pct(after,newB);
-  icon.src=RANK_ICONS[oldKey];document.querySelector("#updateRankName").textContent=rankName(oldKey);document.querySelector("#ratingBefore").textContent=before;document.querySelector("#ratingAfter").textContent=after;document.querySelector("#ratingDelta").textContent=`+${after-before} Rating`;document.querySelector("#updateKicker").textContent=t("overlay.update",{n:81});document.querySelector("#rankUpdateTitle").textContent=t("overlay.yourProgress");
-  document.querySelector("#updateLow").textContent=oldB.low;document.querySelector("#updateHigh").textContent=oldB.high;document.querySelector("#updateProgressTitle").textContent=oldB.next?t("overlay.progressTo",{rank:rankName(oldB.next)}):rankName(oldKey);document.querySelector("#updateProgressPct").textContent=`${Math.round(beforePct)}%`;document.querySelector("#updateRemaining").textContent=t("overlay.left",{n:Math.max(0,oldB.high-before)});
+  if(!modal||!card||!icon||!bar||!message)return;
+  const oldKey=(!legacy&&payload.rankBefore)||getRankKey(before),newKey=(!legacy&&payload.rankAfter)||getRankKey(after);
+  const rankChanged=oldKey!==newKey,rankUp=rankChanged&&after>before,oldB=getBounds(before),newB=getBounds(after),beforePct=pct(before,oldB),afterPct=pct(after,newB),delta=after-before;
+  card.classList.remove("rank-up");void card.offsetWidth;if(rankUp)card.classList.add("rank-up");message.hidden=true;
+  icon.src=RANK_ICONS[oldKey];document.querySelector("#updateRankName").textContent=rankName(oldKey);
+  document.querySelector("#ratingBefore").textContent=Math.round(before);document.querySelector("#ratingAfter").textContent=Math.round(after);
+  const deltaEl=document.querySelector("#ratingDelta");deltaEl.textContent=`${delta>=0?'+':''}${Math.round(delta)} Rating`;deltaEl.className=`delta ${delta>=0?'positive':'negative'}`;
+  const gameNo=Number(payload.gameNumber||0);document.querySelector("#updateKicker").textContent=gameNo?`RANKED UPDATE · GAME ${gameNo}`:"RANKED UPDATE";document.querySelector("#rankUpdateTitle").textContent=t("overlay.yourProgress");
+  document.querySelector("#updateLow").textContent=oldB.low;document.querySelector("#updateHigh").textContent=oldB.high;document.querySelector("#updateProgressTitle").textContent=oldB.next?t("overlay.progressTo",{rank:rankName(oldB.next)}):rankName(oldKey);document.querySelector("#updateProgressPct").textContent=`${Math.round(beforePct)}%`;document.querySelector("#updateRemaining").textContent=t("overlay.left",{n:Math.max(0,Math.round(oldB.high-before))});
+  const factors=document.querySelector("#rankUpdateCard .factor-grid");if(factors)factors.hidden=true;
   modal.hidden=false;bar.style.transition="none";bar.style.width=`${beforePct}%`;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.transition="width 2.1s cubic-bezier(.2,.75,.2,1)";bar.style.width=rankUp?"100%":`${afterPct}%`;document.querySelector("#updateProgressPct").textContent=rankUp?"100%":`${Math.round(afterPct)}%`;}));
-  if(rankUp){setTimeout(()=>{icon.src=RANK_ICONS[newKey];document.querySelector("#updateRankName").textContent=rankName(newKey);document.querySelector("#newRankName").textContent=rankName(newKey);message.hidden=false;bar.style.transition="none";bar.style.width="0%";document.querySelector("#updateLow").textContent=newB.low;document.querySelector("#updateHigh").textContent=newB.high;document.querySelector("#updateProgressTitle").textContent=rankName(newKey);document.querySelector("#updateRemaining").textContent=`${after} / ${newB.high}`;requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.transition="width 2.1s cubic-bezier(.2,.75,.2,1)";bar.style.width=`${afterPct}%`;document.querySelector("#updateProgressPct").textContent=`${Math.round(afterPct)}%`;}));},2300);}
+  const firstTarget=rankChanged?(after>before?100:0):afterPct;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.transition="width 3.5s cubic-bezier(.2,.75,.2,1)";bar.style.width=`${firstTarget}%`;document.querySelector("#updateProgressPct").textContent=`${Math.round(firstTarget)}%`;}));
+  if(rankChanged){setTimeout(()=>{icon.src=RANK_ICONS[newKey];document.querySelector("#updateRankName").textContent=rankName(newKey);document.querySelector("#newRankName").textContent=rankName(newKey);message.hidden=!rankUp;bar.style.transition="none";bar.style.width=after>before?"0%":"100%";document.querySelector("#updateLow").textContent=newB.low;document.querySelector("#updateHigh").textContent=newB.high;document.querySelector("#updateProgressTitle").textContent=newB.next?t("overlay.progressTo",{rank:rankName(newB.next)}):rankName(newKey);document.querySelector("#updateRemaining").textContent=t("overlay.left",{n:Math.max(0,Math.round(newB.high-after))});requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.transition="width 3.5s cubic-bezier(.2,.75,.2,1)";bar.style.width=`${afterPct}%`;document.querySelector("#updateProgressPct").textContent=`${Math.round(afterPct)}%`;}));},3850);}
 }
-window.simulateRealtimeRatingEvent=(payload={})=>openRankUpdate(!!payload.rankUp);
+window.simulateRealtimeRatingEvent=(payload={})=>openRankUpdate(payload);
 
 document.addEventListener("click",e=>{
   const route=e.target.closest("[data-route]");if(route){e.preventDefault();if(route.dataset.route==="profile"){state.profilePlayer=state.ownPlayer;renderProfile();}setPage(route.dataset.route);}
@@ -1539,7 +1566,29 @@ window.addEventListener("hashchange",()=>setPage(location.hash.replace("#","")||
     renderPlacementTrack(done,true);
     document.querySelector("#placementModal").hidden=false;
   }
-  window.simulatePlacementRatingEvent=(payload={})=>openPlacementDemo(Math.max(1,Math.min(15,payload.done||7)));
+  window.simulatePlacementRatingEvent=(payload={})=>{
+    const done=Math.max(1,Math.min(15,Number(payload.done||7)));
+    openPlacementDemo(done);
+    const modal=document.querySelector("#placementModal");
+    if(!modal)return;
+    modal.querySelector(".placement-track")?.removeAttribute("hidden");
+    const track=modal.querySelector("#placementTrack");if(track)track.style.display="";
+    modal.classList.remove("placement-ranked-complete");
+    if(done===15&&payload.completed&&Number.isFinite(Number(payload.rating))){
+      const rating=Math.round(Number(payload.rating)),key=payload.rankAfter||getRankKey(rating);
+      setTimeout(()=>{
+        if(modal.hidden)return;
+        modal.classList.add("placement-ranked-complete");
+        const kicker=modal.querySelector("#placementKicker"),title=modal.querySelector("#placementTitle"),subtitle=modal.querySelector("#placementSubtitle"),status=modal.querySelector("#placementStatusLabel"),name=modal.querySelector("#placementRankName"),copyEl=modal.querySelector("#placementProgressCopy"),help=modal.querySelector("#placementHelp"),img=modal.querySelector(".unranked-badge-wrap img");
+        const lang=(window.state?.lang||document.documentElement.lang||'de');
+        if(kicker)kicker.textContent=lang==='de'?'EINRANKUNG ABGESCHLOSSEN':lang==='fr'?'CLASSEMENT TERMINÉ':'PLACEMENTS COMPLETE';
+        if(title)title.textContent=lang==='de'?'DEIN RANG':lang==='fr'?'TON RANG':'YOUR RANK';
+        if(subtitle)subtitle.textContent=lang==='de'?'Deine 15 Einrankungsmatches sind abgeschlossen.':lang==='fr'?'Tes 15 matchs de placement sont terminés.':'Your 15 placement games are complete.';
+        if(status)status.textContent=lang==='de'?'AKTUELLER RANG':lang==='fr'?'RANG ACTUEL':'CURRENT RANK';
+        if(name)name.textContent=rankName(key);if(copyEl)copyEl.innerHTML=`<b>${rating}</b> RATING`;if(help)help.textContent=lang==='de'?'Ab jetzt zählt jedes weitere Game als normales Ranked-Game.':lang==='fr'?'Les prochaines parties utilisent maintenant le système Ranked normal.':'Future games now use the normal Ranked system.';if(img)img.src=RANK_ICONS[key];if(track)track.style.display='none';
+      },4200);
+    }
+  };
 
   function injectPlacementDemoButton(){
     const actions=document.querySelector(".profile-demo-actions");
@@ -2002,6 +2051,9 @@ window.HubAPI = (() => {
 
   function subscribeToRatingEvents(onInsert) { return client.channel('hub-rating-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'rating_history'},p=>onInsert(p.new)).subscribe(); }
   function subscribeToPlacementEvents(onInsert) { return client.channel('hub-placement-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'placement_update_notifications'},p=>onInsert(p.new)).subscribe(); }
+  function subscribeToCompetitiveUpdates(onInsert) { return client.channel('hub-competitive-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'competitive_update_notifications'},p=>onInsert(p.new)).subscribe(); }
+  async function getLatestCompetitiveUpdateId() { const {data,error}=await client.from('competitive_update_notifications').select('id').order('id',{ascending:false}).limit(1);if(error)throw error;return Number(data?.[0]?.id||0); }
+  async function getCompetitiveUpdatesAfter(id) { const {data,error}=await client.from('competitive_update_notifications').select('*').gt('id',Number(id||0)).order('id',{ascending:true}).limit(50);if(error)throw error;return data||[]; }
   function subscribeToSocial(onChange) { return client.channel('hub-social-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'cup_registration_members'},onChange)
@@ -2024,7 +2076,7 @@ window.HubAPI = (() => {
     adminAddPlayerToCup,adminStartNextRound,adminDeleteRound,adminAdjustEvent,adminReplaceRound,adminImportRoundByName,adminRenamePlayer,adminSetRating,adminSetPeak,
     adminSetStats,adminResetStats,adminResetAvatar,adminSetAvatar,adminAccountAction,
     getFakeRankingProfiles,adminCreateFakeRankingProfile,adminUpdateFakeRankingProfile,adminDeleteFakeRankingProfile,
-    heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToPlacementEvents,subscribeToSocial,subscribeToCup,subscribeToStats };
+    heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToPlacementEvents,subscribeToCompetitiveUpdates,getLatestCompetitiveUpdateId,getCompetitiveUpdatesAfter,subscribeToSocial,subscribeToCup,subscribeToStats };
 })();
 
 </script>
@@ -2362,80 +2414,53 @@ window.HubAPI = (() => {
 
   window.HubV3 = { live, toast, restoreAuth, openOwnProfile, syncOwnProfileToUi, refreshForeignProfile, pixelDataUrl, rankKey, rankLabel, copy };
 
-  api.client.auth.onAuthStateChange(()=>setTimeout(()=>restoreAuth(false),0));
-  api.subscribeToRatingEvents(evt=>{
+  api.client.auth.onAuthStateChange(()=>setTimeout(()=>{competitiveCursor=null;seenCompetitiveUpdates.clear();restoreAuth(false);},0));
+
+  let competitiveCursor=null,competitivePollBusy=false,silentProfilePollBusy=false;
+  const seenCompetitiveUpdates=new Set();
+  async function applyCompetitiveUpdate(evt){
     if(!live.player||evt.global_player_id!==live.player.id)return;
-    const wasRanked=!!live.player.is_ranked;
-    // Only already-ranked users can read rating_history; their delta/rank overlay remains unchanged.
-    if(wasRanked&&live.player.ranking_experience_enabled!==false&&typeof window.simulateRealtimeRatingEvent==='function'){
-      window.simulateRealtimeRatingEvent({rankUp:evt.rank_before&&evt.rank_after&&evt.rank_before!==evt.rank_after});
-    }
-    setTimeout(async()=>{
-      try{
-        live.player=await api.getMyProfile();
-        live.stats=await api.getCareerStatsFor(live.player.id);
-        await syncOwnProfileToUi();
-        document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player}}));
-      }catch(e){console.error(e);}
-    },120);
-  });
-
-  api.subscribeToPlacementEvents(evt=>{
-    if(!live.player||evt.global_player_id!==live.player.id)return;
-    const done=Math.max(1,Math.min(15,Number(evt.placement_game_number||0)));
-    const beforePlacement=Number(live.player.placement_games||0);
-    setTimeout(async()=>{
-      try{
-        // The notification and global-player update commit together, but retry briefly to avoid any UI race.
-        let refreshed=null;
-        for(let i=0;i<5;i++){
-          refreshed=await api.getMyProfile();
-          if(Number(refreshed?.placement_games||0)>=done)break;
-          await new Promise(r=>setTimeout(r,90));
-        }
-        if(refreshed)live.player=refreshed;
-        live.stats=await api.getCareerStatsFor(live.player.id);
-        await syncOwnProfileToUi();
-        if(done>beforePlacement&&live.player.ranking_experience_enabled!==false&&typeof window.simulatePlacementRatingEvent==='function'){
-          window.simulatePlacementRatingEvent({done,round:Number(evt.round||0)});
-        }
-        document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player,placement:true}}));
-      }catch(e){console.error('Placement realtime update failed',e);}
-    },120);
-  });
-
-
-  let liveProgressPollBusy=false;
-  setInterval(async()=>{
-    if(liveProgressPollBusy||document.hidden||!live.session||!live.player)return;
-    liveProgressPollBusy=true;
+    const id=Number(evt.id||0);if(id&&seenCompetitiveUpdates.has(id))return;if(id){seenCompetitiveUpdates.add(id);competitiveCursor=Math.max(Number(competitiveCursor||0),id);}
     try{
-      const beforePlacement=Number(live.player.placement_games||0);
-      const beforeRating=Number(live.player.rating||0);
-      const beforeRanked=!!live.player.is_ranked;
-      const refreshed=await api.getMyProfile();
-      if(!refreshed)return;
-      const afterPlacement=Number(refreshed.placement_games||0);
-      const afterRating=Number(refreshed.rating||0);
-      const afterRanked=!!refreshed.is_ranked;
-      const changed=afterPlacement!==beforePlacement||afterRanked!==beforeRanked||Math.abs(afterRating-beforeRating)>.001;
-      if(!changed)return;
-
-      live.player=refreshed;
+      const refreshed=await api.getMyProfile();if(refreshed)live.player=refreshed;
       try{live.stats=await api.getCareerStatsFor(live.player.id);}catch(_){}
       await syncOwnProfileToUi();
-
-      // Only an increase in placement count represents a newly finalized placement.
-      // Deletions/recalculations can only update silently.
-      if(afterPlacement>beforePlacement&&afterPlacement<=15&&live.player.ranking_experience_enabled!==false&&typeof window.simulatePlacementRatingEvent==='function'){
-        window.simulatePlacementRatingEvent({done:afterPlacement});
+      if(live.player.ranking_experience_enabled!==false){
+        if(evt.placement_game_number!==null&&evt.placement_game_number!==undefined){
+          const done=Math.max(1,Math.min(15,Number(evt.placement_game_number)));
+          if(typeof window.simulatePlacementRatingEvent==='function')window.simulatePlacementRatingEvent({done,completed:!!evt.became_ranked,rating:evt.rating_after??live.player.rating,rankAfter:evt.rank_after,gameNumber:Number(evt.game_number||done)});
+        }else if(typeof window.simulateRealtimeRatingEvent==='function'){
+          window.simulateRealtimeRatingEvent({before:Number(evt.rating_before),after:Number(evt.rating_after),delta:Number(evt.final_delta),rankBefore:evt.rank_before,rankAfter:evt.rank_after,gameNumber:Number(evt.game_number||0)});
+        }
       }
-      document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{player:live.player,pollFallback:true,placementChanged:afterPlacement!==beforePlacement}}));
-    }catch(e){console.warn('Live progress fallback failed',e);}
-    finally{liveProgressPollBusy=false;}
+      document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player,finalize:true}}));
+    }catch(e){console.error('Competitive live update failed',e);}
+  }
+
+  api.subscribeToCompetitiveUpdates(evt=>{if(live.player&&evt.global_player_id===live.player.id)applyCompetitiveUpdate(evt);});
+
+  setInterval(async()=>{
+    if(competitivePollBusy||document.hidden||!live.session||!live.player)return;
+    competitivePollBusy=true;
+    try{
+      if(competitiveCursor===null){competitiveCursor=await api.getLatestCompetitiveUpdateId();return;}
+      const rows=await api.getCompetitiveUpdatesAfter(competitiveCursor);
+      for(const evt of rows){competitiveCursor=Math.max(Number(competitiveCursor||0),Number(evt.id||0));await applyCompetitiveUpdate(evt);}
+    }catch(e){console.warn('Competitive notification fallback failed',e);}
+    finally{competitivePollBusy=false;}
   },2000);
 
-  restoreAuth(false).then(updateRegistrationButton);
+  setInterval(async()=>{
+    if(silentProfilePollBusy||document.hidden||!live.session||!live.player)return;
+    silentProfilePollBusy=true;
+    try{
+      const before=live.player,refreshed=await api.getMyProfile();if(!refreshed)return;
+      const changed=Number(before.placement_games||0)!==Number(refreshed.placement_games||0)||!!before.is_ranked!==!!refreshed.is_ranked||Math.abs(Number(before.rating||0)-Number(refreshed.rating||0))>.001;
+      if(changed){live.player=refreshed;try{live.stats=await api.getCareerStatsFor(live.player.id);}catch(_){}await syncOwnProfileToUi();document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{player:live.player,silent:true}}));}
+    }catch(e){console.warn('Silent live profile refresh failed',e);}finally{silentProfilePollBusy=false;}
+  },2000);
+
+  restoreAuth(false).then(async()=>{updateRegistrationButton();try{if(live.session)competitiveCursor=await api.getLatestCompetitiveUpdateId();}catch(_){}});
 })();
 
 </script>
@@ -2444,6 +2469,7 @@ window.HubAPI = (() => {
 (() => {
   const api=window.HubAPI, core=window.HubV3;
   if(!api||!core)return;
+  document.querySelector('.profile-demo-actions')?.remove();document.querySelector('#showRoundUpdateButton')?.remove();
   const live=core.live;
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
   const copy=core.copy || ((a)=>a);
@@ -2478,17 +2504,15 @@ window.HubAPI = (() => {
   function ensureLogin(){if(live.session&&live.player)return true;$('#loginDemoButton')?.click();return false;}
 
   // ---------- global ranking ----------
-  function fakeAsPlayer(f){return {_fake:true,id:f.id,current_name:f.name,avatar_pixels:f.avatar_pixels,is_ranked:true,placement_games:Number(f.games||15),rating:Number(f.rating||0),peak_rating:Number(f.peak||f.rating||0),rank_key:f.rank_key,form:Array.isArray(f.form)?f.form:[]};}
+  function fakeAsPlayer(f){return {_fake:true,id:f.id,current_name:f.name,avatar_pixels:f.avatar_pixels,is_ranked:true,placement_games:15,competitive_games:Number(f.games||15),rating:Number(f.rating||0),peak_rating:Number(f.peak||f.rating||0),rank_key:f.rank_key,form:Array.isArray(f.form)?f.form:[],trend:null};}
   function rankedPlayers(){return [...(live.globalPlayers||[]).filter(p=>p.is_ranked&&Number(p.placement_games)>=15),...(real.fakeProfiles||[]).map(fakeAsPlayer)].sort((a,b)=>Number(b.rating)-Number(a.rating)||a.current_name.localeCompare(b.current_name));}
   function formMarkup(p){const vals=Array.isArray(p.form)?p.form.slice(-5):[];if(!vals.length)return '—';return `<span class="v3-form-chips">${vals.map(v=>{const t=String(v).trim(),low=t.toLowerCase(),cls=(low==='w'||/^\+/.test(t)||Number(t)>0)?'win':(low==='l'||/^-/.test(t)||Number(t)<0)?'loss':'draw';return `<i class="${cls}" title="${esc(t)}">${esc(t)}</i>`;}).join('')}</span>`;}
   function rankingRow(p,i,compact=false){
-    const rank=p._fake?core.rankLabel(p.rank_key):core.rankLabel(core.rankKey(Number(p.rating)));
-    const attrs=p._fake?`data-v3-fake-row="${p.id}"`:`data-profile-player="${esc(p.current_name)}"`;
-    return `<div class="ranking-row v3-real-ranking-row ${p._fake?'v3-fake-ranking-row':''}" tabindex="0" role="button" ${attrs}>
-      <span class="position">${i+1}</span><span class="player-cell">${avatarImg(p,'ranking-avatar pixel-avatar')}<strong>${esc(p.current_name)}</strong>${p._fake&&live.isAdmin?`<button class="v3-fake-delete" type="button" data-v3-delete-fake="${p.id}" title="${copy('Remove fake profile','Fake-Profil entfernen','Supprimer le faux profil')}">×</button>`:''}</span>
-      <span class="rank-cell"><img src="${rankIcon(p)}" alt=""><b>${rank}</b></span><strong class="rating-cell">${Math.round(Number(p.rating))}</strong>
-      ${compact?'':`<span>${Math.round(Number(p.peak_rating||p.rating))}</span><span>${Number(p.placement_games||0)}</span><span>${formMarkup(p)}</span>`}
-    </div>`;
+    const rank=p._fake?core.rankLabel(p.rank_key):core.rankLabel(core.rankKey(Number(p.rating))),attrs=p._fake?`data-v3-fake-row="${p.id}"`:`data-profile-player="${esc(p.current_name)}"`,games=Number(p.competitive_games??p.placement_games??0),trend=p.trend===null||p.trend===undefined?null:Number(p.trend),trendText=trend===null?'—':`${trend>=0?'+':''}${Math.round(trend)}`,trendClass=trend===null?'':trend>=0?'positive':'negative';
+    const player=`<div class="player-name player-with-avatar">${avatarImg(p,'list-avatar pixel-avatar')}<span>${esc(p.current_name)}</span>${p._fake&&live.isAdmin?`<button class="v3-fake-delete" type="button" data-v3-delete-fake="${p.id}" title="${copy('Remove fake profile','Fake-Profil entfernen','Supprimer le faux profil')}">×</button>`:''}</div>`;
+    const rankCell=`<div class="rank-cell"><img src="${rankIcon(p)}" alt=""><span>${rank}</span></div>`;
+    if(compact)return `<div class="ranking-row v3-real-ranking-row ${p._fake?'v3-fake-ranking-row':''}" tabindex="0" role="button" ${attrs}><div class="placement">${i+1}</div>${player}${rankCell}<div class="rating">${Math.round(Number(p.rating))}</div><div class="trend ${trendClass}">${trendText}</div></div>`;
+    return `<div class="ranking-row v3-real-ranking-row ${p._fake?'v3-fake-ranking-row':''}" tabindex="0" role="button" ${attrs}><div class="placement">${i+1}</div>${player}${rankCell}<div class="rating">${Math.round(Number(p.rating))}</div><div class="peak">${Math.round(Number(p.peak_rating||p.rating))}</div><div class="games">${games}</div><div class="form-pills">${formMarkup(p)}</div></div>`;
   }
   function ensureFakeRankingControls(){
     const toolbar=$('.ranking-toolbar');if(!toolbar)return;let b=$('#v3CreateFakeRanking');
@@ -2727,29 +2751,17 @@ window.HubAPI = (() => {
     const panel=$('.history-panel'),recent=$('[data-page="profile"] .recent-updates');if(!panel||!recent)return;
     const h=(history||[]).slice(-40),chart=$('.chart',panel),updates=$('.update-list',recent);if(!chart||!updates)return;
     if(!h.length){chart.innerHTML=`<p class="v3-empty">${copy('No competitive games yet.','Noch keine Competitive-Games gespielt.','Aucune partie compétitive.')}</p>`;updates.innerHTML='';recent.hidden=true;return;}
-    const rows=`<div class="v3-history-list">${h.map((x,idx)=>{
-      const game=Number(x.game_number||idx+1),hidden=x.final_delta===null||x.final_delta===undefined||game<=15;
-      const delta=hidden?copy('HIDDEN','VERDECKT','CACHÉ'):`${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}`;
-      return `<div class="v3-history-row"><div class="v3-history-game"><strong>Game ${game}</strong><small>${copy('Round','Runde','Manche')} ${Number(x.round||0)}</small></div><div class="v3-history-cup"><strong>${esc(x.tournament_name||copy('Competitive Cup','Competitive Cup','Cup compétitif'))}</strong><small>${x.created_at?new Date(x.created_at).toLocaleDateString():''}</small></div><div class="v3-history-stats"><i>K ${Number(x.round_kills||0)}</i><i>DM ${Number(x.round_deathmatches||0)}</i><i>W ${Number(x.round_wins||0)}</i><i>PTS ${Number(x.individual_points||0)}</i></div><div class="v3-history-delta ${hidden?'hidden-rating':Number(x.final_delta)>=0?'positive':'negative'}">${delta}</div></div>`;
-    }).join('')}</div>`;
-    const ranked=h.filter((x,idx)=>Number(x.game_number||idx+1)>=16&&x.rating_after!==null&&x.rating_after!==undefined&&Number.isFinite(Number(x.rating_after)));
+    renderHistoryGraphV4._history=history;
+    if(renderHistoryGraphV4.expanded===undefined)renderHistoryGraphV4.expanded=false;
+    let toggle=panel.querySelector('.v3-history-toggle');const oldTag=panel.querySelector('.panel-header .mode-tag');if(!toggle){toggle=document.createElement('button');toggle.type='button';toggle.className='mode-tag v3-history-toggle';oldTag?.replaceWith(toggle);toggle.onclick=()=>{renderHistoryGraphV4.expanded=!renderHistoryGraphV4.expanded;renderHistoryGraphV4(renderHistoryGraphV4._history||[]);};}
+    const maxRows=renderHistoryGraphV4.expanded?40:10;toggle.textContent=renderHistoryGraphV4.expanded?copy('Show latest 10','Nur letzte 10','Afficher les 10 dernières'):copy('Show up to 40','Bis zu 40 anzeigen','Afficher jusqu’à 40');toggle.disabled=h.length<=10;
+    const display=[...h].reverse().slice(0,maxRows);
+    const rows=`<div class="v3-history-list">${display.map((x,idx)=>{const game=Number(x.game_number||0),hidden=x.final_delta===null||x.final_delta===undefined||game<=15,delta=hidden?copy('HIDDEN','VERDECKT','CACHÉ'):`${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}`;return `<div class="v3-history-row"><div class="v3-history-game"><strong>Game ${game}</strong><small>${copy('Round','Runde','Manche')} ${Number(x.round||0)}</small></div><div class="v3-history-cup"><strong>${esc(x.tournament_name||copy('Competitive Cup','Competitive Cup','Cup compétitif'))}</strong><small>${x.created_at?new Date(x.created_at).toLocaleDateString():''}</small></div><div class="v3-history-stats"><i>K ${Number(x.round_kills||0)}</i><i>DM ${Number(x.round_deathmatches||0)}</i><i>W ${Number(x.round_wins||0)}</i><i>PTS ${Number(x.individual_points||0)}</i></div><div class="v3-history-delta ${hidden?'hidden-rating':Number(x.final_delta)>=0?'positive':'negative'}">${delta}</div></div>`;}).join('')}</div>`;
+    const ranked=h.filter(x=>Number(x.game_number||0)>=16&&x.rating_after!==null&&x.rating_after!==undefined&&Number.isFinite(Number(x.rating_after)));
     let graph='';
-    if(ranked.length){
-      const first=ranked[0],firstGame=Number(first.game_number||16),firstAfter=Number(first.rating_after),firstDelta=Number(first.final_delta||0);
-      const points=[{game:Math.max(15,firstGame-1),rating:firstAfter-firstDelta,start:true},...ranked.map((x,idx)=>({game:Number(x.game_number||firstGame+idx),rating:Number(x.rating_after)}))];
-      const vals=points.map(x=>x.rating);let lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(100,hi-lo),pad=Math.max(25,span*.18);
-      lo=Math.floor((lo-pad)/25)*25;hi=Math.ceil((hi+pad)/25)*25;
-      if(hi-lo<100){const mid=(hi+lo)/2;lo=Math.floor((mid-50)/25)*25;hi=lo+100;}
-      const W=720,H=236,L=12,R=12,T=12,B=24,plotW=W-L-R,plotH=H-T-B;
-      const xAt=i=>L+(points.length===1?plotW/2:(i/(points.length-1))*plotW),yAt=v=>T+((hi-v)/(hi-lo))*plotH;
-      const coords=points.map((pt,i)=>[xAt(i),yAt(pt.rating)]),line=coords.map((c,i)=>`${i?'L':'M'} ${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' ');
-      const area=`${line} L ${coords[coords.length-1][0].toFixed(2)} ${(T+plotH).toFixed(2)} L ${coords[0][0].toFixed(2)} ${(T+plotH).toFixed(2)} Z`;
-      const ticks=Array.from({length:5},(_,i)=>hi-(hi-lo)*(i/4));
-      graph=`<div class="v3-rating-graph"><div class="v3-rating-ylabels">${ticks.map(v=>`<span>${Math.round(v)}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Rating Verlauf"><defs><linearGradient id="v3RatingFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38ead8" stop-opacity=".30"/><stop offset="100%" stop-color="#38ead8" stop-opacity=".025"/></linearGradient></defs>${ticks.map(v=>`<line class="v3-rating-grid" x1="${L}" y1="${yAt(v)}" x2="${W-R}" y2="${yAt(v)}"/>`).join('')}<path class="v3-rating-area" d="${area}"/><path class="v3-rating-line" d="${line}"/>${coords.map((c,i)=>`<circle class="v3-rating-point" cx="${c[0]}" cy="${c[1]}" r="3"><title>${points[i].start?copy('Starting rating','Start-Rating','Rating initial'):`Game ${points[i].game}`}: ${Math.round(points[i].rating)}</title></circle>`).join('')}</svg><div class="v3-rating-xlabels"><span>${copy('START','START','DÉBUT')}</span><span>Game ${points[points.length-1].game}</span></div></div>`;
-    }
+    if(ranked.length){const first=ranked[0],firstGame=Number(first.game_number||16),firstAfter=Number(first.rating_after),firstDelta=Number(first.final_delta||0),points=[{game:Math.max(15,firstGame-1),rating:firstAfter-firstDelta,start:true},...ranked.map(x=>({game:Number(x.game_number),rating:Number(x.rating_after)}))],vals=points.map(x=>x.rating);let lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(100,hi-lo),pad=Math.max(25,span*.18);lo=Math.floor((lo-pad)/25)*25;hi=Math.ceil((hi+pad)/25)*25;if(hi-lo<100){const mid=(hi+lo)/2;lo=Math.floor((mid-50)/25)*25;hi=lo+100;}const W=720,H=236,L=12,R=12,T=12,B=24,plotW=W-L-R,plotH=H-T-B,xAt=i=>L+(points.length===1?plotW/2:(i/(points.length-1))*plotW),yAt=v=>T+((hi-v)/(hi-lo))*plotH,coords=points.map((pt,i)=>[xAt(i),yAt(pt.rating)]),line=coords.map((c,i)=>`${i?'L':'M'} ${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' '),area=`${line} L ${coords[coords.length-1][0].toFixed(2)} ${(T+plotH).toFixed(2)} L ${coords[0][0].toFixed(2)} ${(T+plotH).toFixed(2)} Z`,ticks=Array.from({length:5},(_,i)=>hi-(hi-lo)*(i/4));graph=`<div class="v3-rating-graph"><div class="v3-rating-ylabels">${ticks.map(v=>`<span>${Math.round(v)}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Rating Verlauf"><defs><linearGradient id="v3RatingFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38ead8" stop-opacity=".30"/><stop offset="100%" stop-color="#38ead8" stop-opacity=".025"/></linearGradient></defs>${ticks.map(v=>`<line class="v3-rating-grid" x1="${L}" y1="${yAt(v)}" x2="${W-R}" y2="${yAt(v)}"/>`).join('')}<path class="v3-rating-area" d="${area}"/><path class="v3-rating-line" d="${line}"/>${coords.map((c,i)=>`<circle class="v3-rating-point" cx="${c[0]}" cy="${c[1]}" r="3"><title>${points[i].start?copy('Starting rating','Start-Rating','Rating initial'):`Game ${points[i].game}`}: ${Math.round(points[i].rating)}</title></circle>`).join('')}</svg><div class="v3-rating-xlabels"><span>${copy('START','START','DÉBUT')}</span><span>Game ${points[points.length-1].game}</span></div></div>`;}
     chart.innerHTML=graph+rows;
-    const visible=h.filter((x,idx)=>Number(x.game_number||idx+1)>=16&&x.final_delta!==null&&x.final_delta!==undefined).slice(-5).reverse();
-    recent.hidden=!visible.length;updates.innerHTML=visible.map(x=>`<div><span>Game ${Number(x.game_number||0)}</span><strong class="${Number(x.final_delta)>=0?'positive':'negative'}">${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}</strong></div>`).join('');
+    const visible=h.filter(x=>Number(x.game_number||0)>=16&&x.final_delta!==null&&x.final_delta!==undefined).slice(-5).reverse();recent.hidden=!visible.length;updates.innerHTML=visible.map(x=>`<div><span>Game ${Number(x.game_number||0)}</span><strong class="${Number(x.final_delta)>=0?'positive':'negative'}">${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}</strong></div>`).join('');
   }
   renderHistoryGraph=renderHistoryGraphV4;
 
