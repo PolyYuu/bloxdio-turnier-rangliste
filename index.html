@@ -1013,17 +1013,13 @@ function rankingRow(player,index,compact=false){
     ${compact?`<div class="trend ${trendClass}">${prefix}${player.trend}</div>`:`<div class="peak">${player.peak}</div><div class="games">${player.games}</div><div class="form-pills">${form}</div>`}
   </div>`;
 }
-function renderOverviewRanking(){ document.querySelector("#overviewRankingRows").innerHTML=PLAYERS.slice(0,8).map((p,i)=>rankingRow(p,i,true)).join(""); }
+function renderOverviewRanking(){ /* live ranking renderer owns #overviewRankingRows */ }
 function renderRankFilter(){
   const select=document.querySelector("#rankFilter");
   const keys=["grandmaster","master","diamond","emerald","gold","iron","wood"];
   select.innerHTML=`<option value="all">${t("ranking.allRanks")}</option>`+keys.map(k=>`<option value="${k}">${rankName(k)}</option>`).join("");
 }
-function renderFullRanking(){
-  const q=(document.querySelector("#rankingSearch")?.value||"").toLowerCase(), filter=document.querySelector("#rankFilter")?.value||"all";
-  const filtered=PLAYERS.filter(p=>p.name.toLowerCase().includes(q)&&(filter==="all"||getRankKey(p.rating)===filter));
-  document.querySelector("#fullRankingRows").innerHTML=filtered.map((p,i)=>rankingRow(p,PLAYERS.indexOf(p),false)).join("")||`<div style="padding:34px;color:#8f82a9;text-align:center">${t("ranking.empty")}</div>`;
-}
+function renderFullRanking(){ /* live ranking renderer owns #fullRankingRows */ }
 function competitionRanks(rows){ let out=[],last=null,rank=0;rows.forEach((r,i)=>{if(r.points!==last)rank=i+1;out.push(rank);last=r.points;});return out; }
 function individualRows(){
   const rows=PLAYERS.map(p=>({name:p.name,points:cupStats(p.name).points})).sort((a,b)=>b.points-a.points);
