@@ -20,11 +20,12 @@ old_logo = "html.hub-live-booting .site-header .hub-logo{visibility:visible!impo
 new_logo = "html.hub-live-booting .site-header .hub-logo{visibility:visible!important;width:248px!important;height:auto!important;max-width:56vw!important;object-fit:contain!important;filter:drop-shadow(0 14px 34px rgba(122,66,255,.26))}"
 replace_once(old_logo, new_logo, 'loader logo scale')
 
-# The early account script cannot directly see renderProfileLive from the later live UI IIFE.
+# The account/profile script cannot directly see renderProfileLive from the later live UI IIFE.
 old_open = """async function openOwnProfile(){
     if(!live.session)return openAuth('login');
     const name=live.player?.current_name||state.ownPlayer;
     if(!name)return;
+    state.ownPlayer=name;state.profilePlayer=name;
     await renderProfileLive(name);
     setPage('profile');
   }"""
@@ -32,6 +33,7 @@ new_open = """async function openOwnProfile(){
     if(!live.session)return openAuth('login');
     const name=live.player?.current_name||state.ownPlayer;
     if(!name)return;
+    state.ownPlayer=name;state.profilePlayer=name;
     const renderLive=window.HubV3?.renderProfileLive;
     if(typeof renderLive==='function') await renderLive(name);
     else await syncOwnProfileToUi();
@@ -43,14 +45,14 @@ old_foreign = "Promise.resolve(renderProfileLive(name)).then(()=>setPage('profil
 new_foreign = "Promise.resolve(typeof window.HubV3?.renderProfileLive==='function'?window.HubV3.renderProfileLive(name):refreshForeignProfile(name)).then(()=>setPage('profile')).catch(err=>toast(err?.message||String(err),true));"
 replace_once(old_foreign, new_foreign, 'profile click runtime bridge')
 
-# Expose the later live renderer through the shared bridge. Function declarations are hoisted in this IIFE.
+# Expose the later live renderer through the shared bridge.
 marker = "  async function renderProfileLive(name){"
 if s.count(marker) != 1:
     raise SystemExit(f'renderProfileLive marker: expected 1, got {s.count(marker)}')
 s = s.replace(marker, "  window.HubV3.renderProfileLive=(name)=>renderProfileLive(name);\n\n" + marker, 1)
 
-# Guard against the regression that produced the Safari runtime error.
-if "await renderProfileLive(name);" in s:
+# Guard against the Safari regression.
+if "state.ownPlayer=name;state.profilePlayer=name;\n    await renderProfileLive(name);" in s:
     raise SystemExit('direct early renderProfileLive call still present')
 if "Promise.resolve(renderProfileLive(name))" in s:
     raise SystemExit('direct click renderProfileLive call still present')
