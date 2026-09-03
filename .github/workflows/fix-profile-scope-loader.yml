@@ -46,3 +46,5 @@ jobs:
           git add index.html
           git commit -m 'Fix live profile runtime bridge and enlarge loader logo'
           git push origin HEAD:main
+
+# rerun: 2
