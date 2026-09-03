@@ -14,8 +14,8 @@
     }
     html.hub-live-booting .site-header{visibility:visible!important;position:fixed!important;inset:0!important;z-index:2147483647!important;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;pointer-events:none!important}
     html.hub-live-booting .site-header>*{visibility:hidden!important}
-    html.hub-live-booting .site-header .hub-brand{visibility:visible!important;position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%) scale(1.25)!important;transform-origin:center center!important;width:248px!important;height:auto!important;min-width:0!important;overflow:visible!important}
-    html.hub-live-booting .site-header .hub-logo{visibility:visible!important;width:248px!important;height:auto!important;max-width:56vw!important;object-fit:contain!important;filter:drop-shadow(0 14px 34px rgba(122,66,255,.26))}
+    html.hub-live-booting .site-header .hub-brand{visibility:visible!important;position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:388px!important;height:auto!important;min-width:0!important;overflow:visible!important}
+    html.hub-live-booting .site-header .hub-logo{visibility:visible!important;width:388px!important;height:auto!important;max-width:80vw!important;object-fit:contain!important;filter:drop-shadow(0 14px 34px rgba(122,66,255,.26))}
   </style>
   <script>document.documentElement.classList.add('hub-live-booting');</script>
   <style id="hub-critical-css">
@@ -2299,7 +2299,7 @@ window.HubAPI = (() => {
   }
 
   function pixelsFromEditor(){
-    return $$('#avatarPixelGrid .pixel-cell').map(cell=>{
+    return $$('#avatarPixelGrid .avatar-pixel, #avatarPixelGrid .pixel-cell').map(cell=>{
       const c=cell.style.backgroundColor||'#ffffff';
       if(c.startsWith('#'))return c.toUpperCase();
       const m=c.match(/\d+/g);if(!m)return '#FFFFFF';return '#'+m.slice(0,3).map(n=>(+n).toString(16).padStart(2,'0')).join('').toUpperCase();
@@ -2343,8 +2343,19 @@ window.HubAPI = (() => {
 
   $('#avatarSaveButton')?.addEventListener('click',async()=>{
     if(!live.session||!live.player||state.profilePlayer!==state.ownPlayer)return;
-    try{const pixels=pixelsFromEditor();if(pixels.length===256){await api.saveAvatar(pixels);live.player.avatar_pixels=pixels;const ownGp=(live.globalPlayers||[]).find(p=>p.id===live.player.id);if(ownGp)ownGp.avatar_pixels=pixels;cacheAvatar(live.player);const av=$('#profileAvatar');if(av)av.src=pixelDataUrl(pixels);toast(copy('Avatar saved.','Avatar gespeichert.','Avatar enregistré.'));}}
-    catch(err){toast(err.message||String(err),true);}
+    try{
+      const pixels=pixelsFromEditor();
+      if(pixels.length!==256)throw new Error(copy('Avatar editor did not return 256 pixels.','Der Avatar-Editor hat nicht 256 Pixel geliefert.','L’éditeur avatar n’a pas renvoyé 256 pixels.'));
+      await api.saveAvatar(pixels);
+      const refreshed=await api.getMyProfile();
+      if(!refreshed||!Array.isArray(refreshed.avatar_pixels)||refreshed.avatar_pixels.length!==256)throw new Error(copy('Avatar was not persisted. Please try again.','Der Avatar wurde nicht dauerhaft gespeichert. Bitte erneut versuchen.','L’avatar n’a pas été enregistré durablement.'));
+      live.player=refreshed;
+      const ownGp=(live.globalPlayers||[]).find(p=>p.id===live.player.id);
+      if(ownGp)ownGp.avatar_pixels=[...refreshed.avatar_pixels];
+      cacheAvatar(refreshed);
+      const av=$('#profileAvatar');if(av)av.src=pixelDataUrl(refreshed.avatar_pixels);
+      toast(copy('Avatar saved.','Avatar gespeichert.','Avatar enregistré.'));
+    }catch(err){toast(err.message||String(err),true);}
   });
 
   window.HubV3 = { live, toast, restoreAuth, openOwnProfile, syncOwnProfileToUi, refreshForeignProfile, pixelDataUrl, rankKey, rankLabel, copy };
