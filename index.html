@@ -634,6 +634,23 @@ body:before{z-index:-4;opacity:.44}
   .rank-update-modal.rank-up{animation-duration:2.33s!important;animation-delay:3.67s!important}.rank-update-modal.rank-up .rankup-flare{animation-duration:2.5s!important;animation-delay:3.67s!important}.rank-update-modal.rank-up .update-rank-icon{animation-duration:3s!important;animation-delay:3.42s!important}
 </style>
 
+
+<style id="hub-ranked-followup-fixes">
+  #overviewRankingRows.compact-list .v3-real-ranking-row{grid-template-columns:50px 1.55fr 1fr .8fr .7fr!important}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.placement{text-align:center}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.player-name{min-width:0}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.rank-cell{min-width:0;justify-content:flex-start}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.rating{text-align:left}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.trend{text-align:left!important;display:block!important}
+  .v3-history-more{display:flex;justify-content:center;padding:14px 0 2px}
+  .v3-history-more-button{min-width:190px}
+  .history-panel .panel-header .mode-tag{pointer-events:none}
+  @media(max-width:760px){
+    #overviewRankingRows.compact-list .v3-real-ranking-row{grid-template-columns:44px minmax(150px,1fr) 120px 70px!important}
+    #overviewRankingRows.compact-list .v3-real-ranking-row>.trend{display:none!important}
+  }
+</style>
+
 </head>
 <body>
   <div class="wallpaper" aria-hidden="true"></div>
@@ -1974,6 +1991,7 @@ window.HubAPI = (() => {
   async function getCareerStatsFor(playerId) { const { data, error } = await client.from('player_career_stats').select('*').eq('global_player_id', playerId).maybeSingle(); if (error) throw error; return data; }
   async function getRatingHistory(playerId) { const { data,error }=await client.from('rating_history').select('*').eq('global_player_id',playerId).order('created_at',{ascending:true}); if(error)throw error; return data||[]; }
   async function getMyCompetitiveHistory() { const data=await rpc('get_my_competitive_history'); return data||[]; }
+  async function getCompetitiveHistoryForPlayer(playerId) { const data=await rpc('get_competitive_history_for_player',{p_player_id:playerId}); return data||[]; }
   async function getGlobalPlayers() { const { data, error } = await client.from('player_directory').select('*').order('rating', { ascending: false, nullsFirst: false }); if (error) throw error; return data || []; }
   async function adminGetGlobalPlayers() { const data=await rpc('admin_get_global_players'); return data||[]; }
   async function adminGetAccountPlayers() { const data=await rpc('admin_get_account_players'); return data||[]; }
@@ -2069,7 +2087,7 @@ window.HubAPI = (() => {
     .on('postgres_changes',{event:'*',schema:'public',table:'global_players'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'ranking_fake_profiles'},onChange).subscribe(); }
 
-  return { client,signUp,login,logout,currentSession,currentPlayerId,getPlayer,getMyProfile,getCareerStatsFor,getRatingHistory,getMyCompetitiveHistory,getGlobalPlayers,adminGetGlobalPlayers,adminGetAccountPlayers,searchPlayers,
+  return { client,signUp,login,logout,currentSession,currentPlayerId,getPlayer,getMyProfile,getCareerStatsFor,getRatingHistory,getMyCompetitiveHistory,getCompetitiveHistoryForPlayer,getGlobalPlayers,adminGetGlobalPlayers,adminGetAccountPlayers,searchPlayers,
     changePassword,changeMyName,setRankingExperience,saveAvatar,acknowledgeAvatarReset,getTournaments,getCupData,getSocialState,
     sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,
     finalizeRoundRating,recalculateRoundRating,recalculateRatingFromRound,uploadCupIcon,adminCreateCup,adminUpdateCup,adminDeleteCup,adminSetCupStatus,adminCreateTeam,
@@ -2753,14 +2771,17 @@ window.HubAPI = (() => {
     if(!h.length){chart.innerHTML=`<p class="v3-empty">${copy('No competitive games yet.','Noch keine Competitive-Games gespielt.','Aucune partie compétitive.')}</p>`;updates.innerHTML='';recent.hidden=true;return;}
     renderHistoryGraphV4._history=history;
     if(renderHistoryGraphV4.expanded===undefined)renderHistoryGraphV4.expanded=false;
-    let toggle=panel.querySelector('.v3-history-toggle');const oldTag=panel.querySelector('.panel-header .mode-tag');if(!toggle){toggle=document.createElement('button');toggle.type='button';toggle.className='mode-tag v3-history-toggle';oldTag?.replaceWith(toggle);toggle.onclick=()=>{renderHistoryGraphV4.expanded=!renderHistoryGraphV4.expanded;renderHistoryGraphV4(renderHistoryGraphV4._history||[]);};}
-    const maxRows=renderHistoryGraphV4.expanded?40:10;toggle.textContent=renderHistoryGraphV4.expanded?copy('Show latest 10','Nur letzte 10','Afficher les 10 dernières'):copy('Show up to 40','Bis zu 40 anzeigen','Afficher jusqu’à 40');toggle.disabled=h.length<=10;
+    const headerTag=panel.querySelector('.panel-header .mode-tag');
+    const maxRows=renderHistoryGraphV4.expanded?40:10;
+    if(headerTag)headerTag.textContent=renderHistoryGraphV4.expanded?copy('Latest 40 games','Letzte 40 Games','40 dernières parties'):copy('Latest 10 games','Letzte 10 Games','10 dernières parties');
     const display=[...h].reverse().slice(0,maxRows);
     const rows=`<div class="v3-history-list">${display.map((x,idx)=>{const game=Number(x.game_number||0),hidden=x.final_delta===null||x.final_delta===undefined||game<=15,delta=hidden?copy('HIDDEN','VERDECKT','CACHÉ'):`${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}`;return `<div class="v3-history-row"><div class="v3-history-game"><strong>Game ${game}</strong><small>${copy('Round','Runde','Manche')} ${Number(x.round||0)}</small></div><div class="v3-history-cup"><strong>${esc(x.tournament_name||copy('Competitive Cup','Competitive Cup','Cup compétitif'))}</strong><small>${x.created_at?new Date(x.created_at).toLocaleDateString():''}</small></div><div class="v3-history-stats"><i>K ${Number(x.round_kills||0)}</i><i>DM ${Number(x.round_deathmatches||0)}</i><i>W ${Number(x.round_wins||0)}</i><i>PTS ${Number(x.individual_points||0)}</i></div><div class="v3-history-delta ${hidden?'hidden-rating':Number(x.final_delta)>=0?'positive':'negative'}">${delta}</div></div>`;}).join('')}</div>`;
     const ranked=h.filter(x=>Number(x.game_number||0)>=16&&x.rating_after!==null&&x.rating_after!==undefined&&Number.isFinite(Number(x.rating_after)));
     let graph='';
     if(ranked.length){const first=ranked[0],firstGame=Number(first.game_number||16),firstAfter=Number(first.rating_after),firstDelta=Number(first.final_delta||0),points=[{game:Math.max(15,firstGame-1),rating:firstAfter-firstDelta,start:true},...ranked.map(x=>({game:Number(x.game_number),rating:Number(x.rating_after)}))],vals=points.map(x=>x.rating);let lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(100,hi-lo),pad=Math.max(25,span*.18);lo=Math.floor((lo-pad)/25)*25;hi=Math.ceil((hi+pad)/25)*25;if(hi-lo<100){const mid=(hi+lo)/2;lo=Math.floor((mid-50)/25)*25;hi=lo+100;}const W=720,H=236,L=12,R=12,T=12,B=24,plotW=W-L-R,plotH=H-T-B,xAt=i=>L+(points.length===1?plotW/2:(i/(points.length-1))*plotW),yAt=v=>T+((hi-v)/(hi-lo))*plotH,coords=points.map((pt,i)=>[xAt(i),yAt(pt.rating)]),line=coords.map((c,i)=>`${i?'L':'M'} ${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' '),area=`${line} L ${coords[coords.length-1][0].toFixed(2)} ${(T+plotH).toFixed(2)} L ${coords[0][0].toFixed(2)} ${(T+plotH).toFixed(2)} Z`,ticks=Array.from({length:5},(_,i)=>hi-(hi-lo)*(i/4));graph=`<div class="v3-rating-graph"><div class="v3-rating-ylabels">${ticks.map(v=>`<span>${Math.round(v)}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Rating Verlauf"><defs><linearGradient id="v3RatingFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38ead8" stop-opacity=".30"/><stop offset="100%" stop-color="#38ead8" stop-opacity=".025"/></linearGradient></defs>${ticks.map(v=>`<line class="v3-rating-grid" x1="${L}" y1="${yAt(v)}" x2="${W-R}" y2="${yAt(v)}"/>`).join('')}<path class="v3-rating-area" d="${area}"/><path class="v3-rating-line" d="${line}"/>${coords.map((c,i)=>`<circle class="v3-rating-point" cx="${c[0]}" cy="${c[1]}" r="3"><title>${points[i].start?copy('Starting rating','Start-Rating','Rating initial'):`Game ${points[i].game}`}: ${Math.round(points[i].rating)}</title></circle>`).join('')}</svg><div class="v3-rating-xlabels"><span>${copy('START','START','DÉBUT')}</span><span>Game ${points[points.length-1].game}</span></div></div>`;}
-    chart.innerHTML=graph+rows;
+    const more=h.length>10?`<div class="v3-history-more"><button type="button" class="ghost-button v3-history-more-button">${renderHistoryGraphV4.expanded?copy('Show less','Weniger anzeigen','Afficher moins'):copy('Show more','Mehr anzeigen','Afficher plus')}</button></div>`:'';
+    chart.innerHTML=graph+rows+more;
+    chart.querySelector('.v3-history-more-button')?.addEventListener('click',()=>{renderHistoryGraphV4.expanded=!renderHistoryGraphV4.expanded;renderHistoryGraphV4(renderHistoryGraphV4._history||[]);});
     const visible=h.filter(x=>Number(x.game_number||0)>=16&&x.final_delta!==null&&x.final_delta!==undefined).slice(-5).reverse();recent.hidden=!visible.length;updates.innerHTML=visible.map(x=>`<div><span>Game ${Number(x.game_number||0)}</span><strong class="${Number(x.final_delta)>=0?'positive':'negative'}">${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}</strong></div>`).join('');
   }
   renderHistoryGraph=renderHistoryGraphV4;
@@ -2779,7 +2800,7 @@ window.HubAPI = (() => {
     }
     $('#v3ProfilePlacement',card)?.remove();$$('.profile-rank-card > *',card).forEach(el=>el.hidden=false);if(historyPanel)historyPanel.hidden=false;if(recent)recent.hidden=false;
     const rating=Number(gp.rating),key=core.rankKey(rating),b=profileBounds(rating);$('#profileRankIcon').src=rankIcon(gp);$('#profileRankName').textContent=core.rankLabel(key);$('#profileRating').textContent=Math.round(rating);$('#profilePeak').textContent=`Peak: ${Math.round(Number(gp.peak_rating||rating))}`;const pct=Math.max(0,Math.min(100,(rating-b.low)/(b.high-b.low)*100));$('#profileProgressBar').style.width=`${pct}%`;$('#profileProgressPct').textContent=`${Math.round(pct)}%`;$('#profileRangeLow').textContent=b.low;$('#profileRangeHigh').textContent=b.high;$('#profileProgressTitle').textContent=b.next?`${copy('To','Zu','Vers')} ${core.rankLabel(b.next)}`:core.rankLabel(key);$('#profileRatingRemaining').textContent=b.next?`${Math.max(0,Math.round(b.high-rating))} ${copy('left','übrig','restants')}`:'MAX';
-    try{let hist=own?await api.getMyCompetitiveHistory():await api.getRatingHistory(gp.id);if(!own)hist=(hist||[]).map((x,i)=>({...x,game_number:i+1,final_delta:i<15?null:x.final_delta,rating_after:i<15?null:x.rating_after}));renderHistoryGraph(hist);}catch(_){renderHistoryGraph([]);}
+    try{const hist=own?await api.getMyCompetitiveHistory():await api.getCompetitiveHistoryForPlayer(gp.id);renderHistoryGraph(hist);}catch(err){console.error('profile history',err);renderHistoryGraph([]);}
   }
 
   // ---------- Admin ----------
