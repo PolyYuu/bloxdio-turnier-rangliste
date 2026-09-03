@@ -653,6 +653,7 @@ body:before{z-index:-4;opacity:.44}
 
 
 <style id="hub-offline-catchup-export-fixes">
+  [hidden]{display:none!important}
   .v3-registration-export{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 4px 14px;color:#8f88a5;font-size:11px}
   .v3-registration-export button{white-space:nowrap}
   @media(max-width:700px){.v3-registration-export{align-items:stretch;flex-direction:column}.v3-registration-export button{width:100%}}
@@ -2081,6 +2082,7 @@ window.HubAPI = (() => {
   async function getCompetitiveUpdatesAfter(id) { const {data,error}=await client.from('competitive_update_notifications').select('*').gt('id',Number(id||0)).order('id',{ascending:true}).limit(50);if(error)throw error;return data||[]; }
   async function getMyAnimationState() { const data=await rpc('get_my_animation_state'); return Array.isArray(data)?(data[0]||null):data; }
   async function ackMyAnimationState() { await rpc('ack_my_animation_state'); }
+  async function adminGetCupRegistrations(tournamentId) { const data=await rpc('admin_get_cup_registrations',{p_tournament_id:tournamentId}); return data||[]; }
   function subscribeToSocial(onChange) { return client.channel('hub-social-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'cup_registration_members'},onChange)
@@ -2103,7 +2105,7 @@ window.HubAPI = (() => {
     adminAddPlayerToCup,adminStartNextRound,adminDeleteRound,adminAdjustEvent,adminReplaceRound,adminImportRoundByName,adminRenamePlayer,adminSetRating,adminSetPeak,
     adminSetStats,adminResetStats,adminResetAvatar,adminSetAvatar,adminAccountAction,
     getFakeRankingProfiles,adminCreateFakeRankingProfile,adminUpdateFakeRankingProfile,adminDeleteFakeRankingProfile,
-    heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToPlacementEvents,subscribeToCompetitiveUpdates,getLatestCompetitiveUpdateId,getCompetitiveUpdatesAfter,getMyAnimationState,ackMyAnimationState,subscribeToSocial,subscribeToCup,subscribeToStats };
+    heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToPlacementEvents,subscribeToCompetitiveUpdates,getLatestCompetitiveUpdateId,getCompetitiveUpdatesAfter,getMyAnimationState,ackMyAnimationState,adminGetCupRegistrations,subscribeToSocial,subscribeToCup,subscribeToStats };
 })();
 
 </script>
@@ -2417,7 +2419,8 @@ window.HubAPI = (() => {
       e.preventDefault();e.stopImmediatePropagation();
       if(!live.session){openAuth('login');return;}
       const parentModal=foreign.closest('.modal-backdrop');
-      if(parentModal)parentModal.hidden=true;
+      if(parentModal){parentModal.hidden=true;parentModal.classList.remove('open','active');}
+      ['teamDetailModal','cupPlayerDetailModal'].forEach(id=>{const m=document.getElementById(id);if(m){m.hidden=true;m.classList.remove('open','active');}});
       const name=foreign.dataset.profilePlayer;
       state.profilePlayer=name;
       Promise.resolve(typeof window.HubV3?.renderProfileLive==='function'?window.HubV3.renderProfileLive(name):refreshForeignProfile(name)).then(()=>setPage('profile')).catch(err=>toast(err?.message||String(err),true));
@@ -2611,7 +2614,9 @@ window.HubAPI = (() => {
 
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
-      if(catchupBusy){catchupToken++;catchupBusy=false;closeCompetitiveOverlays();}
+      if(liveAckTimer){clearTimeout(liveAckTimer);liveAckTimer=null;}
+      closeCompetitiveOverlays();
+      if(catchupBusy){catchupToken++;catchupBusy=false;}
     }else setTimeout(runMissedCompetitiveCatchup,180);
   });
   window.addEventListener('focus',()=>setTimeout(runMissedCompetitiveCatchup,180));
@@ -3009,16 +3014,14 @@ function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const 
   function eventCounts(p,data,round){const s=statsForPlayer(p,{...data,events:data.events.filter(e=>e.round===round)});return s;}
   function renderAdminParticipants(cup,data){const wrap=$('#adminParticipantRows');if(!wrap)return;const teamMap=new Map(data.teams.map(t=>[t.id,t]));wrap.innerHTML=data.players.map(p=>{const s=eventCounts(p,data,real.adminRound),team=teamMap.get(p.team_id);return `<div class="admin-player-row v3-admin-player-row"><strong>${esc(p.name)}</strong><span>${esc(team?.name||'—')}</span><b>${s.points}</b><span>${copy('Round','Runde','Manche')} ${real.adminRound}</span><span class="v3-event-buttons"><button data-v3-event="kill:1" data-player-id="${p.id}">+1 K</button><button data-v3-event="kill:-1" data-player-id="${p.id}">−1 K</button><button data-v3-event="deathmatch:1" data-player-id="${p.id}" class="${s.dm?'active':''}">+3 DM</button><button data-v3-event="deathmatch:-1" data-player-id="${p.id}">−3</button><button data-v3-event="win:1" data-player-id="${p.id}" class="${s.w?'active':''}">+2 W</button><button data-v3-event="win:-1" data-player-id="${p.id}">−2</button><button class="v3-manage-player" data-v3-manage-player="${p.id}">${copy('Manage','Verwalten','Gérer')}</button></span></div>`}).join('');}
   async function loadAdminRegistrationTeams(cupId){
-    const [{data:regs,error:re},{data:members,error:me}]=await Promise.all([
-      api.client.from('cup_registrations').select('id,status,created_by,confirmed_team_id,created_at').eq('tournament_id',cupId).order('created_at',{ascending:true}),
-      api.client.from('cup_registration_members').select('registration_id,global_player_id,status,created_at').eq('tournament_id',cupId).order('created_at',{ascending:true})
-    ]);
-    if(re)throw re;if(me)throw me;
-    const ids=[...new Set((members||[]).map(m=>m.global_player_id).filter(Boolean))];
-    let directory=[];
-    if(ids.length){const {data,error}=await api.client.from('player_directory').select('id,current_name').in('id',ids);if(error)throw error;directory=data||[];}
-    const names=new Map(directory.map(p=>[p.id,p.current_name]));
-    return (regs||[]).map(r=>({...r,members:(members||[]).filter(m=>m.registration_id===r.id).map(m=>names.get(m.global_player_id)||'Unbekannt')}));
+    const rows=await api.adminGetCupRegistrations(cupId);
+    return (rows||[]).map(r=>({
+      id:r.registration_id,
+      status:r.status,
+      created_by:r.created_by,
+      created_at:r.created_at,
+      members:Array.isArray(r.member_names)?r.member_names:[]
+    }));
   }
   async function downloadAdminRegistrations(cup){
     try{
