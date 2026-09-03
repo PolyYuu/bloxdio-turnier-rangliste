@@ -22,25 +22,47 @@ new_return="adminAddPlayerToCup,adminStartNextRound,adminDeleteRound,adminAdjust
 replace_once(old_return,new_return,'export name-based import API')
 
 # Frontend parser: registration/tournament rows are no longer prerequisites.
+# Parse the familiar import format line-by-line instead of resolving against
+# already-created tournament teams/players.
 pattern=r"  function parseOldImport\(text,cup,data\)\{.*?\n  function openImport\(\)\{"
 match=re.search(pattern,s,re.S)
 if not match:
     raise SystemExit('parseOldImport block not found')
 new_parser=r'''  function parseOldImport(text,cup,data){
-    const colorPattern=COLORS.map(c=>c[0].replace(' ','\\s+')).join('|');
-    const sectionRegex=new RegExp(`(?:^|\\n)\\s*(${colorPattern})\\s*:\\s*([\\s\\S]*?)(?=(?:\\n\\s*(?:${colorPattern})\\s*:)|$)`,'gi');
-    const sections=[];let match;
-    while((match=sectionRegex.exec(String(text).replace(/\\r/g,'')))){
-      const color=COLOR_MAP.get(match[1].replace(/\\s+/g,' ').toLowerCase());
-      const players=[];
-      const playerRegex=/(?:^|,)\\s*([^,:\\n]+?)\\s*:\\s*(\\/|(?:(?:k|dm|w)\\s*:\\s*-?\\d+\\s*)+)\\s*(?=,|$)/gi;
-      let pm;const sectionText=match[2].trim().replace(/,+\\s*$/,'');const covered=Array(sectionText.length).fill(false);
-      while((pm=playerRegex.exec(sectionText))){players.push({name:pm[1].trim(),...parseStats(pm[2])});for(let i=pm.index;i<playerRegex.lastIndex;i++)covered[i]=true;}
-      const unparsed=[...sectionText].filter((ch,i)=>!covered[i]&&!/[\\s,]/.test(ch)).join('');
-      if(unparsed)throw new Error(`Invalid import content at ${color[0]}.`);
-      if(!players.length)throw new Error(`No players for ${color[0]}.`);
-      sections.push({name:color[0],hex:color[1],players});
+    const sections=[];
+    let current=null;
+    const flush=()=>{
+      if(!current)return;
+      const body=current.lines.join(' ').trim();
+      if(!body)throw new Error(`No players for ${current.name}.`);
+      const entries=body.split(',').map(x=>x.trim()).filter(Boolean);
+      const players=entries.map(entry=>{
+        const colon=entry.indexOf(':');
+        if(colon<1)throw new Error(`Invalid player entry at ${current.name}: ${entry}`);
+        const name=entry.slice(0,colon).trim();
+        const stats=entry.slice(colon+1).trim();
+        if(!name)throw new Error(`Missing player name at ${current.name}.`);
+        return {name,...parseStats(stats)};
+      });
+      sections.push({name:current.name,hex:current.hex,players});
+      current=null;
+    };
+    for(const raw of String(text).replace(/\r/g,'').split('\n')){
+      const line=raw.trim();
+      if(!line)continue;
+      if(line.endsWith(':')){
+        const label=line.slice(0,-1).trim();
+        const color=COLOR_MAP.get(label.toLowerCase());
+        if(color){
+          flush();
+          current={name:color[0],hex:color[1],lines:[]};
+          continue;
+        }
+      }
+      if(!current)throw new Error(`Invalid import line: ${line}`);
+      current.lines.push(line);
     }
+    flush();
     if(!sections.length)throw new Error(copy('No valid team sections found.','Keine gültigen Teamabschnitte gefunden.','Aucune section valide.'));
     const resolved=[];const used=new Set();
     for(const sec of sections){
