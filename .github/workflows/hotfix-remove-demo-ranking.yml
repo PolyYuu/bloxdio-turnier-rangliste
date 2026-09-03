@@ -1,0 +1,51 @@
+name: Hotfix remove demo ranking
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hotfix-remove-demo-ranking.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Disable legacy demo ranking renderers
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          old_overview = 'function renderOverviewRanking(){ document.querySelector("#overviewRankingRows").innerHTML=PLAYERS.slice(0,8).map((p,i)=>rankingRow(p,i,true)).join(""); }'
+          new_overview = 'function renderOverviewRanking(){ /* live ranking renderer owns #overviewRankingRows */ }'
+          old_full = '''function renderFullRanking(){
+            const q=(document.querySelector("#rankingSearch")?.value||"").toLowerCase(), filter=document.querySelector("#rankFilter")?.value||"all";
+            const filtered=PLAYERS.filter(p=>p.name.toLowerCase().includes(q)&&(filter==="all"||getRankKey(p.rating)===filter));
+            document.querySelector("#fullRankingRows").innerHTML=filtered.map((p,i)=>rankingRow(p,PLAYERS.indexOf(p),false)).join("")||`<div style="padding:34px;color:#8f82a9;text-align:center">${t("ranking.empty")}</div>`;
+          }'''
+          new_full = 'function renderFullRanking(){ /* live ranking renderer owns #fullRankingRows */ }'
+          if old_overview not in s:
+              raise SystemExit('legacy overview demo renderer not found')
+          if old_full not in s:
+              raise SystemExit('legacy full demo renderer not found')
+          s = s.replace(old_overview, new_overview, 1).replace(old_full, new_full, 1)
+          p.write_text(s)
+          PY
+          ! grep -q 'PLAYERS.slice(0,8).*rankingRow' index.html
+          ! grep -q 'filtered=PLAYERS.filter' index.html
+      - name: Commit hotfix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Fix demo ranking resurfacing'
+          git push origin HEAD:main
