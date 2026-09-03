@@ -14,8 +14,8 @@
     }
     html.hub-live-booting .site-header{visibility:visible!important;position:fixed!important;inset:0!important;z-index:2147483647!important;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;pointer-events:none!important}
     html.hub-live-booting .site-header>*{visibility:hidden!important}
-    html.hub-live-booting .site-header .hub-brand{visibility:visible!important;position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:310px!important;height:auto!important;min-width:0!important;overflow:visible!important}
-    html.hub-live-booting .site-header .hub-logo{visibility:visible!important;width:310px!important;height:auto!important;max-width:70vw!important;object-fit:contain!important;filter:drop-shadow(0 14px 34px rgba(122,66,255,.26))}
+    html.hub-live-booting .site-header .hub-brand{visibility:visible!important;position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%) scale(1.25)!important;transform-origin:center center!important;width:248px!important;height:auto!important;min-width:0!important;overflow:visible!important}
+    html.hub-live-booting .site-header .hub-logo{visibility:visible!important;width:248px!important;height:auto!important;max-width:56vw!important;object-fit:contain!important;filter:drop-shadow(0 14px 34px rgba(122,66,255,.26))}
   </style>
   <script>document.documentElement.classList.add('hub-live-booting');</script>
   <style id="hub-critical-css">
@@ -2250,7 +2250,9 @@ window.HubAPI = (() => {
     const name=live.player?.current_name||state.ownPlayer;
     if(!name)return;
     state.ownPlayer=name;state.profilePlayer=name;
-    await renderProfileLive(name);
+    const renderLive=window.HubV3?.renderProfileLive;
+    if(typeof renderLive==='function') await renderLive(name);
+    else await syncOwnProfileToUi();
     setPage('profile');
   }
 
@@ -2335,7 +2337,7 @@ window.HubAPI = (() => {
       if(!live.session){openAuth('login');return;}
       const name=foreign.dataset.profilePlayer;
       state.profilePlayer=name;
-      Promise.resolve(renderProfileLive(name)).then(()=>setPage('profile')).catch(err=>toast(err?.message||String(err),true));
+      Promise.resolve(typeof window.HubV3?.renderProfileLive==='function'?window.HubV3.renderProfileLive(name):refreshForeignProfile(name)).then(()=>setPage('profile')).catch(err=>toast(err?.message||String(err),true));
     }
   },true);
 
@@ -2673,6 +2675,8 @@ window.HubAPI = (() => {
     recent.hidden=!visible.length;updates.innerHTML=visible.map(x=>`<div><span>Game ${Number(x.game_number||0)}</span><strong class="${Number(x.final_delta)>=0?'positive':'negative'}">${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}</strong></div>`).join('');
   }
   renderHistoryGraph=renderHistoryGraphV4;
+
+  window.HubV3.renderProfileLive=(name)=>renderProfileLive(name);
 
   async function renderProfileLive(name){
     if(!live.player)return;const gp=(name===live.player.current_name?live.player:null)||live.globalPlayers.find(p=>p.current_name===name);if(!gp)return;
