@@ -2,9 +2,10 @@ name: Profile and rating graph UI hotfix
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - '.github/workflows/profile-history-ui-hotfix.yml'
+      - .github/workflows/profile-history-ui-hotfix.yml
 
 permissions:
   contents: write
@@ -13,204 +14,26 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-
-      - name: Patch production frontend
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path('index.html')
-          s = p.read_text()
-
-          def replace_once(old, new, label):
-              global s
-              n = s.count(old)
-              if n < 1:
-                  raise SystemExit(f'{label}: expected text not found')
-              s = s.replace(old, new, 1)
-              print(f'{label}: patched (found {n})')
-
-          # 1) Loader logo ~25% larger: 248px -> 310px.
-          loader_count = s.count('width:248px!important')
-          if loader_count != 2:
-              raise SystemExit(f'loader logo: expected exactly 2 width:248px occurrences, got {loader_count}')
-          s = s.replace('width:248px!important', 'width:310px!important')
-
-          # 2) One canonical placement sentence everywhere.
-          s = s.replace(
-              'Das Rating bleibt bis Placement 15 unsichtbar.',
-              'Dein verstecktes Rating wird erst nach Einrankungsrunde 15 angezeigt.'
-          )
-          s = s.replace(
-              'Rating is hidden until placement 15.',
-              'Your hidden rating is not shown until placement 15.'
-          )
-          s = s.replace(
-              'Rating caché jusqu’à la 15e manche.',
-              'Ton rating caché reste invisible jusqu’à la 15e manche.'
-          )
-
-          # Own profile must prefer the fresh account object over a possibly stale global-list copy.
-          replace_once(
-              "const gp=live.globalPlayers.find(p=>p.current_name===name)||(name===live.player.current_name?live.player:null);",
-              "const gp=(name===live.player.current_name?live.player:null)||live.globalPlayers.find(p=>p.current_name===name);",
-              'own profile data priority'
-          )
-
-          # Do not let openOwnProfile invoke the old demo renderer first.
-          old_open = """async function openOwnProfile(){
-    if(!live.session)return openAuth('login');
-    try { state.profilePlayer=state.ownPlayer; renderProfile(); } catch(_){}
-    setPage('profile'); await syncOwnProfileToUi();
-  }"""
-          new_open = """async function openOwnProfile(){
-    if(!live.session)return openAuth('login');
-    const name=live.player?.current_name||state.ownPlayer;
-    if(!name)return;
-    await renderProfileLive(name);
-    setPage('profile');
-  }"""
-          replace_once(old_open, new_open, 'openOwnProfile')
-
-          # syncOwnProfileToUi must also never render the legacy/demo profile.
-          replace_once(
-              "try { state.ownPlayer=live.player.current_name; state.profilePlayer=live.player.current_name; renderProfile(); } catch(_){}",
-              "state.ownPlayer=live.player.current_name; state.profilePlayer=live.player.current_name;",
-              'syncOwnProfileToUi legacy render removal'
-          )
-
-          # Keep the live global player copy in sync immediately after an own avatar save.
-          replace_once(
-              "live.player.avatar_pixels=pixels;cacheAvatar(live.player);const av=$('#profileAvatar');if(av)av.src=pixelDataUrl(pixels);",
-              "live.player.avatar_pixels=pixels;const gp=(live.globalPlayers||[]).find(p=>p.id===live.player.id);if(gp)gp.avatar_pixels=pixels;cacheAvatar(live.player);const av=$('#profileAvatar');if(av)av.src=pixelDataUrl(pixels);",
-              'avatar live cache sync'
-          )
-
-          # Replace the late bubble profile navigation with a capture-phase live-only route.
-          old_click = """document.addEventListener('click',e=>{
-    if(e.target.closest('[data-route=\"profile\"]')&&live.session)setTimeout(()=>openOwnProfile(),0);
-    const foreign=e.target.closest('[data-profile-player]');if(foreign&&live.session)setTimeout(()=>refreshForeignProfile(foreign.dataset.profilePlayer),0);
-  });"""
-          new_click = """document.addEventListener('click',e=>{
-    const ownRoute=e.target.closest('[data-route=\"profile\"]');
-    if(ownRoute){
-      e.preventDefault();e.stopImmediatePropagation();
-      if(!live.session){openAuth('login');return;}
-      openOwnProfile().catch(err=>toast(err?.message||String(err),true));
-      return;
-    }
-    const foreign=e.target.closest('[data-profile-player]');
-    if(foreign){
-      e.preventDefault();e.stopImmediatePropagation();
-      if(!live.session){openAuth('login');return;}
-      const name=foreign.dataset.profilePlayer;
-      Promise.resolve(renderProfileLive(name)).then(()=>setPage('profile')).catch(err=>toast(err?.message||String(err),true));
-    }
-  },true);"""
-          replace_once(old_click, new_click, 'unified profile click routing')
-
-          # 3) Restore a live beta-style rating graph, but only when Game 16+ is public.
-          graph_impl = r'''
-  function renderHistoryGraphV4(history){
-    const panel=$('.history-panel'),recent=$('[data-page="profile"] .recent-updates');if(!panel||!recent)return;
-    const h=(history||[]).slice(-40),chart=$('.chart',panel),updates=$('.update-list',recent);if(!chart||!updates)return;
-    if(!h.length){chart.innerHTML=`<p class="v3-empty">${copy('No competitive games yet.','Noch keine Competitive-Games gespielt.','Aucune partie compétitive.')}</p>`;updates.innerHTML='';recent.hidden=true;return;}
-
-    const rows=`<div class="v3-history-list">${h.map((x,idx)=>{
-      const game=Number(x.game_number||idx+1),hidden=x.final_delta===null||x.final_delta===undefined||game<=15;
-      const delta=hidden?copy('HIDDEN','VERDECKT','CACHÉ'):`${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}`;
-      return `<div class="v3-history-row"><div class="v3-history-game"><strong>Game ${game}</strong><small>${copy('Round','Runde','Manche')} ${Number(x.round||0)}</small></div><div class="v3-history-cup"><strong>${esc(x.tournament_name||copy('Competitive Cup','Competitive Cup','Cup compétitif'))}</strong><small>${x.created_at?new Date(x.created_at).toLocaleDateString():''}</small></div><div class="v3-history-stats"><i>K ${Number(x.round_kills||0)}</i><i>DM ${Number(x.round_deathmatches||0)}</i><i>W ${Number(x.round_wins||0)}</i><i>PTS ${Number(x.individual_points||0)}</i></div><div class="v3-history-delta ${hidden?'hidden-rating':Number(x.final_delta)>=0?'positive':'negative'}">${delta}</div></div>`;
-    }).join('')}</div>`;
-
-    const ranked=h.filter((x,idx)=>Number(x.game_number||idx+1)>=16&&x.rating_after!==null&&x.rating_after!==undefined&&Number.isFinite(Number(x.rating_after)));
-    let graph='';
-    if(ranked.length){
-      const first=ranked[0],firstGame=Number(first.game_number||16),firstAfter=Number(first.rating_after),firstDelta=Number(first.final_delta||0);
-      const points=[{game:Math.max(15,firstGame-1),rating:firstAfter-firstDelta,start:true},...ranked.map((x,idx)=>({game:Number(x.game_number||firstGame+idx),rating:Number(x.rating_after)}))];
-      const vals=points.map(x=>x.rating);let lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(100,hi-lo),pad=Math.max(25,span*.18);
-      lo=Math.floor((lo-pad)/25)*25;hi=Math.ceil((hi+pad)/25)*25;
-      if(hi-lo<100){const mid=(hi+lo)/2;lo=Math.floor((mid-50)/25)*25;hi=lo+100;}
-      const W=720,H=236,L=12,R=12,T=12,B=24,plotW=W-L-R,plotH=H-T-B;
-      const xAt=i=>L+(points.length===1?plotW/2:(i/(points.length-1))*plotW),yAt=v=>T+((hi-v)/(hi-lo))*plotH;
-      const coords=points.map((pt,i)=>[xAt(i),yAt(pt.rating)]),line=coords.map((c,i)=>`${i?'L':'M'} ${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' ');
-      const area=`${line} L ${coords[coords.length-1][0].toFixed(2)} ${(T+plotH).toFixed(2)} L ${coords[0][0].toFixed(2)} ${(T+plotH).toFixed(2)} Z`;
-      const ticks=Array.from({length:5},(_,i)=>hi-(hi-lo)*(i/4));
-      graph=`<div class="v3-rating-graph"><div class="v3-rating-ylabels">${ticks.map(v=>`<span>${Math.round(v)}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Rating Verlauf"><defs><linearGradient id="v3RatingFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38ead8" stop-opacity=".30"/><stop offset="100%" stop-color="#38ead8" stop-opacity=".025"/></linearGradient></defs>${ticks.map(v=>`<line class="v3-rating-grid" x1="${L}" y1="${yAt(v)}" x2="${W-R}" y2="${yAt(v)}"/>`).join('')}<path class="v3-rating-area" d="${area}"/><path class="v3-rating-line" d="${line}"/>${coords.map((c,i)=>`<circle class="v3-rating-point" cx="${c[0]}" cy="${c[1]}" r="3"><title>${points[i].start?copy('Starting rating','Start-Rating','Rating initial'):`Game ${points[i].game}`}: ${Math.round(points[i].rating)}</title></circle>`).join('')}</svg><div class="v3-rating-xlabels"><span>${copy('START','START','DÉBUT')}</span><span>Game ${points[points.length-1].game}</span></div></div>`;
-    }
-
-    chart.innerHTML=graph+rows;
-    const visible=h.filter((x,idx)=>Number(x.game_number||idx+1)>=16&&x.final_delta!==null&&x.final_delta!==undefined).slice(-5).reverse();
-    recent.hidden=!visible.length;updates.innerHTML=visible.map(x=>`<div><span>Game ${Number(x.game_number||0)}</span><strong class="${Number(x.final_delta)>=0?'positive':'negative'}">${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}</strong></div>`).join('');
-  }
-  renderHistoryGraph=renderHistoryGraphV4;
-'''
-          marker = "  async function renderProfileLive(name){"
-          if marker not in s:
-              raise SystemExit('renderProfileLive marker not found')
-          if 'function renderHistoryGraphV4(history)' in s:
-              raise SystemExit('graph v4 already exists unexpectedly')
-          s = s.replace(marker, graph_impl + '\n' + marker, 1)
-
-          # Graph CSS + responsive behavior.
-          graph_css = r'''
-  <style id="v3-rating-graph-v4">
-    .v3-rating-graph{position:relative;height:270px;margin:2px 0 18px;padding:8px 12px 28px 46px;border-bottom:1px solid rgba(121,78,210,.18);box-sizing:border-box}
-    .v3-rating-graph svg{display:block;width:100%;height:100%;overflow:visible}
-    .v3-rating-grid{stroke:rgba(128,102,182,.12);stroke-width:1;vector-effect:non-scaling-stroke}
-    .v3-rating-area{fill:url(#v3RatingFill)}
-    .v3-rating-line{fill:none;stroke:#38ead8;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 6px rgba(56,234,216,.24))}
-    .v3-rating-point{fill:#38ead8;stroke:#0b071c;stroke-width:1.5;vector-effect:non-scaling-stroke}
-    .v3-rating-ylabels{position:absolute;left:4px;top:17px;bottom:37px;width:38px;display:flex;flex-direction:column;justify-content:space-between;color:#706486;font:700 8px/1 Montserrat,sans-serif;text-align:right}
-    .v3-rating-xlabels{position:absolute;left:52px;right:13px;bottom:8px;display:flex;justify-content:space-between;color:#706486;font:800 7px/1 Montserrat,sans-serif;letter-spacing:.04em}
-    @media(max-width:700px){.v3-rating-graph{height:220px;padding-left:38px}.v3-rating-ylabels{width:31px;font-size:7px}.v3-rating-xlabels{left:44px}}
-  </style>
-'''
-          if '</head>' not in s:
-              raise SystemExit('head closing tag not found')
-          s = s.replace('</head>', graph_css + '\n</head>', 1)
-
-          p.write_text(s)
-
-          # Structural assertions.
-          checks = {
-              'loader 310': 'width:310px!important',
-              'graph renderer': 'function renderHistoryGraphV4(history)',
-              'graph css': 'id="v3-rating-graph-v4"',
-              'canonical German placement copy': 'Dein verstecktes Rating wird erst nach Einrankungsrunde 15 angezeigt.',
-              'fresh own profile priority': "const gp=(name===live.player.current_name?live.player:null)||live.globalPlayers.find(p=>p.current_name===name);",
-              'unified capture routing': "const ownRoute=e.target.closest('[data-route=\\\"profile\\\"]');",
-          }
-          for label,needle in checks.items():
-              if needle not in s:
-                  raise SystemExit(f'validation failed: {label}')
-          if 'try { state.profilePlayer=state.ownPlayer; renderProfile(); } catch(_){}' in s:
-              raise SystemExit('validation failed: legacy own profile render still present')
-          print('all structural assertions passed')
-          PY
-
-      - name: Validate inline JavaScript syntax
-        shell: bash
+      - name: Patch index
+        run: python .github/scripts/profile_history_ui_hotfix.py
+      - name: Validate JavaScript
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
           s=Path('index.html').read_text()
-          scripts=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',s,re.S|re.I)
           out=Path('/tmp/hub-scripts');out.mkdir(exist_ok=True)
-          for i,body in enumerate(scripts):
-              (out/f'{i}.js').write_text(body)
-          print(f'extracted {len(scripts)} inline scripts')
+          scripts=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',s,re.S|re.I)
+          for i,body in enumerate(scripts):(out/f'{i}.js').write_text(body)
+          print(len(scripts))
           PY
           for f in /tmp/hub-scripts/*.js; do node --check "$f"; done
-
-      - name: Commit frontend hotfix
-        shell: bash
+      - name: Commit
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
