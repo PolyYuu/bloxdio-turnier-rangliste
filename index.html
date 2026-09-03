@@ -2383,6 +2383,7 @@ window.HubAPI = (() => {
   api.subscribeToPlacementEvents(evt=>{
     if(!live.player||evt.global_player_id!==live.player.id)return;
     const done=Math.max(1,Math.min(15,Number(evt.placement_game_number||0)));
+    const beforePlacement=Number(live.player.placement_games||0);
     setTimeout(async()=>{
       try{
         // The notification and global-player update commit together, but retry briefly to avoid any UI race.
@@ -2395,13 +2396,44 @@ window.HubAPI = (() => {
         if(refreshed)live.player=refreshed;
         live.stats=await api.getCareerStatsFor(live.player.id);
         await syncOwnProfileToUi();
-        if(live.player.ranking_experience_enabled!==false&&typeof window.simulatePlacementRatingEvent==='function'){
+        if(done>beforePlacement&&live.player.ranking_experience_enabled!==false&&typeof window.simulatePlacementRatingEvent==='function'){
           window.simulatePlacementRatingEvent({done,round:Number(evt.round||0)});
         }
         document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player,placement:true}}));
       }catch(e){console.error('Placement realtime update failed',e);}
     },120);
   });
+
+
+  let liveProgressPollBusy=false;
+  setInterval(async()=>{
+    if(liveProgressPollBusy||document.hidden||!live.session||!live.player)return;
+    liveProgressPollBusy=true;
+    try{
+      const beforePlacement=Number(live.player.placement_games||0);
+      const beforeRating=Number(live.player.rating||0);
+      const beforeRanked=!!live.player.is_ranked;
+      const refreshed=await api.getMyProfile();
+      if(!refreshed)return;
+      const afterPlacement=Number(refreshed.placement_games||0);
+      const afterRating=Number(refreshed.rating||0);
+      const afterRanked=!!refreshed.is_ranked;
+      const changed=afterPlacement!==beforePlacement||afterRanked!==beforeRanked||Math.abs(afterRating-beforeRating)>.001;
+      if(!changed)return;
+
+      live.player=refreshed;
+      try{live.stats=await api.getCareerStatsFor(live.player.id);}catch(_){}
+      await syncOwnProfileToUi();
+
+      // Only an increase in placement count represents a newly finalized placement.
+      // Deletions/recalculations can only update silently.
+      if(afterPlacement>beforePlacement&&afterPlacement<=15&&live.player.ranking_experience_enabled!==false&&typeof window.simulatePlacementRatingEvent==='function'){
+        window.simulatePlacementRatingEvent({done:afterPlacement});
+      }
+      document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{player:live.player,pollFallback:true,placementChanged:afterPlacement!==beforePlacement}}));
+    }catch(e){console.warn('Live progress fallback failed',e);}
+    finally{liveProgressPollBusy=false;}
+  },2000);
 
   restoreAuth(false).then(updateRegistrationButton);
 })();
