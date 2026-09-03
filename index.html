@@ -1981,6 +1981,7 @@ window.HubAPI = (() => {
   async function adminDeleteRound(tournamentId,round) { return rpc('delete_tournament_round',{p_tournament_id:tournamentId,p_round:round}); }
   async function adminAdjustEvent(playerId,round,type,delta) { return rpc('admin_adjust_round_event',{p_player_id:playerId,p_round:round,p_type:type,p_delta:delta}); }
   async function adminReplaceRound(tournamentId,round,results) { return rpc('replace_round_results',{p_tournament_id:tournamentId,p_round:round,p_results:results}); }
+  async function adminImportRoundByName(tournamentId,round,results) { return rpc('import_round_results_by_name',{p_tournament_id:tournamentId,p_round:round,p_results:results}); }
   async function adminRenamePlayer(id,name) { return rpc('admin_rename_global_player',{p_player_id:id,p_new_name:name}); }
   async function adminSetRating(id,rating) { return rpc('admin_set_player_rating',{p_player_id:id,p_rating:rating}); }
   async function adminSetPeak(id,peak) { return rpc('admin_set_player_peak',{p_player_id:id,p_peak:peak}); }
@@ -2019,7 +2020,7 @@ window.HubAPI = (() => {
     changePassword,changeMyName,setRankingExperience,saveAvatar,acknowledgeAvatarReset,getTournaments,getCupData,getSocialState,
     sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,
     finalizeRoundRating,recalculateRoundRating,recalculateRatingFromRound,uploadCupIcon,adminCreateCup,adminUpdateCup,adminDeleteCup,adminSetCupStatus,adminCreateTeam,
-    adminAddPlayerToCup,adminStartNextRound,adminDeleteRound,adminAdjustEvent,adminReplaceRound,adminRenamePlayer,adminSetRating,adminSetPeak,
+    adminAddPlayerToCup,adminStartNextRound,adminDeleteRound,adminAdjustEvent,adminReplaceRound,adminImportRoundByName,adminRenamePlayer,adminSetRating,adminSetPeak,
     adminSetStats,adminResetStats,adminResetAvatar,adminSetAvatar,adminAccountAction,
     getFakeRankingProfiles,adminCreateFakeRankingProfile,adminUpdateFakeRankingProfile,adminDeleteFakeRankingProfile,
     heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToSocial,subscribeToCup,subscribeToStats };
@@ -2772,13 +2773,54 @@ function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const 
   function openAddPlayer(){const cup=adminCup();if(!cup)return;cupData(cup.id,true).then(data=>{const m=document.createElement('div');m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal"><button class="modal-close" data-v3-close>×</button><span class="eyebrow">ADMIN · ${esc(cup.name)}</span><h2>${copy('Add player','Spieler hinzufügen','Ajouter joueur')}</h2><form id="v3AddPlayer"><label><span>${copy('Current ingame name','Aktueller Ingame-Name','Pseudo actuel')}</span><input name="name" required></label><label><span>Team</span><select name="team"><option value="__new">${copy('Create new team','Neues Team erstellen','Créer une équipe')}</option>${data.teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label><label><span>${copy('New team name','Neuer Teamname','Nom équipe')}</span><input name="teamname" placeholder="Team"></label><div class="v3-form-error"></div><button class="cta-button wide">${copy('Add player','Spieler hinzufügen','Ajouter')}</button></form></section>`;document.body.appendChild(m);m.onclick=e=>{if(e.target===m||e.target.closest('[data-v3-close]'))m.remove();};$('#v3AddPlayer',m).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);e.submitter.disabled=true;try{let team=f.get('team');if(team==='__new')team=await api.adminCreateTeam(cup.id,f.get('teamname')||'Team','');await api.adminAddPlayerToCup(cup.id,team,f.get('name'));m.remove();real.cupCache.delete(cup.id);toast(copy('Player added.','Spieler hinzugefügt.','Joueur ajouté.'));await refreshCups();}catch(err){$('.v3-form-error',m).textContent=err.message;e.submitter.disabled=false;}};});}
   function parseStats(block){const raw=block.trim();if(raw==='/')return{k:0,dm:0,w:0};const out={k:0,dm:0,w:0};const re=/(k|dm|w)\s*:\s*(-?\d+)/gi;let m,seen='';while((m=re.exec(raw))){out[m[1].toLowerCase()]=Number(m[2]);seen+=m[0];}if(!seen)throw new Error(`Invalid stats: ${raw}`);if(out.k<0||![0,1].includes(out.dm)||![0,1].includes(out.w))throw new Error('k >= 0; dm/w only 0 or 1.');return out;}
   function parseOldImport(text,cup,data){
-    const colorPattern=COLORS.map(c=>c[0].replace(' ','\\s+')).join('|');const sectionRegex=new RegExp(`(?:^|\\n)\\s*(${colorPattern})\\s*:\\s*([\\s\\S]*?)(?=(?:\\n\\s*(?:${colorPattern})\\s*:)|$)`,'gi');const sections=[];let match;
-    while((match=sectionRegex.exec(String(text).replace(/\r/g,'')))){const color=COLOR_MAP.get(match[1].replace(/\s+/g,' ').toLowerCase());const players=[];const playerRegex=/(?:^|,)\s*([^,:\n]+?)\s*:\s*(\/|(?:(?:k|dm|w)\s*:\s*-?\d+\s*)+)\s*(?=,|$)/gi;let pm;const sectionText=match[2].trim().replace(/,+\s*$/,'');const covered=Array(sectionText.length).fill(false);while((pm=playerRegex.exec(sectionText))){players.push({name:pm[1].trim(),...parseStats(pm[2])});for(let i=pm.index;i<playerRegex.lastIndex;i++)covered[i]=true;}const unparsed=[...sectionText].filter((ch,i)=>!covered[i]&&!/[\s,]/.test(ch)).join('');if(unparsed)throw new Error(`Invalid import content at ${color[0]}.`);if(!players.length)throw new Error(`No players for ${color[0]}.`);sections.push({color:color[0],players});}
+    const sections=[];
+    let current=null;
+    const flush=()=>{
+      if(!current)return;
+      const body=current.lines.join(' ').trim();
+      if(!body)throw new Error(`No players for ${current.name}.`);
+      const entries=body.split(',').map(x=>x.trim()).filter(Boolean);
+      const players=entries.map(entry=>{
+        const colon=entry.indexOf(':');
+        if(colon<1)throw new Error(`Invalid player entry at ${current.name}: ${entry}`);
+        const name=entry.slice(0,colon).trim();
+        const stats=entry.slice(colon+1).trim();
+        if(!name)throw new Error(`Missing player name at ${current.name}.`);
+        return {name,...parseStats(stats)};
+      });
+      sections.push({name:current.name,hex:current.hex,players});
+      current=null;
+    };
+    for(const raw of String(text).replace(/\r/g,'').split('\n')){
+      const line=raw.trim();
+      if(!line)continue;
+      if(line.endsWith(':')){
+        const label=line.slice(0,-1).trim();
+        const color=COLOR_MAP.get(label.toLowerCase());
+        if(color){
+          flush();
+          current={name:color[0],hex:color[1],lines:[]};
+          continue;
+        }
+      }
+      if(!current)throw new Error(`Invalid import line: ${line}`);
+      current.lines.push(line);
+    }
+    flush();
     if(!sections.length)throw new Error(copy('No valid team sections found.','Keine gültigen Teamabschnitte gefunden.','Aucune section valide.'));
-    const resolved=[];const used=new Set();for(const sec of sections){const team=data.teams.find(t=>t.name.toLowerCase()===sec.color.toLowerCase());if(!team)throw new Error(`${copy('Team not found','Team nicht gefunden','Équipe introuvable')}: ${sec.color}`);const teamPlayers=data.players.filter(p=>p.team_id===team.id);for(const input of sec.players){const p=teamPlayers.find(x=>x.name.toLowerCase()===input.name.toLowerCase());if(!p)throw new Error(`${copy('Current player name not found in team','Aktueller Spielername nicht im Team gefunden','Pseudo actuel introuvable')}: ${input.name}`);if(used.has(p.id))throw new Error(`${input.name} duplicated.`);used.add(p.id);resolved.push({player_id:p.id,k:input.k,dm:input.dm,w:input.w});}}
-    if(resolved.filter(x=>x.w===1).length>1)throw new Error('Only one player may have w:1.');return resolved;
+    const resolved=[];const used=new Set();
+    for(const sec of sections){
+      for(const input of sec.players){
+        const key=input.name.toLowerCase();
+        if(used.has(key))throw new Error(`${input.name} duplicated.`);
+        used.add(key);
+        resolved.push({team_name:sec.name,team_color:sec.hex,player_name:input.name,k:input.k,dm:input.dm,w:input.w});
+      }
+    }
+    if(resolved.filter(x=>x.w===1).length>1)throw new Error('Only one player may have w:1.');
+    return resolved;
   }
-  function openImport(){const cup=adminCup();if(!cup)return;cupData(cup.id,true).then(data=>{const m=document.createElement('div');m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal v3-import-modal"><button class="modal-close" data-v3-close>×</button><span class="eyebrow">${esc(cup.name)} · ${copy('Round','Runde','Manche')} ${real.adminRound}</span><h2>${copy('Import results','Ergebnisse importieren','Importer résultats')}</h2><p>k = Kill (+1), dm = Deathmatch (+3), w = Win (+2). ${copy('The import matches only the current ingame names. Old names are not accepted.','Der Import gleicht ausschließlich die aktuellen Ingame-Namen ab. Alte Namen werden nicht akzeptiert.','Seuls les pseudos actuels sont acceptés.')}</p><textarea id="v3ImportText" rows="14" placeholder="Orange:\nPlayer1: k:3 dm:1 w:0, Player2: /\n\nDark Green:\nPlayer3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-error"></div><button class="cta-button wide" id="v3DoImport">${copy('Import round','Runde importieren','Importer la manche')}</button></section>`;document.body.appendChild(m);m.onclick=e=>{if(e.target===m||e.target.closest('[data-v3-close]'))m.remove();};$('#v3DoImport',m).onclick=async e=>{e.currentTarget.disabled=true;try{const results=parseOldImport($('#v3ImportText',m).value,cup,data);await api.adminReplaceRound(cup.id,real.adminRound,results);m.remove();real.cupCache.delete(cup.id);toast(copy('Round imported. Rating has NOT been finalized yet.','Runde importiert. Das Rating wurde NOCH NICHT finalisiert.','Manche importée. Rating non finalisé.'));await refreshCups();}catch(err){$('.v3-form-error',m).textContent=err.message;e.currentTarget.disabled=false;}};});}
+  function openImport(){const cup=adminCup();if(!cup)return;cupData(cup.id,true).then(data=>{const m=document.createElement('div');m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal v3-import-modal"><button class="modal-close" data-v3-close>×</button><span class="eyebrow">${esc(cup.name)} · ${copy('Round','Runde','Manche')} ${real.adminRound}</span><h2>${copy('Import results','Ergebnisse importieren','Importer résultats')}</h2><p>k = Kill (+1), dm = Deathmatch (+3), w = Win (+2). ${copy('The import matches only the current ingame names. Old names are not accepted. Registrations are optional; missing teams and players are created from this import.','Der Import gleicht ausschließlich die aktuellen Ingame-Namen ab. Alte Namen werden nicht akzeptiert. Registrierungen sind optional; fehlende Teams und Spieler werden durch diesen Import automatisch als Turnierteilnehmer angelegt.','Seuls les pseudos actuels sont acceptés. Les inscriptions sont facultatives ; les équipes et joueurs manquants sont créés par cet import.')}</p><textarea id="v3ImportText" rows="14" placeholder="Orange:\nPlayer1: k:3 dm:1 w:0, Player2: /\n\nDark Green:\nPlayer3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-error"></div><button class="cta-button wide" id="v3DoImport">${copy('Import round','Runde importieren','Importer la manche')}</button></section>`;document.body.appendChild(m);m.onclick=e=>{if(e.target===m||e.target.closest('[data-v3-close]'))m.remove();};$('#v3DoImport',m).onclick=async e=>{e.currentTarget.disabled=true;try{const results=parseOldImport($('#v3ImportText',m).value,cup,data);await api.adminImportRoundByName(cup.id,real.adminRound,results);m.remove();real.cupCache.delete(cup.id);toast(copy('Round imported. Rating has NOT been finalized yet.','Runde importiert. Das Rating wurde NOCH NICHT finalisiert.','Manche importée. Rating non finalisé.'));await refreshCups();}catch(err){$('.v3-form-error',m).textContent=err.message;e.currentTarget.disabled=false;}};});}
   async function confirmFinalize(){const cup=adminCup();if(!cup)return;const ok=confirm(copy(`Finalize round ${real.adminRound}? This calculates rating for every participant.`,`Runde ${real.adminRound} finalisieren? Dadurch wird das Rating aller Teilnehmer berechnet.`,`Finaliser la manche ${real.adminRound} ?`));if(!ok)return;try{await api.finalizeRoundRating(cup.id,real.adminRound);toast(copy('Round rating finalized.','Runden-Rating finalisiert.','Rating finalisé.'));}catch(err){if(/already finalized/i.test(err.message)&&confirm(copy('This round was already finalized. Recalculate it from the current results?','Diese Runde wurde bereits finalisiert. Mit den aktuellen Ergebnissen neu berechnen?','Recalculer cette manche ?'))){try{await api.recalculateRoundRating(cup.id,real.adminRound);toast(copy('Rating recalculated.','Rating neu berechnet.','Rating recalculé.'));}catch(e){if(/Later rounds are finalized/i.test(e.message)&&confirm(copy('Later rounds are already finalized. Recalculate this round and every later finalized round in order?','Spätere Runden sind bereits finalisiert. Diese Runde und alle späteren finalisierten Runden der Reihe nach neu berechnen?','Recalculer cette manche et toutes les suivantes ?'))){try{await api.recalculateRatingFromRound(cup.id,real.adminRound);toast(copy('Rating cascade recalculated.','Rating ab dieser Runde vollständig neu berechnet.','Recalcul complet effectué.'));}catch(x){toast(x.message,true);}}else toast(e.message,true);}}else toast(err.message,true);}}
 
   async function openManageGlobalPlayer(globalPlayerId){
