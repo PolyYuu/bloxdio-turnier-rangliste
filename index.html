@@ -2001,6 +2001,7 @@ window.HubAPI = (() => {
   async function adminGetOnlinePlayers() { const data=await rpc('admin_get_online_players'); return data||[]; }
 
   function subscribeToRatingEvents(onInsert) { return client.channel('hub-rating-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'rating_history'},p=>onInsert(p.new)).subscribe(); }
+  function subscribeToPlacementEvents(onInsert) { return client.channel('hub-placement-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'placement_update_notifications'},p=>onInsert(p.new)).subscribe(); }
   function subscribeToSocial(onChange) { return client.channel('hub-social-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'cup_registration_members'},onChange)
@@ -2023,7 +2024,7 @@ window.HubAPI = (() => {
     adminAddPlayerToCup,adminStartNextRound,adminDeleteRound,adminAdjustEvent,adminReplaceRound,adminImportRoundByName,adminRenamePlayer,adminSetRating,adminSetPeak,
     adminSetStats,adminResetStats,adminResetAvatar,adminSetAvatar,adminAccountAction,
     getFakeRankingProfiles,adminCreateFakeRankingProfile,adminUpdateFakeRankingProfile,adminDeleteFakeRankingProfile,
-    heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToSocial,subscribeToCup,subscribeToStats };
+    heartbeatPresence,clearPresence,adminGetOnlinePlayers,subscribeToRatingEvents,subscribeToPlacementEvents,subscribeToSocial,subscribeToCup,subscribeToStats };
 })();
 
 </script>
@@ -2365,9 +2366,41 @@ window.HubAPI = (() => {
   api.subscribeToRatingEvents(evt=>{
     if(!live.player||evt.global_player_id!==live.player.id)return;
     const wasRanked=!!live.player.is_ranked;
-    // Ranked users get the existing overlay. Placement users never see the hidden delta.
-    if(wasRanked&&live.player.ranking_experience_enabled!==false&&typeof window.simulateRealtimeRatingEvent==='function')window.simulateRealtimeRatingEvent({rankUp:evt.rank_before&&evt.rank_after&&evt.rank_before!==evt.rank_after});
-    setTimeout(async()=>{try{live.player=await api.getMyProfile();live.stats=await api.getCareerStatsFor(live.player.id);await syncOwnProfileToUi();document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player}}));}catch(e){console.error(e);}},80);
+    // Only already-ranked users can read rating_history; their delta/rank overlay remains unchanged.
+    if(wasRanked&&live.player.ranking_experience_enabled!==false&&typeof window.simulateRealtimeRatingEvent==='function'){
+      window.simulateRealtimeRatingEvent({rankUp:evt.rank_before&&evt.rank_after&&evt.rank_before!==evt.rank_after});
+    }
+    setTimeout(async()=>{
+      try{
+        live.player=await api.getMyProfile();
+        live.stats=await api.getCareerStatsFor(live.player.id);
+        await syncOwnProfileToUi();
+        document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player}}));
+      }catch(e){console.error(e);}
+    },120);
+  });
+
+  api.subscribeToPlacementEvents(evt=>{
+    if(!live.player||evt.global_player_id!==live.player.id)return;
+    const done=Math.max(1,Math.min(15,Number(evt.placement_game_number||0)));
+    setTimeout(async()=>{
+      try{
+        // The notification and global-player update commit together, but retry briefly to avoid any UI race.
+        let refreshed=null;
+        for(let i=0;i<5;i++){
+          refreshed=await api.getMyProfile();
+          if(Number(refreshed?.placement_games||0)>=done)break;
+          await new Promise(r=>setTimeout(r,90));
+        }
+        if(refreshed)live.player=refreshed;
+        live.stats=await api.getCareerStatsFor(live.player.id);
+        await syncOwnProfileToUi();
+        if(live.player.ranking_experience_enabled!==false&&typeof window.simulatePlacementRatingEvent==='function'){
+          window.simulatePlacementRatingEvent({done,round:Number(evt.round||0)});
+        }
+        document.dispatchEvent(new CustomEvent('hub:rating-updated',{detail:{event:evt,player:live.player,placement:true}}));
+      }catch(e){console.error('Placement realtime update failed',e);}
+    },120);
   });
 
   restoreAuth(false).then(updateRegistrationButton);
@@ -2820,7 +2853,7 @@ function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const 
     if(resolved.filter(x=>x.w===1).length>1)throw new Error('Only one player may have w:1.');
     return resolved;
   }
-  function openImport(){const cup=adminCup();if(!cup)return;cupData(cup.id,true).then(data=>{const m=document.createElement('div');m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal v3-import-modal"><button class="modal-close" data-v3-close>×</button><span class="eyebrow">${esc(cup.name)} · ${copy('Round','Runde','Manche')} ${real.adminRound}</span><h2>${copy('Import results','Ergebnisse importieren','Importer résultats')}</h2><p>k = Kill (+1), dm = Deathmatch (+3), w = Win (+2). ${copy('The import matches only the current ingame names. Old names are not accepted. Registrations are optional; missing teams and players are created from this import.','Der Import gleicht ausschließlich die aktuellen Ingame-Namen ab. Alte Namen werden nicht akzeptiert. Registrierungen sind optional; fehlende Teams und Spieler werden durch diesen Import automatisch als Turnierteilnehmer angelegt.','Seuls les pseudos actuels sont acceptés. Les inscriptions sont facultatives ; les équipes et joueurs manquants sont créés par cet import.')}</p><textarea id="v3ImportText" rows="14" placeholder="Orange:\nPlayer1: k:3 dm:1 w:0, Player2: /\n\nDark Green:\nPlayer3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-error"></div><button class="cta-button wide" id="v3DoImport">${copy('Import round','Runde importieren','Importer la manche')}</button></section>`;document.body.appendChild(m);m.onclick=e=>{if(e.target===m||e.target.closest('[data-v3-close]'))m.remove();};$('#v3DoImport',m).onclick=async e=>{e.currentTarget.disabled=true;try{const results=parseOldImport($('#v3ImportText',m).value,cup,data);await api.adminImportRoundByName(cup.id,real.adminRound,results);m.remove();real.cupCache.delete(cup.id);toast(copy('Round imported. Rating has NOT been finalized yet.','Runde importiert. Das Rating wurde NOCH NICHT finalisiert.','Manche importée. Rating non finalisé.'));await refreshCups();}catch(err){$('.v3-form-error',m).textContent=err.message;e.currentTarget.disabled=false;}};});}
+  function openImport(){const cup=adminCup();if(!cup)return;cupData(cup.id,true).then(data=>{const m=document.createElement('div');m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal v3-import-modal"><button class="modal-close" data-v3-close>×</button><span class="eyebrow">${esc(cup.name)} · ${copy('Round','Runde','Manche')} ${real.adminRound}</span><h2>${copy('Import results','Ergebnisse importieren','Importer résultats')}</h2><p>k = Kill (+1), dm = Deathmatch (+3), w = Win (+2). ${copy('The import matches only the current ingame names. Old names are not accepted. Registrations are optional; missing teams and players are created from this import.','Der Import gleicht ausschließlich die aktuellen Ingame-Namen ab. Alte Namen werden nicht akzeptiert. Registrierungen sind optional; fehlende Teams und Spieler werden durch diesen Import automatisch als Turnierteilnehmer angelegt.','Seuls les pseudos actuels sont acceptés. Les inscriptions sont facultatives ; les équipes et joueurs manquants sont créés par cet import.')}</p><textarea id="v3ImportText" rows="14" placeholder="Orange:\nPlayer1: k:3 dm:1 w:0, Player2: /\n\nDark Green:\nPlayer3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-error"></div><button class="cta-button wide" id="v3DoImport">${copy('Import round','Runde importieren','Importer la manche')}</button></section>`;document.body.appendChild(m);m.onclick=e=>{if(e.target===m||e.target.closest('[data-v3-close]'))m.remove();};$('#v3DoImport',m).onclick=async e=>{e.currentTarget.disabled=true;try{const results=parseOldImport($('#v3ImportText',m).value,cup,data);await api.adminImportRoundByName(cup.id,real.adminRound,results);m.remove();real.cupCache.delete(cup.id);toast(copy('Round imported. Rating has NOT been finalized yet.','Runde importiert. Cup-Stats sind live; Placement und Rating-Overlay folgen erst nach „Rating finalisieren“.','Manche importée. Rating non finalisé.'));await refreshCups();}catch(err){$('.v3-form-error',m).textContent=err.message;e.currentTarget.disabled=false;}};});}
   async function confirmFinalize(){const cup=adminCup();if(!cup)return;const ok=confirm(copy(`Finalize round ${real.adminRound}? This calculates rating for every participant.`,`Runde ${real.adminRound} finalisieren? Dadurch wird das Rating aller Teilnehmer berechnet.`,`Finaliser la manche ${real.adminRound} ?`));if(!ok)return;try{await api.finalizeRoundRating(cup.id,real.adminRound);toast(copy('Round rating finalized.','Runden-Rating finalisiert.','Rating finalisé.'));}catch(err){if(/already finalized/i.test(err.message)&&confirm(copy('This round was already finalized. Recalculate it from the current results?','Diese Runde wurde bereits finalisiert. Mit den aktuellen Ergebnissen neu berechnen?','Recalculer cette manche ?'))){try{await api.recalculateRoundRating(cup.id,real.adminRound);toast(copy('Rating recalculated.','Rating neu berechnet.','Rating recalculé.'));}catch(e){if(/Later rounds are finalized/i.test(e.message)&&confirm(copy('Later rounds are already finalized. Recalculate this round and every later finalized round in order?','Spätere Runden sind bereits finalisiert. Diese Runde und alle späteren finalisierten Runden der Reihe nach neu berechnen?','Recalculer cette manche et toutes les suivantes ?'))){try{await api.recalculateRatingFromRound(cup.id,real.adminRound);toast(copy('Rating cascade recalculated.','Rating ab dieser Runde vollständig neu berechnet.','Recalcul complet effectué.'));}catch(x){toast(x.message,true);}}else toast(e.message,true);}}else toast(err.message,true);}}
 
   async function openManageGlobalPlayer(globalPlayerId){
@@ -2919,6 +2952,7 @@ function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const 
   }
   function scheduleRefresh(){clearTimeout(real.refreshTimer);real.refreshTimer=setTimeout(refreshEveryVisibleSurface,180);}
   api.subscribeToSocial(scheduleRefresh);api.subscribeToCup(scheduleRefresh);api.subscribeToStats(scheduleRefresh);
+  document.addEventListener('hub:rating-updated',scheduleRefresh);
 
   function startPresence(){
     clearInterval(real.presenceTimer);if(!live.session||!live.player)return;
