@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Survival Games Competitive Hub – V2 click dummy">
   <title>HUB – Survival Games</title>
+  <style id="hub-live-boot-css">
+    html.hub-live-booting body{overflow:hidden}
+    html.hub-live-booting body>*{visibility:hidden!important}
+    html.hub-live-booting body::after{
+      content:"HUB  ·  SURVIVAL GAMES";visibility:visible!important;position:fixed;z-index:2147483647;inset:0;
+      display:grid;place-items:center;color:#38f0db;background:#070414;
+      font-family:"Montserrat",Arial,sans-serif;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;
+    }
+  </style>
+  <script>document.documentElement.classList.add('hub-live-booting');</script>
   <style id="hub-critical-css">
     .hub-brand{display:flex;align-items:center;min-width:124px;height:62px;overflow:hidden}
     .hub-logo{display:block;width:124px;height:61px;object-fit:contain}
@@ -2718,12 +2728,17 @@ window.HubAPI = (() => {
     if(location.hash==='#profile'&&live.player)await renderProfileLive(live.player.current_name);startPresence();
   }
   async function boot(){
-    // Do not guess auth timing: explicitly wait for the real session/profile restore.
-    try{await core.restoreAuth(false);}catch(_){}
-    await refreshForAuth();
-    document.addEventListener('hub:auth-restored',()=>setTimeout(()=>refreshForAuth(),0));
-    api.client.auth.onAuthStateChange(()=>setTimeout(()=>refreshForAuth(),120));
-    setInterval(()=>{if(live.isAdmin&&$('.admin-tabs-v2 [data-admin-tab="online"]')?.classList.contains('active'))renderAdminOnline();},15000);
+    // Keep the legacy/demo markup hidden until the real Supabase state has replaced it.
+    try{
+      // Do not guess auth timing: explicitly wait for the real session/profile restore.
+      try{await core.restoreAuth(false);}catch(_){}
+      await refreshForAuth();
+      document.addEventListener('hub:auth-restored',()=>setTimeout(()=>refreshForAuth(),0));
+      api.client.auth.onAuthStateChange(()=>setTimeout(()=>refreshForAuth(),120));
+      setInterval(()=>{if(live.isAdmin&&$('.admin-tabs-v2 [data-admin-tab="online"]')?.classList.contains('active'))renderAdminOnline();},15000);
+    }finally{
+      requestAnimationFrame(()=>document.documentElement.classList.remove('hub-live-booting'));
+    }
   }
   boot();
 })();
