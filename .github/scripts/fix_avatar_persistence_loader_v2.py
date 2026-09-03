@@ -52,8 +52,8 @@ new_save = """  $('#avatarSaveButton')?.addEventListener('click',async()=>{
 replace_once(old_save, new_save, 'verified avatar persistence')
 
 # Regression guards.
-if "#avatarPixelGrid .pixel-cell').map" in s:
-    raise SystemExit('old avatar-only selector still present')
+if new_pixels not in s:
+    raise SystemExit('combined avatar selector missing')
 if "width:388px!important" not in s:
     raise SystemExit('388px loader width missing')
 if "renderHistoryGraph=renderHistoryGraphV4;" not in s:
