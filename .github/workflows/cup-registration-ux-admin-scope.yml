@@ -1,0 +1,38 @@
+name: Cup registration UX and admin scope fix
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/cup_registration_ux_admin_scope_fix.py'
+      - '.github/workflows/cup-registration-ux-admin-scope.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch index
+        run: python3 .github/scripts/cup_registration_ux_admin_scope_fix.py
+      - name: Validate JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess,tempfile
+          s=Path('index.html').read_text()
+          for body in re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',s,re.S|re.I):
+              if not body.strip():continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False)
+              f.write(body);f.close()
+              subprocess.run(['node','--check',f.name],check=True)
+          PY
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git diff --cached --quiet || git commit -m "Fix Cup default registration UX and admin profile refresh"
+          git push origin HEAD:main
