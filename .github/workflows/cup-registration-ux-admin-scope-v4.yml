@@ -1,0 +1,45 @@
+name: Cup registration UX admin scope v4
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cup-registration-ux-admin-scope-v4.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Adapt patch to live index and run
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/scripts/cup_registration_ux_admin_scope_fix_v2.py')
+          s=p.read_text()
+          s=s.replace("rep1('createCupRegistration,respondCupInvite,cancelCupRegistration,getSocialState','createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,getSocialState','export state api')","rep1('sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,','sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,','export state api')")
+          s=s.replace("rep1(\"if(!real.selectedCupId||!real.cups.some(c=>c.id===real.selectedCupId))real.selectedCupId=(real.cups.find(c=>c.status==='live')||real.cups.find(c=>c.status==='registration')||real.cups[0])?.id||null;\",\"if(!real.selectedCupId||!real.cups.some(c=>c.id===real.selectedCupId))real.selectedCupId=defaultPublicCup()?.id||null;\",'default cup')","rep1(\"if(!real.selectedCupId||!real.cups.some(c=>c.id===real.selectedCupId)) real.selectedCupId=(real.cups.find(c=>c.status==='live')||real.cups.find(c=>c.status==='registration')||real.cups[0])?.id||null;\",\"if(!real.selectedCupId||!real.cups.some(c=>c.id===real.selectedCupId)) real.selectedCupId=defaultPublicCup()?.id||null;\",'default cup')")
+          p.write_text(s)
+          PY
+          python3 .github/scripts/cup_registration_ux_admin_scope_fix_v2.py
+      - name: Validate JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess,tempfile
+          s=Path('index.html').read_text()
+          for body in re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',s,re.S|re.I):
+              if not body.strip():continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False);f.write(body);f.close();subprocess.run(['node','--check',f.name],check=True)
+          PY
+      - name: Commit index only
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout -- .github/scripts/cup_registration_ux_admin_scope_fix_v2.py
+          git add index.html
+          git diff --cached --quiet || git commit -m "Fix Cup default selection registration cancellation layout and admin scope"
+          git push origin HEAD:main
