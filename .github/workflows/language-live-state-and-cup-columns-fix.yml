@@ -1,0 +1,34 @@
+name: Language live state and Cup columns fix
+on:
+  push:
+    paths:
+      - '.github/scripts/language_live_state_and_cup_columns_fix.py'
+      - '.github/workflows/language-live-state-and-cup-columns-fix.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index
+        run: python3 .github/scripts/language_live_state_and_cup_columns_fix.py
+      - name: Validate JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          s=Path('index.html').read_text()
+          for body in re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',s,re.S|re.I):
+              if not body.strip(): continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False)
+              f.write(body);f.close()
+              subprocess.run(['node','--check',f.name],check=True)
+          PY
+      - name: Commit index
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git diff --cached --quiet || git commit -m "Keep language switches on live data and split Cup columns"
+          git push
