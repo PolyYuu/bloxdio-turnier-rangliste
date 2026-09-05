@@ -17,7 +17,7 @@ def rep1(old,new,label):
 # Hub API wrapper for public confirmed registration overview.
 marker="  async function getMyCupRegistrationState(tournamentId) { const data=await rpc('get_my_cup_registration_state',{p_tournament_id:tournamentId}); return Array.isArray(data)?(data[0]||null):data; }"
 rep1(marker,marker+"\n  async function getCupRegistrationOverview(tournamentId) { const data=await rpc('get_cup_registration_overview',{p_tournament_id:tournamentId}); return data||[]; }",'registration overview api')
-rep1('createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,getSocialState','createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,getCupRegistrationOverview,getSocialState','export overview api')
+rep1('sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,','sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,getCupRegistrationOverview,','export overview api')
 
 new_renderer=r'''  async function renderUpcomingCup(cup,data){
     let registrations=[];try{registrations=await api.getCupRegistrationOverview(cup.id);}catch(e){console.warn('registration overview',e);}
