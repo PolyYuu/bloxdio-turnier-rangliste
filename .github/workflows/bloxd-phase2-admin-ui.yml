@@ -1,0 +1,44 @@
+name: Bloxd Phase 2 admin UI
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/bloxd_phase2_admin_ui.py'
+      - '.github/workflows/bloxd-phase2-admin-ui.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch index
+        run: python3 .github/scripts/bloxd_phase2_admin_ui.py
+      - name: Validate inline JavaScript
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,subprocess,sys
+          html=pathlib.Path('index.html').read_text()
+          blocks=re.findall(r'<script(?![^>]*\\bsrc=)[^>]*>(.*?)</script>',html,re.I|re.S)
+          print('inline scripts:',len(blocks))
+          for i,code in enumerate(blocks):
+              if not code.strip(): continue
+              path=pathlib.Path(f'/tmp/hub-inline-{i}.js')
+              path.write_text(code)
+              p=subprocess.run(['node','--check',str(path)],capture_output=True,text=True)
+              if p.returncode:
+                  print(f'JavaScript block {i} failed:')
+                  print(p.stdout);print(p.stderr)
+                  sys.exit(p.returncode)
+          print('all inline JavaScript syntax checks passed')
+          PY
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git diff --cached --quiet || git commit -m 'Add Bloxd Phase 2 live sync controls'
+          git push origin HEAD:main
