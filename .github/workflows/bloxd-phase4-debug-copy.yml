@@ -1,0 +1,45 @@
+name: Bloxd Phase 4 debug copy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/bloxd-phase4-debug-copy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index
+        run: python3 .github/scripts/bloxd_phase4_debug_copy.py
+      - name: Validate inline JavaScript
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,subprocess,sys
+          html=pathlib.Path('index.html').read_text()
+          blocks=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',html,re.I|re.S)
+          for i,code in enumerate(blocks):
+              if not code.strip(): continue
+              path=pathlib.Path(f'/tmp/hub-inline-{i}.js')
+              path.write_text(code)
+              p=subprocess.run(['node','--check',str(path)],capture_output=True,text=True)
+              if p.returncode:
+                  print(p.stdout);print(p.stderr);sys.exit(p.returncode)
+          print('all inline JavaScript syntax checks passed')
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m 'Update Bloxd Live Debug to Phase 4'
+            git push
+          fi
