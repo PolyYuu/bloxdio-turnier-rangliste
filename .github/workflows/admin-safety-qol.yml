@@ -1,0 +1,45 @@
+name: Admin safety QoL
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/admin_safety_qol.py'
+      - '.github/workflows/admin-safety-qol.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch index
+        run: python3 .github/scripts/admin_safety_qol.py
+      - name: Validate JavaScript
+        run: |
+          python3 -m pip install beautifulsoup4
+          python3 - <<'PY'
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          import subprocess,tempfile
+          soup=BeautifulSoup(Path('index.html').read_text(),'html.parser')
+          count=0
+          for i,tag in enumerate(soup.find_all('script')):
+              if tag.get('src'): continue
+              js=tag.string if tag.string is not None else tag.get_text()
+              if not js.strip(): continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False)
+              f.write(js);f.close()
+              subprocess.run(['node','--check',f.name],check=True)
+              count+=1
+          print('validated',count,'inline scripts')
+          PY
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git diff --cached --quiet || git commit -m "Add admin safety previews audit log and backups"
+          git push origin HEAD:main
