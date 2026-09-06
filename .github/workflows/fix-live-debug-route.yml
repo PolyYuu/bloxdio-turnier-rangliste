@@ -1,0 +1,47 @@
+name: Fix live debug route
+
+on:
+  push:
+    paths:
+      - '.github/scripts/fix_live_debug_route.py'
+      - '.github/workflows/fix-live-debug-route.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index
+        run: python .github/scripts/fix_live_debug_route.py
+      - name: Validate inline JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          s=Path('index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          checked=0
+          for i,b in enumerate(blocks):
+              if not b.strip(): continue
+              with tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8') as f:
+                  f.write(b)
+                  name=f.name
+              r=subprocess.run(['node','--check',name],capture_output=True,text=True)
+              if r.returncode:
+                  print(f'Inline script {i} failed syntax check')
+                  print(r.stderr)
+                  raise SystemExit(1)
+              checked+=1
+          print('validated',checked,'inline scripts')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix hidden live debug routing"
+          git push
