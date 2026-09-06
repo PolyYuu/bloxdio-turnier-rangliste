@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script id="hub-live-debug-route-guard">
+(function(){
+  'use strict';
+  const DEBUG_HASH='#live-debug';
+  const SAFE_HASH='#admin';
+  function captureLiveDebugRequest(){
+    if(location.hash!==DEBUG_HASH)return;
+    window.__hubLiveDebugRequested=true;
+    history.replaceState(null,'',location.pathname+location.search+SAFE_HASH);
+    window.dispatchEvent(new CustomEvent('hub:live-debug-requested'));
+  }
+  captureLiveDebugRequest();
+  window.addEventListener('hashchange',captureLiveDebugRequest);
+})();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Survival Games Competitive Hub">
@@ -3486,15 +3501,19 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     }finally{bloxdDebugBusy=false;}
   }
   function stopBloxdDebugPoll(){if(bloxdDebugPoll){clearInterval(bloxdDebugPoll);bloxdDebugPoll=null;}}
+  function wantsBloxdLiveDebug(){return location.hash==='#live-debug'||window.__hubLiveDebugRequested===true;}
   async function syncBloxdDebugRoute(){
     const root=ensureBloxdDebugShell();
-    if(location.hash==='#live-debug'){
+    if(wantsBloxdLiveDebug()){
       if(!live.session){root.hidden=true;return;}
-      if(!live.isAdmin){root.hidden=true;location.hash='#overview';toast(copy('Admin access required.','Admin-Zugriff erforderlich.','Accès admin requis.'),true);return;}
+      if(!live.isAdmin){window.__hubLiveDebugRequested=false;root.hidden=true;location.hash='#overview';toast(copy('Admin access required.','Admin-Zugriff erforderlich.','Accès admin requis.'),true);return;}
+      window.__hubLiveDebugRequested=false;
+      if(location.hash!=='#live-debug')history.replaceState(null,'',location.pathname+location.search+'#live-debug');
       root.hidden=false;await renderBloxdLiveDebug(true);stopBloxdDebugPoll();bloxdDebugPoll=setInterval(()=>{if(document.visibilityState==='visible'&&location.hash==='#live-debug')renderBloxdLiveDebug();},5000);
     }else{root.hidden=true;stopBloxdDebugPoll();}
   }
   window.addEventListener('hashchange',syncBloxdDebugRoute);
+  window.addEventListener('hub:live-debug-requested',()=>setTimeout(syncBloxdDebugRoute,0));
   document.addEventListener('hub:auth-restored',()=>setTimeout(syncBloxdDebugRoute,50));
   if(api.subscribeToBloxdRelay)bloxdDebugChannel=api.subscribeToBloxdRelay(()=>{if(location.hash==='#live-debug')setTimeout(()=>renderBloxdLiveDebug(true),80);});
   setTimeout(syncBloxdDebugRoute,250);
