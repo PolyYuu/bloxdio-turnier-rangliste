@@ -29,6 +29,7 @@ jobs:
         run: |
           node --check src/worker.js
           node --check src/event-parser.js
+          node --check src/snapshot-assembler.js
           node test/event-parser.test.js
 
       - name: Build Docker image
