@@ -15,7 +15,7 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Bind anonymous guest as relay recipient
+      - name: Diagnose room join and bind anonymous relay
         shell: bash
         run: |
           cat > relay-bind-probe.js <<'JS'
@@ -24,114 +24,167 @@ jobs:
           (async () => {
             const worldId = 'HT_Y95VcEQaUBLbTc24H7';
             const command = '/livesync bind t1 sg-headless-probe 1';
-            const browser = await chromium.launch({ headless: true });
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
+            });
             const context = await browser.newContext({
               viewport: { width: 1280, height: 720 },
               locale: 'de-DE'
             });
             const page = await context.newPage();
 
-            let matchmake = null;
+            let discovery = null;
+            let reservation = null;
+            const sockets = [];
+
             page.on('response', async response => {
-              if (!response.url().includes('/social/bloxd-matchmake')) return;
-              try {
-                const data = await response.json();
-                matchmake = {
-                  status: response.status(),
-                  succeeded: data && data.succeeded === true,
-                  lobbyName: data && data.lobbyName || null,
-                  gameServerHost: data && data.gameServerHost || null
-                };
-              } catch (_) {
-                matchmake = { status: response.status(), succeeded: false };
+              const url = response.url();
+              if (url.includes('/social/bloxd-matchmake')) {
+                try {
+                  const data = await response.json();
+                  discovery = {
+                    status: response.status(),
+                    succeeded: data && data.succeeded === true,
+                    lobbyName: data && data.lobbyName || null,
+                    gameServerHost: data && data.gameServerHost || null
+                  };
+                } catch (_) {
+                  discovery = { status: response.status(), succeeded: false };
+                }
+              }
+              if (url.includes('/matchmake/joinOrCreate/classic_playerSchematic')) {
+                try {
+                  const data = await response.json();
+                  reservation = {
+                    status: response.status(),
+                    responseKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+                    hasSessionId: !!(data && data.sessionId),
+                    roomId: data && data.room && data.room.roomId || null,
+                    processId: data && data.room && data.room.processId || null,
+                    errorCode: data && data.code || null,
+                    error: data && (data.error || data.message) || null
+                  };
+                } catch (_) {
+                  reservation = { status: response.status(), nonJson: true };
+                }
               }
             });
 
+            page.on('websocket', ws => {
+              const entry = { url: ws.url(), framesReceived: 0, framesSent: 0, closed: false };
+              sockets.push(entry);
+              ws.on('framereceived', () => entry.framesReceived++);
+              ws.on('framesent', () => entry.framesSent++);
+              ws.on('close', () => entry.closed = true);
+            });
+
             await page.addInitScript(() => {
-              window.__headlessRelayProbe = {
-                seen: [],
-                startedAt: Date.now()
-              };
+              window.__headlessRelayProbe = { seen: [], allTextSamples: [], startedAt: Date.now() };
               const collect = text => {
                 if (!text) return;
-                const lines = String(text).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+                const raw = String(text).trim();
+                if (!raw) return;
+                if (window.__headlessRelayProbe.allTextSamples.length < 60) {
+                  window.__headlessRelayProbe.allTextSamples.push(raw.slice(0, 500));
+                }
+                const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
                 for (const line of lines) {
-                  if (
-                    /Live Sync|Relay-Empf|Relay aktiviert|__SG_EVT__|Turnierlobby|joined/i.test(line) &&
-                    !window.__headlessRelayProbe.seen.includes(line)
-                  ) {
+                  if (/Live Sync|Relay-Empf|Relay aktiviert|__SG_EVT__|Turnierlobby|joined|Press anywhere|enter game/i.test(line) && !window.__headlessRelayProbe.seen.includes(line)) {
                     window.__headlessRelayProbe.seen.push(line.slice(0, 300));
-                    if (window.__headlessRelayProbe.seen.length > 80) {
-                      window.__headlessRelayProbe.seen.shift();
-                    }
+                    if (window.__headlessRelayProbe.seen.length > 100) window.__headlessRelayProbe.seen.shift();
                   }
                 }
               };
               const startObserver = () => {
                 if (!document.body) return setTimeout(startObserver, 100);
-                collect(document.body.innerText || '');
+                collect(document.body.innerText || document.body.textContent || '');
                 const observer = new MutationObserver(mutations => {
                   for (const mutation of mutations) {
-                    if (mutation.type === 'characterData') {
-                      collect(mutation.target && mutation.target.textContent || '');
-                    } else {
-                      for (const node of mutation.addedNodes || []) {
-                        collect(node && node.textContent || '');
-                      }
-                    }
+                    if (mutation.type === 'characterData') collect(mutation.target && mutation.target.textContent || '');
+                    for (const node of mutation.addedNodes || []) collect(node && node.textContent || '');
                   }
                 });
                 observer.observe(document.body, { childList: true, subtree: true, characterData: true });
                 window.__headlessRelayProbe.observerStarted = true;
               };
-              if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', startObserver, { once: true });
-              } else {
-                startObserver();
-              }
+              if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+              else startObserver();
             });
 
             const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
             await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-            // Wait for the game bootstrap/matchmaking first.
-            const matchmakeDeadline = Date.now() + 30000;
-            while ((!matchmake || !matchmake.succeeded) && Date.now() < matchmakeDeadline) {
+            const networkDeadline = Date.now() + 30000;
+            while ((!discovery || !discovery.succeeded || !reservation) && Date.now() < networkDeadline) {
               await page.waitForTimeout(250);
             }
 
-            // Enter the game from the "Press anywhere to enter game" screen.
-            await page.mouse.click(640, 360);
-            await page.waitForTimeout(3500);
+            console.log('discovery=', JSON.stringify(discovery));
+            console.log('reservation=', JSON.stringify(reservation));
+            console.log('websocketsBeforeEnter=', JSON.stringify(sockets));
 
-            const before = await page.evaluate(() => ({
-              text: (document.body && document.body.innerText || '').slice(-5000),
-              probe: window.__headlessRelayProbe || null,
-              activeTag: document.activeElement && document.activeElement.tagName || null
-            }));
-            console.log('matchmake=', JSON.stringify(matchmake));
-            console.log('observerStarted=', !!(before.probe && before.probe.observerStarted));
-            console.log('preCommandSignals=', JSON.stringify(before.probe && before.probe.seen || []));
+            // Prefer a real visible overlay text if Bloxd exposes it in the DOM.
+            const pressText = page.getByText(/Press anywhere to enter game/i).first();
+            let overlayFound = false;
+            try {
+              overlayFound = await pressText.isVisible({ timeout: 3000 });
+            } catch (_) {}
+            console.log('enterOverlayVisible=', overlayFound);
 
-            // Bloxd chat: Enter -> command -> Enter.
-            await page.keyboard.press('Enter');
-            await page.waitForTimeout(300);
-            await page.keyboard.type(command, { delay: 20 });
-            await page.waitForTimeout(200);
-            await page.keyboard.press('Enter');
+            if (overlayFound) {
+              try { await pressText.click({ force: true, timeout: 3000 }); } catch (_) { await page.mouse.click(640, 360); }
+            } else {
+              await page.mouse.click(640, 360);
+              await page.keyboard.press('Space');
+            }
+
+            await page.waitForTimeout(6000);
+
+            const state = await page.evaluate(() => {
+              const els = [...document.querySelectorAll('input,textarea,[contenteditable="true"],button')].slice(0, 80).map(el => ({
+                tag: el.tagName,
+                type: el.getAttribute('type'),
+                placeholder: el.getAttribute('placeholder'),
+                aria: el.getAttribute('aria-label'),
+                text: (el.innerText || el.value || '').slice(0, 100),
+                visible: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
+              }));
+              return {
+                bodyText: (document.body && (document.body.innerText || document.body.textContent) || '').slice(-8000),
+                seen: window.__headlessRelayProbe && window.__headlessRelayProbe.seen || [],
+                samples: window.__headlessRelayProbe && window.__headlessRelayProbe.allTextSamples || [],
+                interactive: els,
+                activeTag: document.activeElement && document.activeElement.tagName || null
+              };
+            });
+
+            console.log('websocketsAfterEnter=', JSON.stringify(sockets));
+            console.log('postEnterSeen=', JSON.stringify(state.seen.slice(-30)));
+            console.log('postEnterInteractive=', JSON.stringify(state.interactive));
+            console.log('postEnterBodyText=', JSON.stringify(state.bodyText.slice(-2500)));
+
+            // Try chat only if a usable room reservation and websocket exist.
+            if (reservation && reservation.hasSessionId && sockets.length) {
+              await page.keyboard.press('Enter');
+              await page.waitForTimeout(500);
+              await page.keyboard.type(command, { delay: 20 });
+              await page.waitForTimeout(250);
+              await page.keyboard.press('Enter');
+            }
 
             const deadline = Date.now() + 15000;
             let result = null;
             while (Date.now() < deadline) {
               result = await page.evaluate(() => {
-                const bodyText = document.body && document.body.innerText || '';
+                const bodyText = document.body && (document.body.innerText || document.body.textContent) || '';
                 const seen = window.__headlessRelayProbe && window.__headlessRelayProbe.seen || [];
                 const combined = seen.join('\n') + '\n' + bodyText;
                 return {
                   bound: /Live Sync gebunden:\s*T1\s*->\s*sg-headless-probe\s*\|\s*Runde\s*1/i.test(combined),
                   relayRecipient: /Relay-Empf[aä]nger/i.test(combined),
                   liveSyncLoaded: /LIVE SYNC|Live Sync/i.test(combined),
-                  seen: seen.slice(-30)
+                  seen: seen.slice(-40)
                 };
               });
               if (result.bound || result.relayRecipient) break;
@@ -139,21 +192,17 @@ jobs:
             }
 
             console.log('relayBindResult=', JSON.stringify(result));
-
+            console.log('finalWebsockets=', JSON.stringify(sockets));
             await browser.close();
 
-            if (!matchmake || !matchmake.succeeded || !matchmake.gameServerHost) {
-              console.error('FAIL: anonymous guest did not obtain gameServerHost');
-              process.exit(2);
-            }
-            if (!result || (!result.bound && !result.relayRecipient)) {
-              console.error('FAIL: bind command was not confirmed in Bloxd DOM');
-              process.exit(3);
-            }
+            if (!discovery || !discovery.succeeded || !discovery.gameServerHost) process.exit(2);
+            if (!reservation || !reservation.hasSessionId || !reservation.roomId) process.exit(3);
+            if (!sockets.length) process.exit(4);
+            if (!result || (!result.bound && !result.relayRecipient)) process.exit(5);
             console.log('HEADLESS_RELAY_BIND_OK=true');
           })().catch(err => {
             console.error('probeFatal=', String(err && err.stack || err));
-            process.exit(4);
+            process.exit(9);
           });
           JS
 
