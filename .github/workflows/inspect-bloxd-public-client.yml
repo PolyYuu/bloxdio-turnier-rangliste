@@ -15,78 +15,116 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Inspect loaded public JavaScript
+      - name: Resolve public client version export
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
           const { chromium } = require('playwright');
+
+          function safeSnippet(text, start, end) {
+            return text.slice(Math.max(0, start), Math.min(text.length, end))
+              .replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
+          }
 
           (async () => {
             const worldId = 'HT_Y95VcEQaUBLbTc24H7';
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext({ locale: 'de-DE' });
             const page = await context.newPage();
-            const matches = [];
-            const scripts = new Set();
+            const scripts = [];
 
             page.on('response', async response => {
               const req = response.request();
               const url = response.url();
               if (req.resourceType() !== 'script' && !/\.js(?:\?|$)/i.test(url)) return;
-              scripts.add(url);
               let text = '';
               try { text = await response.text(); } catch (_) { return; }
               if (!text) return;
-
-              const markers = ['playSessionId', 'generalCookies', 'siteUsed', 'subsiteUsed'];
-              for (const marker of markers) {
-                let pos = text.indexOf(marker);
-                if (pos === -1) continue;
-                const start = Math.max(0, pos - 900);
-                const end = Math.min(text.length, pos + 1800);
-                let snippet = text.slice(start, end);
-                // Public bundle only; trim obvious long encoded/string literals so logs stay safe and readable.
-                snippet = snippet.replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
-                matches.push({
-                  marker,
-                  script: url.split('/').pop(),
-                  snippet
-                });
-              }
+              scripts.push({ url, text });
             });
 
             const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
             await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
             await page.waitForTimeout(12000);
 
-            console.log('scriptCount=', scripts.size);
-            console.log('scriptFiles=', JSON.stringify([...scripts].map(u => u.split('/').pop()).slice(0, 80)));
-            console.log('matchCount=', matches.length);
-            for (const item of matches.slice(0, 12)) {
-              console.log('PUBLIC_CODE_MATCH_START');
-              console.log('marker=', item.marker);
-              console.log('script=', item.script);
-              console.log(item.snippet);
-              console.log('PUBLIC_CODE_MATCH_END');
+            console.log('scriptCount=', scripts.length);
+
+            let joinScript = null;
+            let joinPos = -1;
+            for (const script of scripts) {
+              const pos = script.text.indexOf('version:eQ.d');
+              if (pos !== -1) {
+                joinScript = script;
+                joinPos = pos;
+                break;
+              }
             }
 
-            const globalHints = await page.evaluate(() => {
-              const keys = Object.keys(window).filter(k => /version|build/i.test(k)).slice(0, 80);
-              const out = {};
-              for (const key of keys) {
-                try {
-                  const value = window[key];
-                  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-                    out[key] = String(value).slice(0, 120);
+            if (!joinScript) {
+              console.log('versionExpressionFound=false');
+              await browser.close();
+              process.exit(3);
+              return;
+            }
+
+            console.log('versionExpressionFound=true');
+            console.log('joinScript=', joinScript.url.split('/').pop());
+
+            const before = joinScript.text.slice(Math.max(0, joinPos - 30000), joinPos);
+            const importMatches = [...before.matchAll(/\beQ=EQ\((\d+)\)/g)];
+            const moduleId = importMatches.length ? importMatches[importMatches.length - 1][1] : null;
+            console.log('versionImportModuleId=', moduleId);
+            console.log('joinContext=', safeSnippet(joinScript.text, joinPos - 1800, joinPos + 500));
+
+            if (moduleId) {
+              const moduleHints = [];
+              const moduleDefPatterns = [
+                new RegExp(`(?:^|[,\\{])${moduleId}:\\(?(?:function)?\\s*\\(`, 'g'),
+                new RegExp(`(?:^|[,\\{])${moduleId}:`, 'g')
+              ];
+
+              for (const script of scripts) {
+                for (const pattern of moduleDefPatterns) {
+                  pattern.lastIndex = 0;
+                  let match;
+                  while ((match = pattern.exec(script.text)) !== null) {
+                    moduleHints.push({
+                      script: script.url.split('/').pop(),
+                      snippet: safeSnippet(script.text, match.index - 300, match.index + 2500)
+                    });
+                    if (moduleHints.length >= 8) break;
                   }
-                } catch (_) {}
+                  if (moduleHints.length >= 8) break;
+                }
+                if (moduleHints.length >= 8) break;
               }
-              return out;
-            });
-            console.log('globalVersionHints=', JSON.stringify(globalHints));
+
+              console.log('moduleHintCount=', moduleHints.length);
+              for (const hint of moduleHints) {
+                console.log('VERSION_MODULE_HINT_START');
+                console.log('script=', hint.script);
+                console.log(hint.snippet);
+                console.log('VERSION_MODULE_HINT_END');
+              }
+            }
+
+            // Also search public code for likely client-version literals only when they sit near version/build exports.
+            const numericHints = [];
+            for (const script of scripts) {
+              const re = /\b(?:7\d\d|8\d\d|9\d\d)\b/g;
+              let m;
+              while ((m = re.exec(script.text)) !== null) {
+                const ctx = safeSnippet(script.text, m.index - 180, m.index + 180);
+                if (/version|build|client|outdated|refresh/i.test(ctx)) {
+                  numericHints.push({ script: script.url.split('/').pop(), value: m[0], context: ctx });
+                  if (numericHints.length >= 20) break;
+                }
+              }
+              if (numericHints.length >= 20) break;
+            }
+            console.log('numericVersionHints=', JSON.stringify(numericHints));
 
             await browser.close();
-            if (!matches.length) process.exit(3);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
