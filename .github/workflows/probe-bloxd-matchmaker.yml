@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/probe-bloxd-matchmaker.yml'
       - 'api/bloxd/probe-matchmake.js'
+      - 'api/bloxd/probe-discovery-variants.js'
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -22,4 +23,18 @@ jobs:
           print('discovery=',json.dumps(d.get('discovery'),ensure_ascii=False))
           print('join=',json.dumps(d.get('join'),ensure_ascii=False))
           print('error=',d.get('error'))
+          PY
+
+      - name: Probe safe discovery variants
+        env:
+          URL: "https://bloxdio-turnier-rangliste.vercel.app/api/bloxd/probe-discovery-variants?worldId=HT_Y95VcEQaUBLbTc24H7"
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error "$URL" | tee /tmp/variants.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/variants.json'))
+          print('variantProbeOk=',d.get('ok'))
+          for v in d.get('variants') or []:
+              print(v.get('name'), 'status=',v.get('status'), 'succeeded=',v.get('succeeded'), 'hasGameServerHost=',v.get('hasGameServerHost'), 'responseKeys=',v.get('responseKeys'), 'textLength=',v.get('textLength'))
           PY
