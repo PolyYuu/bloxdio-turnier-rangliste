@@ -15,7 +15,7 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Resolve module 69 compliance export
+      - name: Inspect public traffic-code cache logic
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
@@ -42,57 +42,34 @@ jobs:
               if (text) scripts.push({ url, text });
             });
 
-            await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, {
-              waitUntil: 'domcontentloaded', timeout: 90000
-            });
+            await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
             await page.waitForTimeout(10000);
 
-            const hits = [];
-            const patterns = [
-              /(?:^|[,\{])69:function\s*\([^)]*\)\s*\{/g,
-              /(?:^|[,\{])69:\s*\([^)]*\)\s*=>\s*\{/g,
-              /(?:^|[,\{])69:\s*[^,]{0,120}=>\s*\{/g
-            ];
-
-            for (const script of scripts) {
-              for (const re of patterns) {
-                re.lastIndex = 0;
-                let m;
-                while ((m = re.exec(script.text)) !== null) {
-                  hits.push({
-                    script: script.url.split('/').pop(),
-                    pos: m.index,
-                    context: safe(script.text.slice(Math.max(0, m.index - 500), Math.min(script.text.length, m.index + 10000)))
-                  });
-                  if (hits.length >= 8) break;
+            const needles = ['trafficCode_b_until', 'trafficCode_', '/index/traffic-code', 'Obtaining traffic code', 'Obtained traffic code'];
+            let hitCount = 0;
+            for (const needle of needles) {
+              for (const script of scripts) {
+                let from = 0;
+                let perNeedle = 0;
+                while (perNeedle < 12) {
+                  const pos = script.text.indexOf(needle, from);
+                  if (pos === -1) break;
+                  hitCount++;
+                  perNeedle++;
+                  console.log('CACHE_TRACE_START');
+                  console.log('needle=', needle);
+                  console.log('script=', script.url.split('/').pop());
+                  console.log('pos=', pos);
+                  console.log('context=', safe(script.text.slice(Math.max(0, pos - 4500), Math.min(script.text.length, pos + 6500))));
+                  console.log('CACHE_TRACE_END');
+                  from = pos + needle.length;
                 }
-                if (hits.length >= 8) break;
               }
-              if (hits.length >= 8) break;
             }
 
-            console.log('module69DefCount=', hits.length);
-            for (const hit of hits) {
-              console.log('MODULE69_START');
-              console.log('script=', hit.script);
-              console.log('pos=', hit.pos);
-              console.log('context=', hit.context);
-              console.log('MODULE69_END');
-            }
-
-            // Also inspect exact imports in the connect module to verify the alias mapping.
-            for (const script of scripts) {
-              const pos = script.text.indexOf('24689:');
-              if (pos === -1) continue;
-              console.log('CONNECT_MODULE_START');
-              console.log('script=', script.url.split('/').pop());
-              console.log('context=', safe(script.text.slice(pos, Math.min(script.text.length, pos + 9000))));
-              console.log('CONNECT_MODULE_END');
-              break;
-            }
-
+            console.log('trafficCacheTraceCount=', hitCount);
             await browser.close();
-            if (!hits.length) process.exit(4);
+            if (!hitCount) process.exit(4);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
