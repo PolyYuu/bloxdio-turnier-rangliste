@@ -1,0 +1,210 @@
+name: Probe Bloxd WebSocket
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-bloxd-websocket.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install dependencies
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 ws@8.18.3 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Discover, reserve and open WebSocket
+        shell: bash
+        run: |
+          cat > websocket-probe.js <<'JS'
+          const crypto = require('crypto');
+          const WebSocket = require('ws');
+          const { chromium } = require('playwright');
+
+          const ROOM_NAME = 'classic_playerSchematic';
+          const WORLD_ID = 'HT_Y95VcEQaUBLbTc24H7';
+          const LANGUAGES = ['de-DE', 'de', 'en-US', 'en', 'en-Gb'];
+
+          function allowedHost(host) {
+            return /^gs-[a-z0-9.-]+\.bloxd\.io$/i.test(host || '');
+          }
+
+          async function discoverFreshHost() {
+            const invite = `https://bloxd.io/play/${ROOM_NAME}%7C${WORLD_ID}?lobby=1`;
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({ locale: 'de-DE' });
+            const page = await context.newPage();
+            let discovery = null;
+
+            page.on('response', async response => {
+              if (!response.url().includes('/social/bloxd-matchmake')) return;
+              try {
+                const data = await response.json();
+                if (data && data.succeeded === true && allowedHost(data.gameServerHost)) {
+                  discovery = {
+                    host: data.gameServerHost,
+                    lobbyName: String(data.lobbyName || '1')
+                  };
+                }
+              } catch (_) {}
+            });
+
+            await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            const ua = await page.evaluate(() => navigator.userAgent);
+            const deadline = Date.now() + 20000;
+            while (!discovery && Date.now() < deadline) await page.waitForTimeout(200);
+            await browser.close();
+            if (!discovery) throw new Error('No fresh game-server host discovered');
+            return { ...discovery, ua };
+          }
+
+          async function reserveSeat(host, lobbyName, ua) {
+            const versionMatch = String(ua).match(/Chrome\/([0-9.]+)/i);
+            const chromeVersion = versionMatch ? versionMatch[1] : '140.0.0.0';
+            const fullLobbyName = `${WORLD_ID}|default|${lobbyName || '1'}`;
+            const payload = {
+              cookies: { origin: 'classic' },
+              isMobile: false,
+              browserInfo: {
+                deviceType: 'mouseOnly',
+                name: 'Chrome',
+                platform: 'Linux x86_64',
+                platformType: 'desktop',
+                ua,
+                version: chromeVersion
+              },
+              generalCookies: { joinDiscord: false, newGo: 'c' },
+              isLoggedIn: false,
+              languages: LANGUAGES,
+              lobbyName: fullLobbyName,
+              playSessionId: crypto.randomBytes(10).toString('base64url'),
+              siteUsed: 'bloxd',
+              subsiteUsed: 'bloxd',
+              version: 803
+            };
+
+            const response = await fetch(`https://${host}/matchmake/joinOrCreate/${ROOM_NAME}`, {
+              method: 'POST',
+              headers: {
+                accept: 'application/json',
+                'content-type': 'application/json',
+                origin: 'https://bloxd.io',
+                referer: 'https://bloxd.io/',
+                'x-requested-with': 'XMLHttpRequest',
+                'user-agent': ua
+              },
+              body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            const room = data && data.room;
+            if (!response.ok || !room || !room.roomId || !room.processId || !data.sessionId) {
+              throw new Error(`Seat reservation failed: HTTP ${response.status}`);
+            }
+            return {
+              roomId: room.roomId,
+              processId: room.processId,
+              sessionId: data.sessionId,
+              roomName: room.name || ROOM_NAME,
+              lobbyName: room.lobbyName || fullLobbyName
+            };
+          }
+
+          function openSocket(host, reservation, ua) {
+            return new Promise((resolve, reject) => {
+              const endpoint = `wss://${host}/${encodeURIComponent(reservation.processId)}/${encodeURIComponent(reservation.roomId)}?sessionId=${encodeURIComponent(reservation.sessionId)}`;
+              const summary = {
+                opened: false,
+                messages: 0,
+                binaryMessages: 0,
+                textMessages: 0,
+                totalBytes: 0,
+                firstMessageBytes: null,
+                firstByte: null,
+                closeCode: null,
+                closeReasonLength: null,
+                error: null
+              };
+
+              const ws = new WebSocket(endpoint, {
+                origin: 'https://bloxd.io',
+                headers: {
+                  'User-Agent': ua,
+                  'Pragma': 'no-cache',
+                  'Cache-Control': 'no-cache'
+                },
+                handshakeTimeout: 15000
+              });
+
+              const timeout = setTimeout(() => {
+                try { ws.close(1000, 'probe complete'); } catch (_) {}
+                resolve(summary);
+              }, 10000);
+
+              ws.on('open', () => {
+                summary.opened = true;
+                console.log('WEBSOCKET_OPEN=true');
+              });
+
+              ws.on('message', (data, isBinary) => {
+                const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+                summary.messages++;
+                if (isBinary) summary.binaryMessages++; else summary.textMessages++;
+                summary.totalBytes += buf.length;
+                if (summary.firstMessageBytes == null) {
+                  summary.firstMessageBytes = buf.length;
+                  summary.firstByte = buf.length ? buf[0] : null;
+                }
+                if (summary.messages >= 5) {
+                  clearTimeout(timeout);
+                  try { ws.close(1000, 'probe complete'); } catch (_) {}
+                  setTimeout(() => resolve(summary), 300);
+                }
+              });
+
+              ws.on('close', (code, reason) => {
+                summary.closeCode = code;
+                summary.closeReasonLength = reason ? reason.length : 0;
+                if (summary.opened) {
+                  clearTimeout(timeout);
+                  resolve(summary);
+                }
+              });
+
+              ws.on('error', err => {
+                summary.error = String(err && err.message || err);
+                console.log('WEBSOCKET_ERROR=', summary.error);
+                if (!summary.opened) {
+                  clearTimeout(timeout);
+                  reject(new Error(summary.error));
+                }
+              });
+            });
+          }
+
+          (async () => {
+            const discovery = await discoverFreshHost();
+            console.log('freshHostDiscovered=', true);
+            console.log('hostLooksValid=', allowedHost(discovery.host));
+
+            const reservation = await reserveSeat(discovery.host, discovery.lobbyName, discovery.ua);
+            console.log('reservationOk=', true);
+            console.log('roomIdPresent=', !!reservation.roomId);
+            console.log('processIdPresent=', !!reservation.processId);
+            console.log('sessionIdPresent=', !!reservation.sessionId);
+
+            const socket = await openSocket(discovery.host, reservation, discovery.ua);
+            console.log('websocketSummary=', JSON.stringify(socket));
+
+            const ok = socket.opened && socket.messages > 0;
+            console.log('BLOXD_WEBSOCKET_OK=', ok);
+            if (!ok) process.exit(4);
+          })().catch(err => {
+            console.error('probeFatal=', String(err && err.stack || err));
+            process.exit(9);
+          });
+          JS
+
+          node websocket-probe.js
