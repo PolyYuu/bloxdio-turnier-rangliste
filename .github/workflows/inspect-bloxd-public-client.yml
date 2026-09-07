@@ -15,7 +15,7 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Trace trafficCode and compliance sources
+      - name: Resolve module 69 compliance export
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
@@ -23,18 +23,6 @@ jobs:
 
           function safe(text) {
             return String(text || '').replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
-          }
-
-          function allIndexes(text, needle, max = 30) {
-            const out = [];
-            let from = 0;
-            while (out.length < max) {
-              const pos = text.indexOf(needle, from);
-              if (pos === -1) break;
-              out.push(pos);
-              from = pos + needle.length;
-            }
-            return out;
           }
 
           (async () => {
@@ -55,68 +43,56 @@ jobs:
             });
 
             await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, {
-              waitUntil: 'domcontentloaded',
-              timeout: 90000
+              waitUntil: 'domcontentloaded', timeout: 90000
             });
-            await page.waitForTimeout(12000);
+            await page.waitForTimeout(10000);
 
-            console.log('scriptCount=', scripts.length);
-
-            const needles = ['trafficCode', 'compliance', 'EQ(110)', 'connectToServer(', '.connectToServer('];
-            for (const needle of needles) {
-              let total = 0;
-              console.log('TRACE_GROUP_START=', needle);
-              for (const script of scripts) {
-                const positions = allIndexes(script.text, needle, 20);
-                for (const pos of positions) {
-                  total++;
-                  console.log('TRACE_START');
-                  console.log('needle=', needle);
-                  console.log('script=', script.url.split('/').pop());
-                  console.log('pos=', pos);
-                  console.log('context=', safe(script.text.slice(Math.max(0, pos - 3500), Math.min(script.text.length, pos + 5000))));
-                  console.log('TRACE_END');
-                  if (total >= 20) break;
-                }
-                if (total >= 20) break;
-              }
-              console.log('TRACE_COUNT=', needle, total);
-              console.log('TRACE_GROUP_END=', needle);
-            }
-
-            // Find explicit module definitions for 110 in object-style chunks, if present.
-            const module110Defs = [];
-            const defPatterns = [
-              /(?:^|[,\{])110:\s*function\s*\([^)]*\)\s*\{/g,
-              /(?:^|[,\{])110:\s*\([^)]*\)\s*=>\s*\{/g,
-              /(?:^|[,\{])110:\s*[^,]{0,120}=>\s*\{/g
+            const hits = [];
+            const patterns = [
+              /(?:^|[,\{])69:function\s*\([^)]*\)\s*\{/g,
+              /(?:^|[,\{])69:\s*\([^)]*\)\s*=>\s*\{/g,
+              /(?:^|[,\{])69:\s*[^,]{0,120}=>\s*\{/g
             ];
+
             for (const script of scripts) {
-              for (const re of defPatterns) {
+              for (const re of patterns) {
                 re.lastIndex = 0;
                 let m;
                 while ((m = re.exec(script.text)) !== null) {
-                  module110Defs.push({
+                  hits.push({
                     script: script.url.split('/').pop(),
                     pos: m.index,
-                    context: safe(script.text.slice(Math.max(0, m.index - 500), Math.min(script.text.length, m.index + 4500)))
+                    context: safe(script.text.slice(Math.max(0, m.index - 500), Math.min(script.text.length, m.index + 10000)))
                   });
-                  if (module110Defs.length >= 10) break;
+                  if (hits.length >= 8) break;
                 }
-                if (module110Defs.length >= 10) break;
+                if (hits.length >= 8) break;
               }
-              if (module110Defs.length >= 10) break;
+              if (hits.length >= 8) break;
             }
-            console.log('module110DefCount=', module110Defs.length);
-            for (const hit of module110Defs) {
-              console.log('MODULE110_START');
+
+            console.log('module69DefCount=', hits.length);
+            for (const hit of hits) {
+              console.log('MODULE69_START');
               console.log('script=', hit.script);
               console.log('pos=', hit.pos);
               console.log('context=', hit.context);
-              console.log('MODULE110_END');
+              console.log('MODULE69_END');
+            }
+
+            // Also inspect exact imports in the connect module to verify the alias mapping.
+            for (const script of scripts) {
+              const pos = script.text.indexOf('24689:');
+              if (pos === -1) continue;
+              console.log('CONNECT_MODULE_START');
+              console.log('script=', script.url.split('/').pop());
+              console.log('context=', safe(script.text.slice(pos, Math.min(script.text.length, pos + 9000))));
+              console.log('CONNECT_MODULE_END');
+              break;
             }
 
             await browser.close();
+            if (!hits.length) process.exit(4);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
