@@ -1,0 +1,26 @@
+name: Probe Bloxd Matchmaker
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-bloxd-matchmaker.yml'
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe anonymous reservation
+        env:
+          URL: "https://bloxdio-turnier-rangliste.vercel.app/api/bloxd/probe-matchmake?host=gs-classicvarplayerschematic-qa8sztirjlqpfxhyx26oy-0.bloxd.io&lobbyName=HT_Y95VcEQaUBLbTc24H7%7Cdefault%7C1"
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error "$URL" | tee /tmp/result.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/result.json'))
+          print('ok=',d.get('ok'))
+          print('upstreamStatus=',d.get('upstreamStatus'))
+          r=d.get('reservation') or {}
+          print('room=',r.get('name'))
+          print('lobby=',r.get('lobbyName'))
+          print('sessionIdPresent=',r.get('sessionIdPresent'))
+          print('error=',d.get('error'))
+          PY
