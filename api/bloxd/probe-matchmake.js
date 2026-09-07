@@ -91,9 +91,20 @@ module.exports = async function handler(req, res) {
     try { data = JSON.parse(text); } catch (_) {}
 
     const room = data && data.room ? data.room : null;
+    const sessionIdPresent = !!(data && data.sessionId);
+    const reservationOk = !!(upstream.ok && room && room.roomId && room.processId && sessionIdPresent);
+    const bloxdCode = data && typeof data === 'object' && !Array.isArray(data) && data.code != null ? data.code : null;
+    const bloxdError = data && typeof data === 'object' && !Array.isArray(data)
+      ? (data.error || data.message || null)
+      : null;
+
     return json(res, 200, {
-      ok: upstream.ok,
+      // "ok" means an actual usable seat reservation was returned, not merely HTTP 200.
+      ok: reservationOk,
+      transportOk: upstream.ok,
       upstreamStatus: upstream.status,
+      bloxdCode,
+      bloxdError,
       responseType: data == null ? 'non-json' : Array.isArray(data) ? 'array' : typeof data,
       responseKeys: data && !Array.isArray(data) && typeof data === 'object' ? Object.keys(data) : [],
       reservation: room ? {
@@ -105,12 +116,12 @@ module.exports = async function handler(req, res) {
         maxClients: room.maxClients ?? null,
         locked: room.locked ?? null,
         private: room.private ?? null,
-        sessionIdPresent: !!data.sessionId
+        sessionIdPresent
       } : null,
       sanitizedResponse: data == null ? { textLength: text.length, prefix: text.slice(0, 120) } : sanitize(data),
-      error: upstream.ok ? null : (data && (data.error || data.message)) || text.slice(0, 300) || 'Bloxd matchmaker rejected probe'
+      error: reservationOk ? null : (bloxdError || (!upstream.ok ? `Bloxd matchmaker HTTP ${upstream.status}` : 'No seat reservation returned'))
     });
   } catch (error) {
-    return json(res, 502, { ok: false, error: String(error && error.message || error) });
+    return json(res, 502, { ok: false, transportOk: false, error: String(error && error.message || error) });
   }
 };
