@@ -9,15 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Install Playwright and Xvfb
+      - name: Install runtime
         run: |
           npm init -y >/dev/null 2>&1
           npm install playwright@1.55.0 >/dev/null 2>&1
-          npx playwright install --with-deps chromium >/dev/null 2>&1
           sudo apt-get update -qq >/dev/null 2>&1
           sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri >/dev/null 2>&1
+          google-chrome --version || google-chrome-stable --version || true
 
-      - name: Run normal headed Chromium join probe
+      - name: Run stable Chrome warmup join probe
         shell: bash
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
@@ -29,6 +29,7 @@ jobs:
             const worldId = 'HT_Y95VcEQaUBLbTc24H7';
             const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
             const browser = await chromium.launch({
+              channel: 'chrome',
               headless: false,
               args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-webgl']
             });
@@ -36,6 +37,8 @@ jobs:
             const page = await context.newPage();
 
             const state = {
+              chromeChannel: true,
+              homepageLoaded: false,
               discoveryOk: false,
               trafficCodeRequestSeen: false,
               trafficCodeStatus: null,
@@ -47,7 +50,6 @@ jobs:
               wsOpened: 0,
               wsFrames: 0,
               consoleStages: [],
-              pageErrors: [],
               samples: []
             };
 
@@ -77,48 +79,43 @@ jobs:
 
             page.on('websocket', ws => {
               state.wsOpened++;
-              ws.on('framereceived', () => { state.wsFrames++; });
+              ws.on('framereceived', () => state.wsFrames++);
             });
 
             page.on('console', msg => {
               const text = msg.text();
-              if (/Updated gamestate|Matchmaking libraries loaded|All required libraries loaded|Connecting to |Registering materials|WebGPU|WebGL|traffic code|findingLobby/i.test(text)) {
-                const scrubbed = text
-                  .replace(/wss:\/\/[^\s]+/g, 'wss://[redacted]')
-                  .replace(/[A-Za-z0-9_-]{80,}/g, '[LONG_VALUE]')
-                  .slice(0, 500);
-                if (!state.consoleStages.includes(scrubbed) && state.consoleStages.length < 30) state.consoleStages.push(scrubbed);
+              if (/Updated gamestate|Matchmaking libraries loaded|All required libraries loaded|Connecting to |Obtaining traffic code|Obtained traffic code|Failed to obtain traffic code|WebGPU|WebGL/i.test(text)) {
+                const scrubbed = text.replace(/wss:\/\/[^\s]+/g, 'wss://[redacted]').replace(/[A-Za-z0-9_-]{80,}/g, '[LONG_VALUE]').slice(0, 500);
+                if (!state.consoleStages.includes(scrubbed) && state.consoleStages.length < 40) state.consoleStages.push(scrubbed);
               }
             });
 
-            page.on('pageerror', err => {
-              const text = String(err && err.message || err).replace(/[A-Za-z0-9_-]{80,}/g, '[LONG_VALUE]').slice(0, 300);
-              if (state.pageErrors.length < 10) state.pageErrors.push(text);
-            });
-
+            const home = await page.goto('https://bloxd.io/', { waitUntil: 'domcontentloaded', timeout: 90000 });
+            state.homepageLoaded = !!home && home.ok();
+            await page.waitForTimeout(20000);
             await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
             const started = Date.now();
-            for (const seconds of [10, 30, 60, 90, 120]) {
+            for (const seconds of [15, 30, 60, 90, 120]) {
               const wait = started + seconds * 1000 - Date.now();
               if (wait > 0) await page.waitForTimeout(wait);
               let text = '';
               try { text = (await page.locator('body').innerText()).slice(-1800); } catch (_) {}
-              const percentMatches = [...text.matchAll(/(\d{1,3})%/g)].map(m => Number(m[1])).filter(n => n >= 0 && n <= 100);
+              const percentages = [...text.matchAll(/(\d{1,3})%/g)].map(m => Number(m[1])).filter(n => n >= 0 && n <= 100);
               state.samples.push({
                 seconds,
-                maxVisiblePercent: percentMatches.length ? Math.max(...percentMatches) : null,
+                maxVisiblePercent: percentages.length ? Math.max(...percentages) : null,
                 hasLoading: /loading|registering materials|finding lobby|joining lobby/i.test(text),
                 hasInGameHints: /inventory|respawn|crosshair|health/i.test(text)
               });
               if (state.reservationSeen && state.wsOpened > 0 && state.wsFrames > 0) break;
             }
 
-            console.log('headedSummary=', JSON.stringify(state));
+            console.log('chromeWarmSummary=', JSON.stringify(state));
             await browser.close();
-            if (!state.discoveryOk) process.exit(3);
+            if (!state.homepageLoaded || !state.discoveryOk) process.exit(3);
           })().catch(err => {
-            console.error('headedFatal=', String(err && err.stack || err));
+            console.error('chromeWarmFatal=', String(err && err.stack || err));
             process.exit(9);
           });
           JS
