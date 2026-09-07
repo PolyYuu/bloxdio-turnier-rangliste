@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,3 +35,23 @@ jobs:
       - name: Build Docker image
         working-directory: relay-worker
         run: docker build -t bloxd-sg-relay:test .
+
+      - name: Smoke test Docker runtime
+        shell: bash
+        run: |
+          docker run -d --name relay-smoke \
+            -e HEADLESS=true \
+            -e FORWARD_EVENTS=false \
+            -e VERIFY_TIMEOUT_MS=10000 \
+            -p 3000:3000 \
+            bloxd-sg-relay:test
+          trap 'docker logs relay-smoke || true; docker rm -f relay-smoke >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3000/health >/tmp/relay-health.json; then
+              cat /tmp/relay-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'Relay health endpoint did not become available'
+          exit 1
