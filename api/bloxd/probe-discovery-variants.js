@@ -15,6 +15,7 @@ async function runVariant(name, payload, userAgent) {
     headers: {
       accept: 'application/json',
       'content-type': 'application/json',
+      origin: 'https://bloxd.io',
       referer: 'https://bloxd.io/',
       'user-agent': userAgent
     },
