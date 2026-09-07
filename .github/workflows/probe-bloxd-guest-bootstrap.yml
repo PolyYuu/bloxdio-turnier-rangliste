@@ -1,0 +1,159 @@
+name: Probe Bloxd Guest Bootstrap
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-bloxd-guest-bootstrap.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe plain HTTP cookie bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
+          WORLD='HT_Y95VcEQaUBLbTc24H7'
+          JAR=/tmp/bloxd-cookies.txt
+
+          curl -L --silent --show-error \
+            -A "$UA" \
+            -c "$JAR" -b "$JAR" \
+            'https://bloxd.io/' \
+            -o /tmp/bloxd-home.html
+
+          curl -L --silent --show-error \
+            -A "$UA" \
+            -c "$JAR" -b "$JAR" \
+            "https://bloxd.io/play/classic_playerSchematic%7C${WORLD}?lobby=1" \
+            -o /tmp/bloxd-invite.html
+
+          echo 'Cookie names after plain HTTP bootstrap:'
+          awk 'BEGIN{FS="\t"} !/^#/ && NF>=7 {print $6}' "$JAR" | sort -u || true
+
+          SIDMC=$(awk 'BEGIN{FS="\t"} !/^#/ && $6=="__Secure-3PSIDMC" {print $7; exit}' "$JAR" || true)
+          if [ -n "$SIDMC" ]; then
+            echo '__Secure-3PSIDMC present=yes'
+          else
+            echo '__Secure-3PSIDMC present=no'
+            SIDMC='N/A'
+          fi
+
+          python3 - <<'PY'
+          import json, os
+          world='HT_Y95VcEQaUBLbTc24H7'
+          sidmc=os.environ.get('SIDMC','N/A')
+          payload={
+            'contents': {
+              'gameNameWithVariation': f'classic_playerSchematic|{world}',
+              'languages': ['de-DE','de','en-US','en','en-Gb']
+            },
+            'metricsCookies': {
+              '3PAPISID':'N/A',
+              '1PAPISID':'N/A',
+              '3PSID':'N/A',
+              '1PSID':'N/A',
+              '3PSIDMC': sidmc
+            }
+          }
+          open('/tmp/payload.json','w').write(json.dumps(payload,separators=(',',':')))
+          PY
+
+          STATUS=$(curl --silent --show-error \
+            -A "$UA" \
+            -b "$JAR" -c "$JAR" \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H 'Origin: https://bloxd.io' \
+            -H 'Referer: https://bloxd.io/' \
+            --data-binary @/tmp/payload.json \
+            -o /tmp/matchmake.json \
+            -w '%{http_code}' \
+            'https://social2.bloxd.io/social/bloxd-matchmake')
+
+          echo "plainHttpMatchmakeStatus=$STATUS"
+          python3 - <<'PY'
+          import json
+          raw=open('/tmp/matchmake.json','rb').read()
+          try:
+            d=json.loads(raw)
+          except Exception:
+            print('plainHttpResponseType=non-json')
+            print('plainHttpResponseLength=',len(raw))
+          else:
+            print('plainHttpSucceeded=',d.get('succeeded'))
+            print('plainHttpLobbyName=',d.get('lobbyName'))
+            print('plainHttpGameServerHost=',d.get('gameServerHost'))
+            print('plainHttpResponseKeys=',list(d.keys()) if isinstance(d,dict) else [])
+          PY
+        env:
+          SIDMC: ${{ env.SIDMC }}
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Probe real anonymous browser bootstrap
+        shell: bash
+        run: |
+          cat > /tmp/probe.js <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const worldId = 'HT_Y95VcEQaUBLbTc24H7';
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36',
+              locale: 'de-DE'
+            });
+            const page = await context.newPage();
+
+            let captured = null;
+            page.on('response', async response => {
+              if (!response.url().includes('/social/bloxd-matchmake')) return;
+              try {
+                const data = await response.json();
+                captured = {
+                  status: response.status(),
+                  succeeded: data && data.succeeded === true,
+                  lobbyName: data && data.lobbyName || null,
+                  gameServerHost: data && data.gameServerHost || null,
+                  responseKeys: data && typeof data === 'object' ? Object.keys(data) : []
+                };
+              } catch (_) {
+                captured = { status: response.status(), succeeded: false, nonJson: true };
+              }
+            });
+
+            const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
+            try {
+              await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            } catch (e) {
+              console.log('browserGotoError=', String(e.message || e).slice(0, 180));
+            }
+
+            const deadline = Date.now() + 45000;
+            while (!captured && Date.now() < deadline) {
+              await page.waitForTimeout(500);
+            }
+
+            const cookies = await context.cookies();
+            const names = [...new Set(cookies.map(c => c.name))].sort();
+            const wanted = ['__Secure-3PSIDMC','bb_u_h_init','bb_u_id','bloxd','cf_clearance'];
+            console.log('browserCookieNames=', JSON.stringify(names));
+            for (const name of wanted) {
+              console.log(`${name}Present=`, names.includes(name));
+            }
+            console.log('browserMatchmake=', JSON.stringify(captured));
+
+            await browser.close();
+            if (!captured || !captured.succeeded || !captured.gameServerHost) process.exitCode = 2;
+          })().catch(err => {
+            console.error('probeFatal=', String(err && err.stack || err));
+            process.exitCode = 3;
+          });
+          JS
+          node /tmp/probe.js
