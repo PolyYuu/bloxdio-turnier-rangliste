@@ -15,100 +15,91 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Read public Webpack module 44
+      - name: Locate exact module 44 definition
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
           const { chromium } = require('playwright');
+
+          function safe(text) {
+            return String(text || '').replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
+          }
+
+          function candidatesForModule44(text) {
+            const patterns = [
+              /(?:^|[,\{])44:\s*function\s*\([^)]*\)\s*\{/g,
+              /(?:^|[,\{])44:\s*\([^)]*\)\s*=>\s*\{/g,
+              /(?:^|[,\{])44:\s*[A-Za-z_$][\w$]*\s*=>\s*\{/g
+            ];
+            const hits = [];
+            for (const re of patterns) {
+              let m;
+              while ((m = re.exec(text)) !== null) {
+                const index = m.index + (m[0][0] === ',' || m[0][0] === '{' ? 1 : 0);
+                hits.push(index);
+                if (hits.length >= 20) return [...new Set(hits)].sort((a,b)=>a-b);
+              }
+            }
+            return [...new Set(hits)].sort((a,b)=>a-b);
+          }
 
           (async () => {
             const worldId = 'HT_Y95VcEQaUBLbTc24H7';
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext({ locale: 'de-DE' });
             const page = await context.newPage();
+            const scripts = [];
+
+            page.on('response', async response => {
+              const req = response.request();
+              const url = response.url();
+              if (req.resourceType() !== 'script' && !/\.js(?:\?|$)/i.test(url)) return;
+              if (!/bloxd\.io|blob:/i.test(url)) return;
+              let text = '';
+              try { text = await response.text(); } catch (_) { return; }
+              if (text) scripts.push({ url, text });
+            });
 
             await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, {
               waitUntil: 'domcontentloaded',
               timeout: 90000
             });
-            await page.waitForTimeout(10000);
+            await page.waitForTimeout(12000);
 
-            const result = await page.evaluate(() => {
-              const chunkGlobals = Object.keys(window).filter(k => /^webpackChunk/.test(k));
-              const out = {
-                chunkGlobals,
-                captured: false,
-                module44Present: false,
-                exportKeys: [],
-                primitiveExports: {},
-                module44SourcePrefix: null,
-                error: null
-              };
-
-              if (!chunkGlobals.length) {
-                out.error = 'No webpackChunk global found';
-                return out;
+            const findings = [];
+            for (const script of scripts) {
+              const positions = candidatesForModule44(script.text);
+              for (const pos of positions) {
+                const snippet = safe(script.text.slice(Math.max(0, pos - 300), Math.min(script.text.length, pos + 5000)));
+                findings.push({
+                  script: script.url.split('/').pop(),
+                  pos,
+                  hasExportD: /\.d\([^,]+,\{[^}]*\bd\s*:/.test(snippet),
+                  hasVersionWord: /version|build|client/i.test(snippet),
+                  has803: /\b803\b/.test(snippet),
+                  snippet
+                });
               }
-
-              let req = null;
-              for (const key of chunkGlobals) {
-                try {
-                  const arr = window[key];
-                  if (!Array.isArray(arr) || typeof arr.push !== 'function') continue;
-                  const syntheticId = 900000 + Math.floor(Math.random() * 90000);
-                  arr.push([[syntheticId], {}, r => { req = r; }]);
-                  if (req) break;
-                } catch (_) {}
-              }
-
-              if (!req) {
-                out.error = 'Could not capture webpack require';
-                return out;
-              }
-
-              out.captured = true;
-              out.module44Present = !!(req.m && req.m[44]);
-              if (req.m && req.m[44]) {
-                try {
-                  out.module44SourcePrefix = String(req.m[44]).slice(0, 2000);
-                } catch (_) {}
-              }
-
-              try {
-                const mod = req(44);
-                if (mod && (typeof mod === 'object' || typeof mod === 'function')) {
-                  out.exportKeys = Object.keys(mod).slice(0, 50);
-                  for (const key of out.exportKeys) {
-                    try {
-                      const value = mod[key];
-                      if (
-                        typeof value === 'string' ||
-                        typeof value === 'number' ||
-                        typeof value === 'boolean' ||
-                        value === null
-                      ) {
-                        out.primitiveExports[key] = value;
-                      }
-                    } catch (_) {}
-                  }
-                }
-              } catch (err) {
-                out.error = `require(44): ${String(err && err.message || err)}`;
-              }
-
-              return out;
-            });
-
-            // Module 44 is public client code. Log only short source prefix and primitive exports.
-            if (result.module44SourcePrefix) {
-              result.module44SourcePrefix = result.module44SourcePrefix
-                .replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
             }
-            console.log('webpackRuntimeResult=', JSON.stringify(result));
-            console.log('CLIENT_VERSION_EXPORT_D=', Object.prototype.hasOwnProperty.call(result.primitiveExports || {}, 'd') ? result.primitiveExports.d : null);
+
+            console.log('scriptCount=', scripts.length);
+            console.log('module44CandidateCount=', findings.length);
+            for (const finding of findings.slice(0, 12)) {
+              console.log('MODULE44_CANDIDATE_START');
+              console.log('script=', finding.script);
+              console.log('pos=', finding.pos);
+              console.log('hasExportD=', finding.hasExportD);
+              console.log('hasVersionWord=', finding.hasVersionWord);
+              console.log('has803=', finding.has803);
+              console.log('snippet=', finding.snippet);
+              console.log('MODULE44_CANDIDATE_END');
+            }
+
+            const likely = findings.filter(f => f.hasExportD || f.hasVersionWord || f.has803);
+            console.log('likelyModule44Count=', likely.length);
 
             await browser.close();
-            if (!result.captured || !result.module44Present) process.exit(4);
+            if (!findings.length) process.exit(4);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
