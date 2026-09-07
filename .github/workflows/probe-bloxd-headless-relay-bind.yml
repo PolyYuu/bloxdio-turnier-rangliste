@@ -1,0 +1,160 @@
+name: Probe Bloxd Headless Relay Bind
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-bloxd-headless-relay-bind.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Bind anonymous guest as relay recipient
+        shell: bash
+        run: |
+          cat > relay-bind-probe.js <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const worldId = 'HT_Y95VcEQaUBLbTc24H7';
+            const command = '/livesync bind t1 sg-headless-probe 1';
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              viewport: { width: 1280, height: 720 },
+              locale: 'de-DE'
+            });
+            const page = await context.newPage();
+
+            let matchmake = null;
+            page.on('response', async response => {
+              if (!response.url().includes('/social/bloxd-matchmake')) return;
+              try {
+                const data = await response.json();
+                matchmake = {
+                  status: response.status(),
+                  succeeded: data && data.succeeded === true,
+                  lobbyName: data && data.lobbyName || null,
+                  gameServerHost: data && data.gameServerHost || null
+                };
+              } catch (_) {
+                matchmake = { status: response.status(), succeeded: false };
+              }
+            });
+
+            await page.addInitScript(() => {
+              window.__headlessRelayProbe = {
+                seen: [],
+                startedAt: Date.now()
+              };
+              const collect = text => {
+                if (!text) return;
+                const lines = String(text).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+                for (const line of lines) {
+                  if (
+                    /Live Sync|Relay-Empf|Relay aktiviert|__SG_EVT__|Turnierlobby|joined/i.test(line) &&
+                    !window.__headlessRelayProbe.seen.includes(line)
+                  ) {
+                    window.__headlessRelayProbe.seen.push(line.slice(0, 300));
+                    if (window.__headlessRelayProbe.seen.length > 80) {
+                      window.__headlessRelayProbe.seen.shift();
+                    }
+                  }
+                }
+              };
+              const startObserver = () => {
+                if (!document.body) return setTimeout(startObserver, 100);
+                collect(document.body.innerText || '');
+                const observer = new MutationObserver(mutations => {
+                  for (const mutation of mutations) {
+                    if (mutation.type === 'characterData') {
+                      collect(mutation.target && mutation.target.textContent || '');
+                    } else {
+                      for (const node of mutation.addedNodes || []) {
+                        collect(node && node.textContent || '');
+                      }
+                    }
+                  }
+                });
+                observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+                window.__headlessRelayProbe.observerStarted = true;
+              };
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+              } else {
+                startObserver();
+              }
+            });
+
+            const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
+            await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+            // Wait for the game bootstrap/matchmaking first.
+            const matchmakeDeadline = Date.now() + 30000;
+            while ((!matchmake || !matchmake.succeeded) && Date.now() < matchmakeDeadline) {
+              await page.waitForTimeout(250);
+            }
+
+            // Enter the game from the "Press anywhere to enter game" screen.
+            await page.mouse.click(640, 360);
+            await page.waitForTimeout(3500);
+
+            const before = await page.evaluate(() => ({
+              text: (document.body && document.body.innerText || '').slice(-5000),
+              probe: window.__headlessRelayProbe || null,
+              activeTag: document.activeElement && document.activeElement.tagName || null
+            }));
+            console.log('matchmake=', JSON.stringify(matchmake));
+            console.log('observerStarted=', !!(before.probe && before.probe.observerStarted));
+            console.log('preCommandSignals=', JSON.stringify(before.probe && before.probe.seen || []));
+
+            // Bloxd chat: Enter -> command -> Enter.
+            await page.keyboard.press('Enter');
+            await page.waitForTimeout(300);
+            await page.keyboard.type(command, { delay: 20 });
+            await page.waitForTimeout(200);
+            await page.keyboard.press('Enter');
+
+            const deadline = Date.now() + 15000;
+            let result = null;
+            while (Date.now() < deadline) {
+              result = await page.evaluate(() => {
+                const bodyText = document.body && document.body.innerText || '';
+                const seen = window.__headlessRelayProbe && window.__headlessRelayProbe.seen || [];
+                const combined = seen.join('\n') + '\n' + bodyText;
+                return {
+                  bound: /Live Sync gebunden:\s*T1\s*->\s*sg-headless-probe\s*\|\s*Runde\s*1/i.test(combined),
+                  relayRecipient: /Relay-Empf[aä]nger/i.test(combined),
+                  liveSyncLoaded: /LIVE SYNC|Live Sync/i.test(combined),
+                  seen: seen.slice(-30)
+                };
+              });
+              if (result.bound || result.relayRecipient) break;
+              await page.waitForTimeout(500);
+            }
+
+            console.log('relayBindResult=', JSON.stringify(result));
+
+            await browser.close();
+
+            if (!matchmake || !matchmake.succeeded || !matchmake.gameServerHost) {
+              console.error('FAIL: anonymous guest did not obtain gameServerHost');
+              process.exit(2);
+            }
+            if (!result || (!result.bound && !result.relayRecipient)) {
+              console.error('FAIL: bind command was not confirmed in Bloxd DOM');
+              process.exit(3);
+            }
+            console.log('HEADLESS_RELAY_BIND_OK=true');
+          })().catch(err => {
+            console.error('probeFatal=', String(err && err.stack || err));
+            process.exit(4);
+          });
+          JS
+
+          node relay-bind-probe.js
