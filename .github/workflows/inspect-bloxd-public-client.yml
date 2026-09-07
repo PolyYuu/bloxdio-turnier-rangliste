@@ -1,0 +1,96 @@
+name: Inspect Bloxd Public Client
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-bloxd-public-client.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Inspect loaded public JavaScript
+        shell: bash
+        run: |
+          cat > inspect-client.js <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const worldId = 'HT_Y95VcEQaUBLbTc24H7';
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({ locale: 'de-DE' });
+            const page = await context.newPage();
+            const matches = [];
+            const scripts = new Set();
+
+            page.on('response', async response => {
+              const req = response.request();
+              const url = response.url();
+              if (req.resourceType() !== 'script' && !/\.js(?:\?|$)/i.test(url)) return;
+              scripts.add(url);
+              let text = '';
+              try { text = await response.text(); } catch (_) { return; }
+              if (!text) return;
+
+              const markers = ['playSessionId', 'generalCookies', 'siteUsed', 'subsiteUsed'];
+              for (const marker of markers) {
+                let pos = text.indexOf(marker);
+                if (pos === -1) continue;
+                const start = Math.max(0, pos - 900);
+                const end = Math.min(text.length, pos + 1800);
+                let snippet = text.slice(start, end);
+                // Public bundle only; trim obvious long encoded/string literals so logs stay safe and readable.
+                snippet = snippet.replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
+                matches.push({
+                  marker,
+                  script: url.split('/').pop(),
+                  snippet
+                });
+              }
+            });
+
+            const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
+            await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            await page.waitForTimeout(12000);
+
+            console.log('scriptCount=', scripts.size);
+            console.log('scriptFiles=', JSON.stringify([...scripts].map(u => u.split('/').pop()).slice(0, 80)));
+            console.log('matchCount=', matches.length);
+            for (const item of matches.slice(0, 12)) {
+              console.log('PUBLIC_CODE_MATCH_START');
+              console.log('marker=', item.marker);
+              console.log('script=', item.script);
+              console.log(item.snippet);
+              console.log('PUBLIC_CODE_MATCH_END');
+            }
+
+            const globalHints = await page.evaluate(() => {
+              const keys = Object.keys(window).filter(k => /version|build/i.test(k)).slice(0, 80);
+              const out = {};
+              for (const key of keys) {
+                try {
+                  const value = window[key];
+                  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                    out[key] = String(value).slice(0, 120);
+                  }
+                } catch (_) {}
+              }
+              return out;
+            });
+            console.log('globalVersionHints=', JSON.stringify(globalHints));
+
+            await browser.close();
+            if (!matches.length) process.exit(3);
+          })().catch(err => {
+            console.error('inspectFatal=', String(err && err.stack || err));
+            process.exit(9);
+          });
+          JS
+
+          node inspect-client.js
