@@ -1,0 +1,166 @@
+name: Probe Bloxd Current Host Join
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-bloxd-current-host-join.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Discover fresh host then call joinOrCreate directly
+        shell: bash
+        run: |
+          cat > current-host-join.js <<'JS'
+          const crypto = require('crypto');
+          const { chromium } = require('playwright');
+
+          const ROOM_NAME = 'classic_playerSchematic';
+          const worldId = 'HT_Y95VcEQaUBLbTc24H7';
+          const invite = `https://bloxd.io/play/${ROOM_NAME}%7C${worldId}?lobby=1`;
+          const languages = ['de-DE', 'de', 'en-US', 'en', 'en-Gb'];
+
+          function allowedHost(host) {
+            return /^gs-[a-z0-9.-]+\.bloxd\.io$/i.test(host || '');
+          }
+
+          (async () => {
+            let discovery = null;
+            let browserUa = null;
+
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
+            });
+            const context = await browser.newContext({ locale: 'de-DE' });
+            const page = await context.newPage();
+
+            page.on('response', async response => {
+              if (!response.url().includes('/social/bloxd-matchmake')) return;
+              try {
+                const data = await response.json();
+                if (data && data.succeeded === true && allowedHost(data.gameServerHost)) {
+                  discovery = {
+                    status: response.status(),
+                    succeeded: true,
+                    gameServerHost: data.gameServerHost,
+                    lobbyName: String(data.lobbyName || '1'),
+                    gameNameWithVariation: data.gameNameWithVariation || null
+                  };
+                }
+              } catch (_) {}
+            });
+
+            await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            browserUa = await page.evaluate(() => navigator.userAgent);
+
+            const deadline = Date.now() + 20000;
+            while (!discovery && Date.now() < deadline) {
+              await page.waitForTimeout(200);
+            }
+
+            console.log('discovery=', JSON.stringify(discovery));
+            console.log('browserUaPresent=', !!browserUa);
+            await browser.close();
+
+            if (!discovery) {
+              console.error('FAIL: no fresh Bloxd host discovered');
+              process.exit(2);
+            }
+
+            const fullLobbyName = `${worldId}|default|${discovery.lobbyName || '1'}`;
+            const playSessionId = crypto.randomBytes(10).toString('base64url');
+            const joinUrl = `https://${discovery.gameServerHost}/matchmake/joinOrCreate/${ROOM_NAME}`;
+
+            const chromeVersionMatch = String(browserUa || '').match(/Chrome\/([0-9.]+)/i);
+            const chromeVersion = chromeVersionMatch ? chromeVersionMatch[1] : '140.0.0.0';
+
+            const payload = {
+              cookies: { origin: 'classic' },
+              isMobile: false,
+              browserInfo: {
+                deviceType: 'mouseOnly',
+                name: 'Chrome',
+                platform: 'Linux x86_64',
+                platformType: 'desktop',
+                ua: browserUa || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36',
+                version: chromeVersion
+              },
+              generalCookies: {
+                joinDiscord: false,
+                newGo: 'c'
+              },
+              isLoggedIn: false,
+              languages,
+              lobbyName: fullLobbyName,
+              playSessionId,
+              siteUsed: 'bloxd',
+              subsiteUsed: 'bloxd',
+              version: 803
+            };
+
+            const response = await fetch(joinUrl, {
+              method: 'POST',
+              headers: {
+                accept: 'application/json',
+                'content-type': 'application/json',
+                origin: 'https://bloxd.io',
+                referer: 'https://bloxd.io/',
+                'x-requested-with': 'XMLHttpRequest',
+                'user-agent': browserUa || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36'
+              },
+              body: JSON.stringify(payload),
+              redirect: 'manual'
+            });
+
+            const text = await response.text();
+            let data = null;
+            try { data = JSON.parse(text); } catch (_) {}
+
+            const room = data && data.room || null;
+            const result = {
+              status: response.status,
+              transportOk: response.ok,
+              responseType: data == null ? 'non-json' : Array.isArray(data) ? 'array' : typeof data,
+              responseKeys: data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data) : [],
+              bloxdCode: data && data.code != null ? data.code : null,
+              bloxdError: data && (data.error || data.message) || null,
+              reservation: room ? {
+                name: room.name || null,
+                roomId: room.roomId || null,
+                processId: room.processId || null,
+                lobbyName: room.lobbyName || null,
+                clients: room.clients ?? null,
+                maxClients: room.maxClients ?? null,
+                sessionIdPresent: !!(data && data.sessionId)
+              } : null,
+              nonJsonLength: data == null ? text.length : null
+            };
+
+            console.log('joinResult=', JSON.stringify(result));
+
+            const ok = !!(
+              response.ok &&
+              room &&
+              room.roomId &&
+              room.processId &&
+              data &&
+              data.sessionId
+            );
+
+            console.log('FRESH_HOST_JOIN_OK=', ok);
+            if (!ok) process.exit(3);
+          })().catch(err => {
+            console.error('probeFatal=', String(err && err.stack || err));
+            process.exit(9);
+          });
+          JS
+
+          node current-host-join.js
