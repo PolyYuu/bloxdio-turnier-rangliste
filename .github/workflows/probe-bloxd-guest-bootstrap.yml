@@ -76,8 +76,8 @@ jobs:
 
           echo "plainHttpMatchmakeStatus=$STATUS"
           python3 - <<'PY'
-          import json
-          raw=open('/tmp/matchmake.json','rb').read() if __import__('os').path.exists('/tmp/matchmake.json') else b''
+          import json, os
+          raw=open('/tmp/matchmake.json','rb').read() if os.path.exists('/tmp/matchmake.json') else b''
           try:
             d=json.loads(raw)
           except Exception:
@@ -102,7 +102,7 @@ jobs:
       - name: Probe real anonymous browser bootstrap
         shell: bash
         run: |
-          cat > /tmp/probe.js <<'JS'
+          cat > probe.js <<'JS'
           const { chromium } = require('playwright');
 
           (async () => {
@@ -159,4 +159,4 @@ jobs:
             process.exitCode = 3;
           });
           JS
-          node /tmp/probe.js
+          node probe.js
