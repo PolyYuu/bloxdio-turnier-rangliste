@@ -12,6 +12,26 @@ function isAllowedBloxdHost(host) {
   return /^gs-[a-z0-9.-]+\.bloxd\.io$/i.test(host || '');
 }
 
+function sanitize(value, depth = 0) {
+  if (depth > 4) return '[max-depth]';
+  if (value == null) return value;
+  if (Array.isArray(value)) return value.slice(0, 10).map(v => sanitize(v, depth + 1));
+  if (typeof value !== 'object') {
+    if (typeof value === 'string') return value.length > 120 ? `${value.slice(0, 40)}…(${value.length})` : value;
+    return value;
+  }
+  const out = {};
+  for (const [key, val] of Object.entries(value)) {
+    const k = String(key).toLowerCase();
+    if (/(session|token|cookie|auth|sid|traffic|secret|credential|password)/i.test(k)) {
+      out[key] = val == null ? null : '[redacted]';
+    } else {
+      out[key] = sanitize(val, depth + 1);
+    }
+  }
+  return out;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Method not allowed' });
 
@@ -74,6 +94,8 @@ module.exports = async function handler(req, res) {
     return json(res, 200, {
       ok: upstream.ok,
       upstreamStatus: upstream.status,
+      responseType: data == null ? 'non-json' : Array.isArray(data) ? 'array' : typeof data,
+      responseKeys: data && !Array.isArray(data) && typeof data === 'object' ? Object.keys(data) : [],
       reservation: room ? {
         name: room.name || null,
         roomId: room.roomId || null,
@@ -85,6 +107,7 @@ module.exports = async function handler(req, res) {
         private: room.private ?? null,
         sessionIdPresent: !!data.sessionId
       } : null,
+      sanitizedResponse: data == null ? { textLength: text.length, prefix: text.slice(0, 120) } : sanitize(data),
       error: upstream.ok ? null : (data && (data.error || data.message)) || text.slice(0, 300) || 'Bloxd matchmaker rejected probe'
     });
   } catch (error) {
