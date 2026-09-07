@@ -11,8 +11,9 @@ jobs:
     steps:
       - name: Probe plain HTTP cookie bootstrap
         shell: bash
+        continue-on-error: true
         run: |
-          set -euo pipefail
+          set -u
           UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
           WORLD='HT_Y95VcEQaUBLbTc24H7'
           JAR=/tmp/bloxd-cookies.txt
@@ -21,13 +22,13 @@ jobs:
             -A "$UA" \
             -c "$JAR" -b "$JAR" \
             'https://bloxd.io/' \
-            -o /tmp/bloxd-home.html
+            -o /tmp/bloxd-home.html || true
 
           curl -L --silent --show-error \
             -A "$UA" \
             -c "$JAR" -b "$JAR" \
             "https://bloxd.io/play/classic_playerSchematic%7C${WORLD}?lobby=1" \
-            -o /tmp/bloxd-invite.html
+            -o /tmp/bloxd-invite.html || true
 
           echo 'Cookie names after plain HTTP bootstrap:'
           awk 'BEGIN{FS="\t"} !/^#/ && NF>=7 {print $6}' "$JAR" | sort -u || true
@@ -39,6 +40,7 @@ jobs:
             echo '__Secure-3PSIDMC present=no'
             SIDMC='N/A'
           fi
+          export SIDMC
 
           python3 - <<'PY'
           import json, os
@@ -70,25 +72,26 @@ jobs:
             --data-binary @/tmp/payload.json \
             -o /tmp/matchmake.json \
             -w '%{http_code}' \
-            'https://social2.bloxd.io/social/bloxd-matchmake')
+            'https://social2.bloxd.io/social/bloxd-matchmake' || true)
 
           echo "plainHttpMatchmakeStatus=$STATUS"
           python3 - <<'PY'
           import json
-          raw=open('/tmp/matchmake.json','rb').read()
+          raw=open('/tmp/matchmake.json','rb').read() if __import__('os').path.exists('/tmp/matchmake.json') else b''
           try:
             d=json.loads(raw)
           except Exception:
             print('plainHttpResponseType=non-json')
             print('plainHttpResponseLength=',len(raw))
           else:
-            print('plainHttpSucceeded=',d.get('succeeded'))
-            print('plainHttpLobbyName=',d.get('lobbyName'))
-            print('plainHttpGameServerHost=',d.get('gameServerHost'))
-            print('plainHttpResponseKeys=',list(d.keys()) if isinstance(d,dict) else [])
+            if isinstance(d, dict):
+              print('plainHttpSucceeded=',d.get('succeeded'))
+              print('plainHttpLobbyName=',d.get('lobbyName'))
+              print('plainHttpGameServerHost=',d.get('gameServerHost'))
+              print('plainHttpResponseKeys=',list(d.keys()))
+            else:
+              print('plainHttpResponseType=',type(d).__name__)
           PY
-        env:
-          SIDMC: ${{ env.SIDMC }}
 
       - name: Install Playwright
         run: |
