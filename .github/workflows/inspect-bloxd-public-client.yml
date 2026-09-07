@@ -15,7 +15,7 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Locate exact module 44 definition
+      - name: Trace module 44 across bundle encodings
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
@@ -25,22 +25,15 @@ jobs:
             return String(text || '').replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
           }
 
-          function candidatesForModule44(text) {
-            const patterns = [
-              /(?:^|[,\{])44:\s*function\s*\([^)]*\)\s*\{/g,
-              /(?:^|[,\{])44:\s*\([^)]*\)\s*=>\s*\{/g,
-              /(?:^|[,\{])44:\s*[A-Za-z_$][\w$]*\s*=>\s*\{/g
-            ];
-            const hits = [];
-            for (const re of patterns) {
-              let m;
-              while ((m = re.exec(text)) !== null) {
-                const index = m.index + (m[0][0] === ',' || m[0][0] === '{' ? 1 : 0);
-                hits.push(index);
-                if (hits.length >= 20) return [...new Set(hits)].sort((a,b)=>a-b);
-              }
+          function collectPositions(text, re, limit = 20) {
+            const out = [];
+            let m;
+            while ((m = re.exec(text)) !== null) {
+              out.push(m.index);
+              if (out.length >= limit) break;
+              if (m.index === re.lastIndex) re.lastIndex++;
             }
-            return [...new Set(hits)].sort((a,b)=>a-b);
+            return out;
           }
 
           (async () => {
@@ -66,40 +59,102 @@ jobs:
             });
             await page.waitForTimeout(12000);
 
+            const patterns = [
+              ['plainProperty', /(?:^|[,\{])\s*44\s*:/g],
+              ['quotedProperty', /[\{,]\s*["']44["']\s*:/g],
+              ['computedProperty', /\[\s*44\s*\]\s*:/g],
+              ['assignment', /(?:modules|moduleMap|[A-Za-z_$][\w$]*)\s*\[\s*44\s*\]\s*=/g],
+              ['methodSyntax', /(?:^|[,\{])\s*44\s*\([^)]*\)\s*\{/g],
+              ['require44', /\b[A-Za-z_$][\w$]*\(44\)/g],
+              ['literal44', /\b44\b/g]
+            ];
+
             const findings = [];
             for (const script of scripts) {
-              const positions = candidatesForModule44(script.text);
-              for (const pos of positions) {
-                const snippet = safe(script.text.slice(Math.max(0, pos - 300), Math.min(script.text.length, pos + 5000)));
-                findings.push({
-                  script: script.url.split('/').pop(),
-                  pos,
-                  hasExportD: /\.d\([^,]+,\{[^}]*\bd\s*:/.test(snippet),
-                  hasVersionWord: /version|build|client/i.test(snippet),
-                  has803: /\b803\b/.test(snippet),
-                  snippet
-                });
+              for (const [kind, re] of patterns) {
+                re.lastIndex = 0;
+                const positions = collectPositions(script.text, re, kind === 'literal44' ? 8 : 20);
+                for (const pos of positions) {
+                  const snippet = safe(script.text.slice(Math.max(0, pos - 900), Math.min(script.text.length, pos + 3500)));
+                  findings.push({
+                    kind,
+                    script: script.url.split('/').pop(),
+                    pos,
+                    hasExportD: /\.d\([^,]+,\{[^}]*\bd\s*:/.test(snippet),
+                    hasVersionWord: /version|build|client/i.test(snippet),
+                    has803: /\b803\b/.test(snippet),
+                    hasJoinPayload: /playSessionId|joinOrCreate|generalCookies/.test(snippet),
+                    snippet
+                  });
+                }
               }
             }
 
             console.log('scriptCount=', scripts.length);
-            console.log('module44CandidateCount=', findings.length);
-            for (const finding of findings.slice(0, 12)) {
-              console.log('MODULE44_CANDIDATE_START');
-              console.log('script=', finding.script);
-              console.log('pos=', finding.pos);
-              console.log('hasExportD=', finding.hasExportD);
-              console.log('hasVersionWord=', finding.hasVersionWord);
-              console.log('has803=', finding.has803);
-              console.log('snippet=', finding.snippet);
-              console.log('MODULE44_CANDIDATE_END');
+            const counts = {};
+            for (const f of findings) counts[f.kind] = (counts[f.kind] || 0) + 1;
+            console.log('findingCounts=', JSON.stringify(counts));
+
+            const requireHits = findings.filter(f => f.kind === 'require44');
+            console.log('require44Count=', requireHits.length);
+            for (const f of requireHits.slice(0, 10)) {
+              console.log('REQUIRE44_START');
+              console.log('script=', f.script);
+              console.log('pos=', f.pos);
+              console.log('snippet=', f.snippet);
+              console.log('REQUIRE44_END');
             }
 
-            const likely = findings.filter(f => f.hasExportD || f.hasVersionWord || f.has803);
-            console.log('likelyModule44Count=', likely.length);
+            const definitionKinds = new Set(['plainProperty','quotedProperty','computedProperty','assignment','methodSyntax']);
+            const defs = findings.filter(f => definitionKinds.has(f.kind));
+            console.log('definitionCandidateCount=', defs.length);
+            for (const f of defs.slice(0, 20)) {
+              console.log('MODULE44_DEF_START');
+              console.log('kind=', f.kind);
+              console.log('script=', f.script);
+              console.log('pos=', f.pos);
+              console.log('hasExportD=', f.hasExportD);
+              console.log('hasVersionWord=', f.hasVersionWord);
+              console.log('has803=', f.has803);
+              console.log('snippet=', f.snippet);
+              console.log('MODULE44_DEF_END');
+            }
+
+            const interestingLiterals = findings.filter(f =>
+              f.kind === 'literal44' && (f.hasExportD || f.hasVersionWord || f.has803 || f.hasJoinPayload)
+            );
+            console.log('interestingLiteral44Count=', interestingLiterals.length);
+            for (const f of interestingLiterals.slice(0, 20)) {
+              console.log('INTERESTING44_START');
+              console.log('script=', f.script);
+              console.log('pos=', f.pos);
+              console.log('snippet=', f.snippet);
+              console.log('INTERESTING44_END');
+            }
+
+            // Also reveal how the main app's module table is encoded by sampling real numeric module definitions.
+            const tableShape = [];
+            const shapePatterns = [
+              /(?:^|[,\{])(\d{1,5}):\s*function\s*\(/g,
+              /(?:^|[,\{])(\d{1,5}):\s*\([^)]*\)\s*=>\s*\{/g,
+              /(?:^|[,\{])(\d{1,5}):\s*\([^)]*\)\s*=>/g
+            ];
+            for (const script of scripts) {
+              for (const re of shapePatterns) {
+                re.lastIndex = 0;
+                let m;
+                while ((m = re.exec(script.text)) !== null) {
+                  tableShape.push({ script: script.url.split('/').pop(), id: Number(m[1]), context: safe(script.text.slice(m.index, m.index + 260)) });
+                  if (tableShape.length >= 30) break;
+                }
+                if (tableShape.length >= 30) break;
+              }
+              if (tableShape.length >= 30) break;
+            }
+            console.log('moduleTableShape=', JSON.stringify(tableShape));
 
             await browser.close();
-            if (!findings.length) process.exit(4);
+            if (!requireHits.length) process.exit(4);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
