@@ -2,6 +2,7 @@ const express = require('express');
 const { chromium } = require('playwright');
 const fs = require('fs');
 const { parseMarker } = require('./event-parser');
+const { SnapshotAssembler } = require('./snapshot-assembler');
 
 const PORT = Number(process.env.PORT || 3000);
 const WORLD_ID = process.env.BLOXD_WORLD_ID || 'HT_Y95VcEQaUBLbTc24H7';
@@ -11,6 +12,7 @@ const HEADLESS = String(process.env.HEADLESS || 'false').toLowerCase() === 'true
 const CHROME_CHANNEL = process.env.CHROME_CHANNEL || 'chromium';
 const VERIFY_TIMEOUT_MS = Number(process.env.VERIFY_TIMEOUT_MS || 45000);
 const RECONNECT_DELAY_MS = Number(process.env.RECONNECT_DELAY_MS || 5000);
+const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_MS || 20000);
 const RELAY_ID = process.env.RELAY_ID || 'bloxd-persistent-relay';
 const HUB_API_URL = process.env.HUB_API_URL || '';
 const HUB_RELAY_KEY = process.env.HUB_RELAY_KEY || '';
@@ -31,6 +33,9 @@ const state = {
   markerCount: 0,
   supportedMarkerCount: 0,
   unsupportedMarkerCount: 0,
+  snapshotFragmentCount: 0,
+  snapshotCount: 0,
+  pendingSnapshots: 0,
   forwardedCount: 0,
   forwardFailures: 0,
   lastEventType: null,
@@ -92,6 +97,19 @@ async function postToHub(payload, attempt = 0) {
   }
 }
 
+const snapshotAssembler = new SnapshotAssembler({
+  relayId: RELAY_ID,
+  delayMs: 2500,
+  onSnapshot: async payload => {
+    state.snapshotCount += 1;
+    state.pendingSnapshots = snapshotAssembler.pendingCount;
+    state.lastEventType = 'round_snapshot';
+    console.log('[sg-marker]', JSON.stringify({ event: payload.event, eventId: payload.eventId, supported: true }));
+    await postToHub(payload);
+    state.pendingSnapshots = snapshotAssembler.pendingCount;
+  }
+});
+
 async function handleMarker(raw) {
   if (typeof raw !== 'string') return;
   const marker = sanitizeMarker(raw);
@@ -101,8 +119,17 @@ async function handleMarker(raw) {
 
   const parsed = parseMarker(marker, RELAY_ID);
   if (!parsed) return;
-  state.lastEventType = parsed.type || parsed.event || null;
 
+  if (parsed.fragment) {
+    state.snapshotFragmentCount += 1;
+    state.lastEventType = parsed.fragmentType;
+    const accepted = snapshotAssembler.accept(parsed);
+    state.pendingSnapshots = snapshotAssembler.pendingCount;
+    console.log('[sg-marker]', JSON.stringify({ fragment: parsed.fragmentType, accepted }));
+    return;
+  }
+
+  state.lastEventType = parsed.type || parsed.event || null;
   if (parsed.unsupported) {
     state.unsupportedMarkerCount += 1;
     console.log('[sg-marker]', JSON.stringify({ type: parsed.type, supported: false }));
@@ -222,6 +249,21 @@ async function watchOneGeneration(context) {
   }
 }
 
+function startHeartbeat() {
+  const send = () => postToHub({
+    event: 'relay_heartbeat',
+    relayId: RELAY_ID,
+    timestamp: Date.now(),
+    meta: {
+      version: 'persistent-relay-v1.1-snapshot',
+      status: state.status,
+      page: state.pageUrl
+    }
+  });
+  send();
+  return setInterval(send, HEARTBEAT_INTERVAL_MS);
+}
+
 async function main() {
   fs.mkdirSync(USER_DATA_DIR, { recursive: true });
   const launchOptions = {
@@ -241,8 +283,10 @@ async function main() {
   const context = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
   state.browserStarted = true;
   setStatus('CONNECTING', { forwardingEnabled: state.forwardingEnabled });
+  const heartbeatTimer = startHeartbeat();
 
   context.on('close', () => {
+    clearInterval(heartbeatTimer);
     state.browserStarted = false;
     setStatus('STOPPED', { lastError: 'Browser context closed.' });
   });
@@ -255,8 +299,6 @@ async function main() {
     }
     if (!state.browserStarted) break;
     if (state.status === 'NEEDS_VERIFICATION') {
-      // Keep the same browser and persistent profile open. A human may complete
-      // Bloxd's normal verification remotely; no challenge is solved automatically.
       const page = context.pages()[0];
       while (state.status === 'NEEDS_VERIFICATION' && page && !page.isClosed()) {
         await installMarkerObserver(page);
@@ -285,7 +327,7 @@ app.get('/ready', (_req, res) => {
   res.status(state.status === 'ONLINE' ? 200 : 503).json({ ready: state.status === 'ONLINE', status: state.status });
 });
 app.get('/', (_req, res) => {
-  res.type('text/plain').send(`Bloxd SG Relay\nstatus=${state.status}\nmarkers=${state.markerCount}\nforwarding=${state.forwardingEnabled}\n`);
+  res.type('text/plain').send(`Bloxd SG Relay\nstatus=${state.status}\nmarkers=${state.markerCount}\nsnapshots=${state.snapshotCount}\nforwarding=${state.forwardingEnabled}\n`);
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`[relay-http] listening on ${PORT}`));
