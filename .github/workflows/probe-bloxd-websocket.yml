@@ -15,10 +15,10 @@ jobs:
           npm install playwright@1.55.0 ws@8.18.3 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Discover, reserve and diagnose WebSocket
+      - name: Probe nearby Bloxd client versions
         shell: bash
         run: |
-          cat > websocket-probe.js <<'JS'
+          cat > websocket-version-probe.js <<'JS'
           const crypto = require('crypto');
           const WebSocket = require('ws');
           const { chromium } = require('playwright');
@@ -26,46 +26,22 @@ jobs:
           const ROOM_NAME = 'classic_playerSchematic';
           const WORLD_ID = 'HT_Y95VcEQaUBLbTc24H7';
           const LANGUAGES = ['de-DE', 'de', 'en-US', 'en', 'en-Gb'];
+          const VERSIONS = [803, 804, 805, 806];
 
           function allowedHost(host) {
             return /^(?:gs-)?[a-z0-9.-]+\.bloxd\.io(?::\d+)?$/i.test(host || '');
           }
 
-          function decodeMsgpackNumber(buf, offset) {
-            if (offset >= buf.length) return null;
-            const b = buf[offset++];
-            if (b <= 0x7f) return { value: b, offset };
-            if (b >= 0xe0) return { value: b - 256, offset };
-            if (b === 0xcc && offset + 1 <= buf.length) return { value: buf.readUInt8(offset), offset: offset + 1 };
-            if (b === 0xcd && offset + 2 <= buf.length) return { value: buf.readUInt16BE(offset), offset: offset + 2 };
-            if (b === 0xce && offset + 4 <= buf.length) return { value: buf.readUInt32BE(offset), offset: offset + 4 };
-            if (b === 0xd0 && offset + 1 <= buf.length) return { value: buf.readInt8(offset), offset: offset + 1 };
-            if (b === 0xd1 && offset + 2 <= buf.length) return { value: buf.readInt16BE(offset), offset: offset + 2 };
-            if (b === 0xd2 && offset + 4 <= buf.length) return { value: buf.readInt32BE(offset), offset: offset + 4 };
-            return null;
-          }
-
-          function decodeMsgpackString(buf, offset) {
-            if (offset >= buf.length) return null;
-            const b = buf[offset++];
-            let len = null;
-            if ((b & 0xe0) === 0xa0) len = b & 0x1f;
-            else if (b === 0xd9 && offset + 1 <= buf.length) { len = buf.readUInt8(offset); offset += 1; }
-            else if (b === 0xda && offset + 2 <= buf.length) { len = buf.readUInt16BE(offset); offset += 2; }
-            if (len == null || offset + len > buf.length) return null;
-            return { value: buf.subarray(offset, offset + len).toString('utf8'), offset: offset + len };
-          }
-
           function decodeColyseusError(buf) {
             if (!buf || buf.length < 2 || buf[0] !== 11) return null;
-            const number = decodeMsgpackNumber(buf, 1);
-            if (!number) return { protocol: 11, errorCode: null, message: null };
-            const str = decodeMsgpackString(buf, number.offset);
-            return {
-              protocol: 11,
-              errorCode: number.value,
-              message: str ? str.value : null
-            };
+            let offset = 1;
+            const prefix = buf[offset++];
+            let code = null;
+            if (prefix < 0x80) code = prefix;
+            else if (prefix === 0xcc && offset + 1 <= buf.length) code = buf.readUInt8(offset);
+            else if (prefix === 0xcd && offset + 2 <= buf.length) code = buf.readUInt16LE(offset);
+            else if (prefix === 0xce && offset + 4 <= buf.length) code = buf.readUInt32LE(offset);
+            return { protocol: 11, errorCode: code };
           }
 
           async function discoverFreshHost() {
@@ -94,7 +70,7 @@ jobs:
             return { ...discovery, ua };
           }
 
-          async function reserveSeat(host, lobbyName, ua) {
+          async function reserveSeat(host, lobbyName, ua, clientVersion) {
             const versionMatch = String(ua).match(/Chrome\/([0-9.]+)/i);
             const chromeVersion = versionMatch ? versionMatch[1] : '140.0.0.0';
             const fullLobbyName = `${WORLD_ID}|default|${lobbyName || '1'}`;
@@ -102,8 +78,12 @@ jobs:
               cookies: { origin: 'classic' },
               isMobile: false,
               browserInfo: {
-                deviceType: 'mouseOnly', name: 'Chrome', platform: 'Linux x86_64',
-                platformType: 'desktop', ua, version: chromeVersion
+                deviceType: 'mouseOnly',
+                name: 'Chrome',
+                platform: 'Linux x86_64',
+                platformType: 'desktop',
+                ua,
+                version: chromeVersion
               },
               generalCookies: { joinDiscord: false, newGo: 'c' },
               isLoggedIn: false,
@@ -112,7 +92,7 @@ jobs:
               playSessionId: crypto.randomBytes(10).toString('base64url'),
               siteUsed: 'bloxd',
               subsiteUsed: 'bloxd',
-              version: 803
+              version: clientVersion
             };
 
             const response = await fetch(`https://${host}/matchmake/joinOrCreate/${ROOM_NAME}`, {
@@ -128,83 +108,74 @@ jobs:
               body: JSON.stringify(payload)
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data = null;
+            try { data = JSON.parse(text); } catch (_) {}
             const room = data && data.room;
             if (!response.ok || !room || !room.roomId || !room.processId || !data.sessionId) {
-              throw new Error(`Seat reservation failed: HTTP ${response.status}`);
+              return {
+                ok: false,
+                status: response.status,
+                code: data && data.code != null ? data.code : null,
+                error: data && (data.error || data.message) || null
+              };
             }
+
             return {
+              ok: true,
               roomId: room.roomId,
               processId: room.processId,
               sessionId: data.sessionId,
-              publicAddress: typeof room.publicAddress === 'string' ? room.publicAddress.trim() : '',
-              roomName: room.name || ROOM_NAME,
-              lobbyName: room.lobbyName || fullLobbyName
+              publicAddress: typeof room.publicAddress === 'string' ? room.publicAddress.trim() : ''
             };
           }
 
-          function openSocket(discoveryHost, reservation, ua) {
-            return new Promise((resolve, reject) => {
-              const requestedHost = reservation.publicAddress || discoveryHost;
-              if (!allowedHost(requestedHost)) throw new Error('Reservation returned non-Bloxd publicAddress');
-              const endpoint = `wss://${requestedHost}/${encodeURIComponent(reservation.processId)}/${encodeURIComponent(reservation.roomId)}?sessionId=${encodeURIComponent(reservation.sessionId)}`;
-              const summary = {
-                opened: false, messages: 0, binaryMessages: 0, textMessages: 0,
-                totalBytes: 0, firstMessageBytes: null, firstByte: null,
-                firstFrameHex: null, protocolError: null,
-                usedPublicAddress: !!reservation.publicAddress,
-                closeCode: null, closeReasonLength: null, error: null
+          function consumeReservation(discoveryHost, reservation, ua) {
+            return new Promise((resolve) => {
+              const host = reservation.publicAddress || discoveryHost;
+              const endpoint = `wss://${host}/${encodeURIComponent(reservation.processId)}/${encodeURIComponent(reservation.roomId)}?sessionId=${encodeURIComponent(reservation.sessionId)}`;
+              const result = {
+                opened: false,
+                firstByte: null,
+                firstFrameHex: null,
+                errorCode: null,
+                closeCode: null,
+                socketError: null
+              };
+              let settled = false;
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                try { ws.close(); } catch (_) {}
+                resolve(result);
               };
 
               const ws = new WebSocket(endpoint, {
                 origin: 'https://bloxd.io',
-                headers: { 'User-Agent': ua, 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' },
-                handshakeTimeout: 15000
+                headers: { 'User-Agent': ua },
+                handshakeTimeout: 10000
               });
 
-              const timeout = setTimeout(() => {
-                try { ws.close(1000, 'probe complete'); } catch (_) {}
-                resolve(summary);
-              }, 10000);
-
-              ws.on('open', () => {
-                summary.opened = true;
-                console.log('WEBSOCKET_OPEN=true');
-              });
-
-              ws.on('message', (data, isBinary) => {
+              const timer = setTimeout(finish, 7000);
+              ws.on('open', () => { result.opened = true; });
+              ws.on('message', data => {
                 const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-                summary.messages++;
-                if (isBinary) summary.binaryMessages++; else summary.textMessages++;
-                summary.totalBytes += buf.length;
-                if (summary.firstMessageBytes == null) {
-                  summary.firstMessageBytes = buf.length;
-                  summary.firstByte = buf.length ? buf[0] : null;
-                  summary.firstFrameHex = buf.subarray(0, 64).toString('hex');
-                  summary.protocolError = decodeColyseusError(buf);
-                }
-                if (summary.messages >= 5) {
-                  clearTimeout(timeout);
-                  try { ws.close(1000, 'probe complete'); } catch (_) {}
-                  setTimeout(() => resolve(summary), 300);
-                }
+                result.firstByte = buf.length ? buf[0] : null;
+                result.firstFrameHex = buf.subarray(0, 32).toString('hex');
+                const decoded = decodeColyseusError(buf);
+                result.errorCode = decoded && decoded.errorCode;
+                clearTimeout(timer);
+                setTimeout(finish, 100);
               });
-
-              ws.on('close', (code, reason) => {
-                summary.closeCode = code;
-                summary.closeReasonLength = reason ? reason.length : 0;
-                if (summary.opened) {
-                  clearTimeout(timeout);
-                  resolve(summary);
-                }
+              ws.on('close', code => {
+                result.closeCode = code;
+                clearTimeout(timer);
+                finish();
               });
-
               ws.on('error', err => {
-                summary.error = String(err && err.message || err);
-                if (!summary.opened) {
-                  clearTimeout(timeout);
-                  reject(new Error(summary.error));
-                }
+                result.socketError = String(err && err.message || err);
+                clearTimeout(timer);
+                finish();
               });
             });
           }
@@ -213,21 +184,45 @@ jobs:
             const discovery = await discoverFreshHost();
             console.log('freshHostDiscovered=', true);
 
-            const reservation = await reserveSeat(discovery.host, discovery.lobbyName, discovery.ua);
-            console.log('reservationOk=', true);
-            console.log('publicAddressPresent=', !!reservation.publicAddress);
-            console.log('publicAddressAllowed=', reservation.publicAddress ? allowedHost(reservation.publicAddress) : null);
+            let winningVersion = null;
+            const results = [];
 
-            const socket = await openSocket(discovery.host, reservation, discovery.ua);
-            console.log('websocketSummary=', JSON.stringify(socket));
+            for (const version of VERSIONS) {
+              const reservation = await reserveSeat(discovery.host, discovery.lobbyName, discovery.ua, version);
+              if (!reservation.ok) {
+                const row = { version, reservationOk: false, httpStatus: reservation.status, code: reservation.code };
+                results.push(row);
+                console.log('versionProbe=', JSON.stringify(row));
+                continue;
+              }
 
-            const joined = socket.opened && socket.messages > 0 && socket.firstByte === 10;
-            console.log('BLOXD_COLYSEUS_JOIN_FRAME=', joined);
-            if (!socket.opened || !socket.messages) process.exit(4);
+              const socket = await consumeReservation(discovery.host, reservation, discovery.ua);
+              const row = {
+                version,
+                reservationOk: true,
+                socketOpened: socket.opened,
+                firstByte: socket.firstByte,
+                errorCode: socket.errorCode,
+                closeCode: socket.closeCode,
+                firstFrameHex: socket.firstFrameHex
+              };
+              results.push(row);
+              console.log('versionProbe=', JSON.stringify(row));
+
+              if (socket.firstByte === 10) {
+                winningVersion = version;
+                break;
+              }
+            }
+
+            console.log('versionProbeSummary=', JSON.stringify(results));
+            console.log('BLOXD_CURRENT_CLIENT_VERSION=', winningVersion);
+
+            if (!winningVersion) process.exit(5);
           })().catch(err => {
             console.error('probeFatal=', String(err && err.stack || err));
             process.exit(9);
           });
           JS
 
-          node websocket-probe.js
+          node websocket-version-probe.js
