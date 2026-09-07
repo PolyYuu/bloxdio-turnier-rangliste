@@ -15,27 +15,17 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Resolve version through public source maps
+      - name: Read public Webpack module 44
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
           const { chromium } = require('playwright');
-
-          function safe(text) {
-            return String(text || '').replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
-          }
 
           (async () => {
             const worldId = 'HT_Y95VcEQaUBLbTc24H7';
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext({ locale: 'de-DE' });
             const page = await context.newPage();
-            let chunk8Url = null;
-
-            page.on('response', response => {
-              const url = response.url();
-              if (/s5187c\.8\.[^.]+\.chunk\.js(?:\?|$)/.test(url)) chunk8Url = url;
-            });
 
             await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, {
               waitUntil: 'domcontentloaded',
@@ -43,76 +33,82 @@ jobs:
             });
             await page.waitForTimeout(10000);
 
-            console.log('chunk8Found=', !!chunk8Url);
-            if (!chunk8Url) {
-              await browser.close();
-              process.exit(3);
-              return;
-            }
+            const result = await page.evaluate(() => {
+              const chunkGlobals = Object.keys(window).filter(k => /^webpackChunk/.test(k));
+              const out = {
+                chunkGlobals,
+                captured: false,
+                module44Present: false,
+                exportKeys: [],
+                primitiveExports: {},
+                module44SourcePrefix: null,
+                error: null
+              };
 
-            const mapUrl = chunk8Url.replace(/(?:\?.*)?$/, '') + '.map';
-            const mapResponse = await context.request.get(mapUrl, { timeout: 30000 });
-            console.log('sourceMapStatus=', mapResponse.status());
-            if (!mapResponse.ok()) {
-              await browser.close();
-              process.exit(4);
-              return;
-            }
-
-            const map = await mapResponse.json();
-            const sources = Array.isArray(map.sources) ? map.sources : [];
-            const contents = Array.isArray(map.sourcesContent) ? map.sourcesContent : [];
-            console.log('sourceCount=', sources.length);
-            console.log('sourcesContentCount=', contents.length);
-
-            const joinMatches = [];
-            for (let i = 0; i < Math.min(sources.length, contents.length); i++) {
-              const content = contents[i] || '';
-              if (!content) continue;
-              if (/playSessionId/.test(content) && /joinOrCreate/.test(content)) {
-                joinMatches.push({ index: i, source: sources[i], content });
+              if (!chunkGlobals.length) {
+                out.error = 'No webpackChunk global found';
+                return out;
               }
-            }
 
-            console.log('joinSourceCount=', joinMatches.length);
-            for (const item of joinMatches.slice(0, 5)) {
-              const pos = item.content.indexOf('joinOrCreate');
-              console.log('JOIN_SOURCE_START');
-              console.log('source=', item.source);
-              console.log('context=', safe(item.content.slice(Math.max(0, pos - 5000), Math.min(item.content.length, pos + 3000))));
-              console.log('JOIN_SOURCE_END');
-            }
-
-            // Search all original source files for likely client-version definitions/imports.
-            const versionHits = [];
-            for (let i = 0; i < Math.min(sources.length, contents.length); i++) {
-              const content = contents[i] || '';
-              if (!content) continue;
-              const lines = content.split(/\r?\n/);
-              for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-                const line = lines[lineNo];
-                if (!/version|clientVersion|buildVersion|CURRENT_VERSION|GAME_VERSION/i.test(line)) continue;
-                if (!/\b(?:7\d\d|8\d\d|9\d\d)\b/.test(line) && !/import|export|const|let|var/.test(line)) continue;
-                versionHits.push({ source: sources[i], line: lineNo + 1, text: safe(line.slice(0, 700)) });
-                if (versionHits.length >= 80) break;
+              let req = null;
+              for (const key of chunkGlobals) {
+                try {
+                  const arr = window[key];
+                  if (!Array.isArray(arr) || typeof arr.push !== 'function') continue;
+                  const syntheticId = 900000 + Math.floor(Math.random() * 90000);
+                  arr.push([[syntheticId], {}, r => { req = r; }]);
+                  if (req) break;
+                } catch (_) {}
               }
-              if (versionHits.length >= 80) break;
-            }
-            console.log('versionHits=', JSON.stringify(versionHits));
 
-            // Find exact 803 occurrences in original sources, if any.
-            const exact803 = [];
-            for (let i = 0; i < Math.min(sources.length, contents.length); i++) {
-              const content = contents[i] || '';
-              let pos = content.indexOf('803');
-              if (pos === -1) continue;
-              exact803.push({ source: sources[i], context: safe(content.slice(Math.max(0, pos - 700), Math.min(content.length, pos + 700))) });
-              if (exact803.length >= 20) break;
+              if (!req) {
+                out.error = 'Could not capture webpack require';
+                return out;
+              }
+
+              out.captured = true;
+              out.module44Present = !!(req.m && req.m[44]);
+              if (req.m && req.m[44]) {
+                try {
+                  out.module44SourcePrefix = String(req.m[44]).slice(0, 2000);
+                } catch (_) {}
+              }
+
+              try {
+                const mod = req(44);
+                if (mod && (typeof mod === 'object' || typeof mod === 'function')) {
+                  out.exportKeys = Object.keys(mod).slice(0, 50);
+                  for (const key of out.exportKeys) {
+                    try {
+                      const value = mod[key];
+                      if (
+                        typeof value === 'string' ||
+                        typeof value === 'number' ||
+                        typeof value === 'boolean' ||
+                        value === null
+                      ) {
+                        out.primitiveExports[key] = value;
+                      }
+                    } catch (_) {}
+                  }
+                }
+              } catch (err) {
+                out.error = `require(44): ${String(err && err.message || err)}`;
+              }
+
+              return out;
+            });
+
+            // Module 44 is public client code. Log only short source prefix and primitive exports.
+            if (result.module44SourcePrefix) {
+              result.module44SourcePrefix = result.module44SourcePrefix
+                .replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
             }
-            console.log('exact803Hits=', JSON.stringify(exact803));
+            console.log('webpackRuntimeResult=', JSON.stringify(result));
+            console.log('CLIENT_VERSION_EXPORT_D=', Object.prototype.hasOwnProperty.call(result.primitiveExports || {}, 'd') ? result.primitiveExports.d : null);
 
             await browser.close();
-            if (!joinMatches.length) process.exit(5);
+            if (!result.captured || !result.module44Present) process.exit(4);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
