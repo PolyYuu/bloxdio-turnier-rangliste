@@ -15,7 +15,7 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Resolve version export from chunk 44
+      - name: Resolve version through public source maps
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
@@ -30,76 +30,89 @@ jobs:
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext({ locale: 'de-DE' });
             const page = await context.newPage();
-            const scripts = [];
+            let chunk8Url = null;
 
-            page.on('response', async response => {
-              const req = response.request();
+            page.on('response', response => {
               const url = response.url();
-              if (req.resourceType() !== 'script' && !/\.js(?:\?|$)/i.test(url)) return;
-              let text = '';
-              try { text = await response.text(); } catch (_) { return; }
-              if (text) scripts.push({ url, text });
+              if (/s5187c\.8\.[^.]+\.chunk\.js(?:\?|$)/.test(url)) chunk8Url = url;
             });
 
             await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, {
               waitUntil: 'domcontentloaded',
               timeout: 90000
             });
-            await page.waitForTimeout(12000);
+            await page.waitForTimeout(10000);
 
-            const chunk44 = scripts.find(s => /s5187c\.44\.[^.]+\.chunk\.js(?:\?|$)/.test(s.url));
-            console.log('chunk44Found=', !!chunk44);
-            if (!chunk44) {
-              console.log('loaded44Like=', JSON.stringify(scripts.map(s => s.url.split('/').pop()).filter(n => /\.44\./.test(n))));
+            console.log('chunk8Found=', !!chunk8Url);
+            if (!chunk8Url) {
               await browser.close();
               process.exit(3);
               return;
             }
 
-            console.log('chunk44File=', chunk44.url.split('/').pop());
-            console.log('chunk44Length=', chunk44.text.length);
-
-            const text = chunk44.text;
-            const exportHits = [];
-            const re = /\.d\(([^,]{1,80}),\{([^}]{1,1200})\}\)/g;
-            let m;
-            while ((m = re.exec(text)) !== null) {
-              if (!/(?:^|,)d\s*:/.test(m[2])) continue;
-              exportHits.push({
-                index: m.index,
-                target: m[1],
-                exports: m[2],
-                context: safe(text.slice(Math.max(0, m.index - 1200), Math.min(text.length, m.index + 2600)))
-              });
-              if (exportHits.length >= 20) break;
+            const mapUrl = chunk8Url.replace(/(?:\?.*)?$/, '') + '.map';
+            const mapResponse = await context.request.get(mapUrl, { timeout: 30000 });
+            console.log('sourceMapStatus=', mapResponse.status());
+            if (!mapResponse.ok()) {
+              await browser.close();
+              process.exit(4);
+              return;
             }
 
-            console.log('dExportHitCount=', exportHits.length);
-            for (const hit of exportHits) {
-              console.log('D_EXPORT_HIT_START');
-              console.log('target=', hit.target);
-              console.log('exports=', safe(hit.exports));
-              console.log('context=', hit.context);
-              console.log('D_EXPORT_HIT_END');
-            }
+            const map = await mapResponse.json();
+            const sources = Array.isArray(map.sources) ? map.sources : [];
+            const contents = Array.isArray(map.sourcesContent) ? map.sourcesContent : [];
+            console.log('sourceCount=', sources.length);
+            console.log('sourcesContentCount=', contents.length);
 
-            // Generic scan for module wrappers near simple version/build constants.
-            const numberHits = [];
-            const numRe = /\b(?:7\d\d|8\d\d|9\d\d)\b/g;
-            while ((m = numRe.exec(text)) !== null) {
-              const ctx = safe(text.slice(Math.max(0, m.index - 500), Math.min(text.length, m.index + 500)));
-              if (/version|client|build|outdated|refresh|exports|=>/.test(ctx)) {
-                numberHits.push({ value: Number(m[0]), context: ctx });
-                if (numberHits.length >= 30) break;
+            const joinMatches = [];
+            for (let i = 0; i < Math.min(sources.length, contents.length); i++) {
+              const content = contents[i] || '';
+              if (!content) continue;
+              if (/playSessionId/.test(content) && /joinOrCreate/.test(content)) {
+                joinMatches.push({ index: i, source: sources[i], content });
               }
             }
-            console.log('chunk44NumericHints=', JSON.stringify(numberHits));
 
-            // Print only a short beginning/end to reveal Webpack module table shape.
-            console.log('chunk44Head=', safe(text.slice(0, 3000)));
-            console.log('chunk44Tail=', safe(text.slice(-3000)));
+            console.log('joinSourceCount=', joinMatches.length);
+            for (const item of joinMatches.slice(0, 5)) {
+              const pos = item.content.indexOf('joinOrCreate');
+              console.log('JOIN_SOURCE_START');
+              console.log('source=', item.source);
+              console.log('context=', safe(item.content.slice(Math.max(0, pos - 5000), Math.min(item.content.length, pos + 3000))));
+              console.log('JOIN_SOURCE_END');
+            }
+
+            // Search all original source files for likely client-version definitions/imports.
+            const versionHits = [];
+            for (let i = 0; i < Math.min(sources.length, contents.length); i++) {
+              const content = contents[i] || '';
+              if (!content) continue;
+              const lines = content.split(/\r?\n/);
+              for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+                const line = lines[lineNo];
+                if (!/version|clientVersion|buildVersion|CURRENT_VERSION|GAME_VERSION/i.test(line)) continue;
+                if (!/\b(?:7\d\d|8\d\d|9\d\d)\b/.test(line) && !/import|export|const|let|var/.test(line)) continue;
+                versionHits.push({ source: sources[i], line: lineNo + 1, text: safe(line.slice(0, 700)) });
+                if (versionHits.length >= 80) break;
+              }
+              if (versionHits.length >= 80) break;
+            }
+            console.log('versionHits=', JSON.stringify(versionHits));
+
+            // Find exact 803 occurrences in original sources, if any.
+            const exact803 = [];
+            for (let i = 0; i < Math.min(sources.length, contents.length); i++) {
+              const content = contents[i] || '';
+              let pos = content.indexOf('803');
+              if (pos === -1) continue;
+              exact803.push({ source: sources[i], context: safe(content.slice(Math.max(0, pos - 700), Math.min(content.length, pos + 700))) });
+              if (exact803.length >= 20) break;
+            }
+            console.log('exact803Hits=', JSON.stringify(exact803));
 
             await browser.close();
+            if (!joinMatches.length) process.exit(5);
           })().catch(err => {
             console.error('inspectFatal=', String(err && err.stack || err));
             process.exit(9);
