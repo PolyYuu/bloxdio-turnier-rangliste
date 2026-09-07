@@ -1,0 +1,36 @@
+name: Test Relay Worker
+on:
+  push:
+    paths:
+      - 'relay-worker/**'
+      - '.github/workflows/test-relay-worker.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: relay-worker/package.json
+
+      - name: Install
+        working-directory: relay-worker
+        run: npm install
+
+      - name: Syntax and parser tests
+        working-directory: relay-worker
+        run: |
+          node --check src/worker.js
+          node --check src/event-parser.js
+          node test/event-parser.test.js
+
+      - name: Build Docker image
+        working-directory: relay-worker
+        run: docker build -t bloxd-sg-relay:test .
