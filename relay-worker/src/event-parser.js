@@ -94,9 +94,57 @@ function parseMarker(marker, relayId = 'persistent-relay') {
     };
   }
 
-  // Snapshot fragments are intentionally not guessed here. They remain observable
-  // as raw machine markers until their exact v1.3 wire format is recovered/tested.
-  return { unsupported: true, type, raw: marker };
+  if (type === 'CANCEL' && parts.length >= 6) {
+    return {
+      ...base(parts, relayId),
+      event: 'round_cancel',
+      eventId: parts[5]
+    };
+  }
+
+  // Exact V1.3 snapshot wire format recovered from the shipped
+  // live_sync-v1.3-snapshot-safe release. These are fragments and are
+  // assembled into one round_snapshot by SnapshotAssembler.
+  if (type === 'SNAPBEGIN' && parts.length >= 8) {
+    return {
+      fragment: true,
+      fragmentType: 'snapshot_begin',
+      matchId: parts[2],
+      syncKey: parts[3],
+      round: Number(parts[4]),
+      eventId: parts[5],
+      map: decodeValue(parts[6]),
+      expectedPlayers: Number(parts[7])
+    };
+  }
+
+  if (type === 'SNAPPLAYER' && parts.length >= 10) {
+    return {
+      fragment: true,
+      fragmentType: 'snapshot_player',
+      matchId: parts[2],
+      player: {
+        playerDbId: parts[3],
+        playerName: decodeValue(parts[4]),
+        teamName: decodeValue(parts[5]),
+        teamColor: decodeValue(parts[6]),
+        kills: Math.max(0, Number(parts[7]) || 0),
+        dm: String(parts[8]) === '1',
+        win: String(parts[9]) === '1'
+      }
+    };
+  }
+
+  if (type === 'SNAPEND' && parts.length >= 4) {
+    return {
+      fragment: true,
+      fragmentType: 'snapshot_end',
+      matchId: parts[2],
+      eventId: parts[3]
+    };
+  }
+
+  return { unsupported: true, type };
 }
 
 module.exports = { parseMarker, shortHash, decodeValue };
