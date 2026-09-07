@@ -1,0 +1,94 @@
+name: Probe Bloxd Headed Join
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-bloxd-headed-join.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Playwright and Xvfb
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          sudo apt-get update -qq >/dev/null 2>&1
+          sudo apt-get install -y xvfb >/dev/null 2>&1
+
+      - name: Run normal headed Chromium join probe
+        shell: bash
+        run: |
+          cat > headed-probe.js <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const worldId = 'HT_Y95VcEQaUBLbTc24H7';
+            const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
+            const browser = await chromium.launch({ headless: false });
+            const context = await browser.newContext({ locale: 'de-DE', viewport: { width: 1280, height: 800 } });
+            const page = await context.newPage();
+
+            let discoveryOk = false;
+            let reservationSeen = false;
+            let wsOpened = 0;
+            let wsFrames = 0;
+            let joinResponseStatus = null;
+            let joinResponseKeys = [];
+            let bodyStates = [];
+
+            page.on('response', async response => {
+              const url = response.url();
+              if (url.includes('/social/bloxd-matchmake')) {
+                try {
+                  const data = await response.json();
+                  discoveryOk = !!(data && data.succeeded === true && data.gameServerHost);
+                } catch (_) {}
+              }
+              if (url.includes('/matchmake/joinOrCreate/')) {
+                joinResponseStatus = response.status();
+                try {
+                  const data = await response.json();
+                  joinResponseKeys = data && typeof data === 'object' ? Object.keys(data) : [];
+                  reservationSeen = !!(data && data.room && data.sessionId);
+                } catch (_) {}
+              }
+            });
+
+            page.on('websocket', ws => {
+              wsOpened++;
+              ws.on('framereceived', () => { wsFrames++; });
+            });
+
+            await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+            for (const delay of [5000, 10000, 20000, 30000]) {
+              await page.waitForTimeout(delay === 5000 ? 5000 : delay - bodyStates.reduce((a,b)=>a+b.delay,0));
+              let text = '';
+              try { text = (await page.locator('body').innerText()).slice(-1200); } catch (_) {}
+              bodyStates.push({ delay, hasLoading: /loading|registering materials|finding lobby|joining lobby/i.test(text), hasInGameHints: /inventory|settings|respawn|crosshair|health/i.test(text) });
+              if (wsOpened > 0 && wsFrames > 0) break;
+            }
+
+            const cookieNames = (await context.cookies()).map(c => c.name).filter((v,i,a)=>a.indexOf(v)===i).sort();
+            console.log('headedSummary=', JSON.stringify({
+              discoveryOk,
+              joinResponseStatus,
+              joinResponseKeys,
+              reservationSeen,
+              wsOpened,
+              wsFrames,
+              cookieNames,
+              bodyStates
+            }));
+
+            await browser.close();
+            if (!discoveryOk) process.exit(3);
+          })().catch(err => {
+            console.error('headedFatal=', String(err && err.stack || err));
+            process.exit(9);
+          });
+          JS
+
+          xvfb-run -a node headed-probe.js
