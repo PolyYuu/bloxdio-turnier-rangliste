@@ -15,15 +15,14 @@ jobs:
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
 
-      - name: Resolve public client version export
+      - name: Resolve version export from chunk 44
         shell: bash
         run: |
           cat > inspect-client.js <<'JS'
           const { chromium } = require('playwright');
 
-          function safeSnippet(text, start, end) {
-            return text.slice(Math.max(0, start), Math.min(text.length, end))
-              .replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
+          function safe(text) {
+            return String(text || '').replace(/[A-Za-z0-9_-]{120,}/g, '[LONG_LITERAL]');
           }
 
           (async () => {
@@ -39,90 +38,66 @@ jobs:
               if (req.resourceType() !== 'script' && !/\.js(?:\?|$)/i.test(url)) return;
               let text = '';
               try { text = await response.text(); } catch (_) { return; }
-              if (!text) return;
-              scripts.push({ url, text });
+              if (text) scripts.push({ url, text });
             });
 
-            const invite = `https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`;
-            await page.goto(invite, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            await page.goto(`https://bloxd.io/play/classic_playerSchematic%7C${worldId}?lobby=1`, {
+              waitUntil: 'domcontentloaded',
+              timeout: 90000
+            });
             await page.waitForTimeout(12000);
 
-            console.log('scriptCount=', scripts.length);
-
-            let joinScript = null;
-            let joinPos = -1;
-            for (const script of scripts) {
-              const pos = script.text.indexOf('version:eQ.d');
-              if (pos !== -1) {
-                joinScript = script;
-                joinPos = pos;
-                break;
-              }
-            }
-
-            if (!joinScript) {
-              console.log('versionExpressionFound=false');
+            const chunk44 = scripts.find(s => /s5187c\.44\.[^.]+\.chunk\.js(?:\?|$)/.test(s.url));
+            console.log('chunk44Found=', !!chunk44);
+            if (!chunk44) {
+              console.log('loaded44Like=', JSON.stringify(scripts.map(s => s.url.split('/').pop()).filter(n => /\.44\./.test(n))));
               await browser.close();
               process.exit(3);
               return;
             }
 
-            console.log('versionExpressionFound=true');
-            console.log('joinScript=', joinScript.url.split('/').pop());
+            console.log('chunk44File=', chunk44.url.split('/').pop());
+            console.log('chunk44Length=', chunk44.text.length);
 
-            const before = joinScript.text.slice(Math.max(0, joinPos - 30000), joinPos);
-            const importMatches = [...before.matchAll(/\beQ=EQ\((\d+)\)/g)];
-            const moduleId = importMatches.length ? importMatches[importMatches.length - 1][1] : null;
-            console.log('versionImportModuleId=', moduleId);
-            console.log('joinContext=', safeSnippet(joinScript.text, joinPos - 1800, joinPos + 500));
-
-            if (moduleId) {
-              const moduleHints = [];
-              const moduleDefPatterns = [
-                new RegExp(`(?:^|[,\\{])${moduleId}:\\(?(?:function)?\\s*\\(`, 'g'),
-                new RegExp(`(?:^|[,\\{])${moduleId}:`, 'g')
-              ];
-
-              for (const script of scripts) {
-                for (const pattern of moduleDefPatterns) {
-                  pattern.lastIndex = 0;
-                  let match;
-                  while ((match = pattern.exec(script.text)) !== null) {
-                    moduleHints.push({
-                      script: script.url.split('/').pop(),
-                      snippet: safeSnippet(script.text, match.index - 300, match.index + 2500)
-                    });
-                    if (moduleHints.length >= 8) break;
-                  }
-                  if (moduleHints.length >= 8) break;
-                }
-                if (moduleHints.length >= 8) break;
-              }
-
-              console.log('moduleHintCount=', moduleHints.length);
-              for (const hint of moduleHints) {
-                console.log('VERSION_MODULE_HINT_START');
-                console.log('script=', hint.script);
-                console.log(hint.snippet);
-                console.log('VERSION_MODULE_HINT_END');
-              }
+            const text = chunk44.text;
+            const exportHits = [];
+            const re = /\.d\(([^,]{1,80}),\{([^}]{1,1200})\}\)/g;
+            let m;
+            while ((m = re.exec(text)) !== null) {
+              if (!/(?:^|,)d\s*:/.test(m[2])) continue;
+              exportHits.push({
+                index: m.index,
+                target: m[1],
+                exports: m[2],
+                context: safe(text.slice(Math.max(0, m.index - 1200), Math.min(text.length, m.index + 2600)))
+              });
+              if (exportHits.length >= 20) break;
             }
 
-            // Also search public code for likely client-version literals only when they sit near version/build exports.
-            const numericHints = [];
-            for (const script of scripts) {
-              const re = /\b(?:7\d\d|8\d\d|9\d\d)\b/g;
-              let m;
-              while ((m = re.exec(script.text)) !== null) {
-                const ctx = safeSnippet(script.text, m.index - 180, m.index + 180);
-                if (/version|build|client|outdated|refresh/i.test(ctx)) {
-                  numericHints.push({ script: script.url.split('/').pop(), value: m[0], context: ctx });
-                  if (numericHints.length >= 20) break;
-                }
-              }
-              if (numericHints.length >= 20) break;
+            console.log('dExportHitCount=', exportHits.length);
+            for (const hit of exportHits) {
+              console.log('D_EXPORT_HIT_START');
+              console.log('target=', hit.target);
+              console.log('exports=', safe(hit.exports));
+              console.log('context=', hit.context);
+              console.log('D_EXPORT_HIT_END');
             }
-            console.log('numericVersionHints=', JSON.stringify(numericHints));
+
+            // Generic scan for module wrappers near simple version/build constants.
+            const numberHits = [];
+            const numRe = /\b(?:7\d\d|8\d\d|9\d\d)\b/g;
+            while ((m = numRe.exec(text)) !== null) {
+              const ctx = safe(text.slice(Math.max(0, m.index - 500), Math.min(text.length, m.index + 500)));
+              if (/version|client|build|outdated|refresh|exports|=>/.test(ctx)) {
+                numberHits.push({ value: Number(m[0]), context: ctx });
+                if (numberHits.length >= 30) break;
+              }
+            }
+            console.log('chunk44NumericHints=', JSON.stringify(numberHits));
+
+            // Print only a short beginning/end to reveal Webpack module table shape.
+            console.log('chunk44Head=', safe(text.slice(0, 3000)));
+            console.log('chunk44Tail=', safe(text.slice(-3000)));
 
             await browser.close();
           })().catch(err => {
