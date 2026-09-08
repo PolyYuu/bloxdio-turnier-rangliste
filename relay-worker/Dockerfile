@@ -21,7 +21,6 @@ COPY start.sh ./start.sh
 RUN chmod +x ./start.sh \
     && mkdir -p /data/chrome-profile /root/.vnc
 
-VOLUME ["/data"]
 EXPOSE 3000 6080
 
 CMD ["./start.sh"]
