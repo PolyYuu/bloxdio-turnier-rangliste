@@ -31,6 +31,12 @@
     statusEl.style.borderColor = ok ? "rgba(67,233,220,.55)" : "rgba(255,125,146,.55)";
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+    })[char]);
+  }
+
   function teamPoints(teamId, throughRound = Infinity) {
     const ids = new Set(players.filter((p) => p.team_id === teamId).map((p) => p.id));
     return events.reduce((sum, event) => {
@@ -63,20 +69,22 @@
   async function loadTournamentData() {
     if (!tournament) await resolveTournament();
 
-    const [tRes, teamRes, playerRes, eventRes, roundRes] = await Promise.all([
+    const [tRes, teamRes, playerRes, roundRes] = await Promise.all([
       db.from("tournaments").select("*").eq("id", tournament.id).single(),
       db.from("teams").select("*").eq("tournament_id", tournament.id).order("created_at"),
       db.from("players").select("*").eq("tournament_id", tournament.id).order("created_at"),
-      db.from("events").select("id,player_id,round,type,points,created_at").in("player_id", players.length ? players.map((p) => p.id) : ["00000000-0000-0000-0000-000000000000"]).order("created_at"),
       db.from("rating_rounds").select("round,finalized_at").eq("tournament_id", tournament.id).order("round", { ascending: false }).limit(1)
     ]);
 
     if (tRes.error) throw tRes.error;
+    if (teamRes.error) throw teamRes.error;
+    if (playerRes.error) throw playerRes.error;
+    if (roundRes.error) throw roundRes.error;
+
     tournament = tRes.data;
     teams = teamRes.data || [];
     players = playerRes.data || [];
 
-    // Players are needed before events can be filtered reliably; load events again with the current player set.
     if (players.length) {
       const eRes = await db.from("events")
         .select("id,player_id,round,type,points,created_at")
@@ -110,6 +118,17 @@
     } catch (_) {}
   }
 
+  async function loadMyRoundResult(round) {
+    if (!myGlobalPlayerId || !tournament) return null;
+    try {
+      const { data, error } = await db.rpc("get_my_competitive_history");
+      if (error || !Array.isArray(data)) return null;
+      return data.find((row) => row.tournament_id === tournament.id && Number(row.round) === Number(round)) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function showRoundOverlay(round) {
     const rows = teams
       .map((team) => ({ team, points: teamPoints(team.id, round) }))
@@ -125,25 +144,30 @@
 
     ratingBlock.hidden = true;
     if (myGlobalPlayerId) {
-      const { data: gp } = await db.from("global_players")
-        .select("rating,placement_games,is_ranked")
-        .eq("id", myGlobalPlayerId)
-        .maybeSingle();
+      const [{ data: gp }, roundResult] = await Promise.all([
+        db.from("global_players")
+          .select("rating,placement_games,is_ranked")
+          .eq("id", myGlobalPlayerId)
+          .maybeSingle(),
+        loadMyRoundResult(round)
+      ]);
+
       if (gp) {
         ratingBlock.hidden = false;
-        ratingValue.textContent = gp.is_ranked
-          ? `${Math.round(Number(gp.rating))} RP`
-          : `${gp.placement_games}/15 · ${Math.round(Number(gp.rating))} hidden RP`;
+        if (!gp.is_ranked) {
+          ratingValue.textContent = `${gp.placement_games}/15 PLACEMENT`;
+        } else if (roundResult && roundResult.rating_after !== null && roundResult.final_delta !== null) {
+          const after = Math.round(Number(roundResult.rating_after));
+          const delta = Math.round(Number(roundResult.final_delta));
+          const before = Math.round(after - delta);
+          ratingValue.textContent = `${before} → ${after} RP · ${delta >= 0 ? "+" : ""}${delta}`;
+        } else {
+          ratingValue.textContent = `${Math.round(Number(gp.rating))} RP`;
+        }
       }
     }
 
     overlay.hidden = false;
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>'"]/g, (char) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
-    })[char]);
   }
 
   function scheduleRefresh() {
@@ -167,8 +191,6 @@
     channel.subscribe((state) => {
       if (state === "SUBSCRIBED") setStatus("HUB LIVE · VERBUNDEN", true);
     });
-
-    // Fallback if Realtime publication for one of the tables is disabled.
     setInterval(scheduleRefresh, 3000);
   }
 
