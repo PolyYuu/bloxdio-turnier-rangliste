@@ -14,7 +14,7 @@
   const message = document.querySelector("#message");
 
   const preset = new URLSearchParams(location.search).get("code");
-  if (preset) codeInput.value = preset.toUpperCase().trim();
+  if (preset) codeInput.value = preset.trim();
 
   function show(text, type = "") {
     message.textContent = text;
@@ -22,19 +22,23 @@
   }
 
   codeInput.addEventListener("input", () => {
-    codeInput.value = codeInput.value.toUpperCase().replace(/\s+/g, "");
+    const value = codeInput.value.replace(/\s+/g, "");
+    codeInput.value = value.startsWith("SGR1.") ? value : value.toUpperCase();
   });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     show("");
 
-    const registrationCode = codeInput.value.trim().toUpperCase();
+    let registrationCode = codeInput.value.trim().replace(/\s+/g, "");
+    if (!registrationCode.startsWith("SGR1.")) registrationCode = registrationCode.toUpperCase();
     const password = passwordInput.value;
     const repeat = repeatInput.value;
 
-    if (!/^SG-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(registrationCode)) {
-      show("Bitte gib einen gültigen Code im Format SG-ABCD-EFGH ein.", "error");
+    const legacyValid = /^SG-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(registrationCode);
+    const signedValid = /^SGR1\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,40}$/.test(registrationCode);
+    if (!legacyValid && !signedValid) {
+      show("Bitte gib den vollständigen Registrierungscode aus Bloxd ein.", "error");
       return;
     }
     if (password.length < 8) {
