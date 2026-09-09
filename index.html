@@ -2510,15 +2510,14 @@ window.HubAPI = (() => {
       live.session=await api.currentSession();
       if(!live.session){live.player=null;live.stats=null;live.isAdmin=false;document.body.classList.remove('ranking-experience-hidden');updateHeader();addRankingPreferenceButton();document.dispatchEvent(new CustomEvent('hub:auth-restored',{detail:{loggedIn:false}}));return;}
       const id=await api.currentPlayerId();
+      let registrationState=null;
       if(!id){
         try{
-          const {data:registrationState}=await api.client.rpc('get_my_registration_status');
-          if(registrationState?.status==='pending'){
-            location.href='pending.html';
-            return;
-          }
-        }catch(_pendingRouteError){}
+          const {data}=await api.client.rpc('get_my_registration_status');
+          registrationState=data||null;
+        }catch(_pendingStateError){}
       }
+      live.registrationState=registrationState;
       live.player=id?await api.getMyProfile():null;
       live.stats=id?await api.getCareerStatsFor(id):null;
       const {data:isAdmin}=await api.client.rpc('is_admin');live.isAdmin=!!isAdmin;
@@ -2526,7 +2525,7 @@ window.HubAPI = (() => {
       if(live.player){ensureDemoPlayer(live.player);cacheAvatar(live.player);state.ownPlayer=live.player.current_name;}
       updateHeader();applyRankingVisibility();await updateRegistrationButton();
       if(live.player && live.player.ranking_experience_enabled===null && !document.getElementById('v3RankingChoice')) openRankingChoice(true);
-      document.dispatchEvent(new CustomEvent('hub:auth-restored',{detail:{loggedIn:!!live.player,player:live.player}}));
+      document.dispatchEvent(new CustomEvent('hub:auth-restored',{detail:{loggedIn:!!live.session,player:live.player,pending:registrationState?.status==='pending',registrationState}}));
     }catch(err){console.error('HUB auth restore failed',err);live.session=null;live.player=null;updateHeader();document.dispatchEvent(new CustomEvent('hub:auth-restored',{detail:{loggedIn:false,error:true}}));}
   }
 
@@ -3602,5 +3601,6 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
 
 </script>
 <!-- HUB V3.5 ONLINE PREVIEW -->
+<script src="pending-hub.js"></script>
 </body>
 </html>
