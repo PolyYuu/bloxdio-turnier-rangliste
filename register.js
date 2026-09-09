@@ -5,6 +5,7 @@
   const SUPABASE_KEY = "sb_publishable_TawTg_9H-hw2TDWFyHH3ow_PTPPfoND";
   const SIGNUP_URL = `${SUPABASE_URL}/functions/v1/hub-signup`;
   const VERIFY_URL = `${SUPABASE_URL}/functions/v1/hub-verify-registration`;
+  const BLOXD_SG_URL = "https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1";
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const $ = (s) => document.querySelector(s);
 
@@ -20,10 +21,19 @@
 
   function showPending(result){
     bloxdForm.classList.add("hidden");webForm.classList.add("hidden");document.querySelector(".tabs").classList.add("hidden");pendingPanel.classList.remove("hidden");
-    pendingText.textContent=result.verification_source==="web_first"
-      ?"Gib den Code jetzt in Bloxd mit /verify DEINCODE ein. Danach kannst du bereits in den HUB wechseln; Stats und Änderungen bleiben bis zur Verifizierung gesperrt."
+    const webFirst=result.verification_source==="web_first";
+    pendingText.textContent=webFirst
+      ?"Gib den Code jetzt in Bloxd mit /verify DEINCODE ein. Du kannst Bloxd direkt über den Button unten öffnen. Danach kannst du bereits in den HUB wechseln; Stats und Änderungen bleiben bis zur Verifizierung gesperrt."
       :"Dein Account ist angelegt. Du kannst bereits in den HUB wechseln; Stats und Änderungen bleiben bis zur Bestätigung deiner permanenten Bloxd-ID gesperrt.";
     if(result.verification_code){pendingCode.textContent=result.verification_code;pendingCodeWrap.classList.remove("hidden");}else pendingCodeWrap.classList.add("hidden");
+
+    let verify=document.querySelector('#pendingOpenVerify');
+    if(webFirst){
+      if(!verify){verify=document.createElement('button');verify.id='pendingOpenVerify';verify.type='button';verify.className='secondary';verify.textContent='ZUM VERIFY';pendingPanel.insertBefore(verify,document.querySelector('#checkStatus'));}
+      verify.hidden=false;
+      verify.onclick=()=>window.open(BLOXD_SG_URL,'_blank','noopener,noreferrer');
+    }else if(verify){verify.hidden=true;}
+
     let go=document.querySelector('#pendingGoHub');
     if(!go){go=document.createElement('button');go.id='pendingGoHub';go.type='button';go.className='secondary';go.textContent='ZUM HUB';pendingPanel.insertBefore(go,document.querySelector('#checkStatus'));go.onclick=()=>location.href='index.html#overview';}
   }
