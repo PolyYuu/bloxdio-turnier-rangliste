@@ -4,85 +4,32 @@
   const SUPABASE_URL = "https://nxzrgbpaxukgjyzwupjp.supabase.co";
   const SUPABASE_KEY = "sb_publishable_TawTg_9H-hw2TDWFyHH3ow_PTPPfoND";
   const SIGNUP_URL = `${SUPABASE_URL}/functions/v1/hub-signup`;
+  const VERIFY_URL = `${SUPABASE_URL}/functions/v1/hub-verify-registration`;
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const $ = (s) => document.querySelector(s);
 
-  const form = document.querySelector("#registerForm");
-  const codeInput = document.querySelector("#registrationCode");
-  const passwordInput = document.querySelector("#password");
-  const repeatInput = document.querySelector("#passwordRepeat");
-  const submitButton = document.querySelector("#submitButton");
-  const message = document.querySelector("#message");
+  const tabBloxd=$("#tabBloxd"), tabWeb=$("#tabWeb"), bloxdForm=$("#bloxdForm"), webForm=$("#webForm");
+  const message=$("#message"), pendingPanel=$("#pendingPanel"), pendingText=$("#pendingText"), pendingCodeWrap=$("#pendingCodeWrap"), pendingCode=$("#pendingCode");
 
-  const preset = new URLSearchParams(location.search).get("code");
-  if (preset) codeInput.value = preset.trim();
+  function show(text,type=""){message.textContent=text;message.className=`message ${type}`.trim();}
+  function cleanShort(v){return String(v||"").toUpperCase().replace(/[\s-]+/g,"");}
+  function setTab(mode){const b=mode==="bloxd";tabBloxd.classList.toggle("active",b);tabWeb.classList.toggle("active",!b);bloxdForm.classList.toggle("hidden",!b);webForm.classList.toggle("hidden",b);show("");}
+  tabBloxd.onclick=()=>setTab("bloxd"); tabWeb.onclick=()=>setTab("web");
 
-  function show(text, type = "") {
-    message.textContent = text;
-    message.className = `message ${type}`.trim();
-  }
+  async function setSession(result){const s=result.session;if(!s?.access_token||!s?.refresh_token)throw new Error("Account erstellt, aber Sitzung konnte nicht gestartet werden.");const {error}=await db.auth.setSession({access_token:s.access_token,refresh_token:s.refresh_token});if(error)throw error;}
 
-  codeInput.addEventListener("input", () => {
-    const value = codeInput.value.replace(/\s+/g, "");
-    codeInput.value = value.startsWith("SGR1.") ? value : value.toUpperCase();
-  });
+  function showPending(result){bloxdForm.classList.add("hidden");webForm.classList.add("hidden");document.querySelector(".tabs").classList.add("hidden");pendingPanel.classList.remove("hidden");pendingText.textContent=result.verification_source==="web_first"?"Gib den Code jetzt in Bloxd mit /verify DEINCODE ein. Falls keine HUB-Bridge online ist, wird die Bestätigung beim nächsten Bridge-Kontakt nachgeholt.":"Dein Account ist angelegt, aber noch nicht mit einer permanenten Bloxd-ID verifiziert. Sobald eine HUB-Bridge die gespeicherte Registrierung abholt, wird dein echter Bloxd-Name automatisch übernommen.";if(result.verification_code){pendingCode.textContent=result.verification_code;pendingCodeWrap.classList.remove("hidden");}else pendingCodeWrap.classList.add("hidden");}
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    show("");
+  async function signup(payload){const r=await fetch(SIGNUP_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY},body:JSON.stringify(payload)});const result=await r.json().catch(()=>({}));if(!r.ok)throw new Error(result.error||"Account konnte nicht erstellt werden.");await setSession(result);if(result.pending){showPending(result);return result;}show(`Profil ${result.username||""} erfolgreich verifiziert.`,"success");setTimeout(()=>location.href="index.html#profile",900);return result;}
 
-    let registrationCode = codeInput.value.trim().replace(/\s+/g, "");
-    if (!registrationCode.startsWith("SGR1.")) registrationCode = registrationCode.toUpperCase();
-    const password = passwordInput.value;
-    const repeat = repeatInput.value;
+  bloxdForm.addEventListener("submit",async(e)=>{e.preventDefault();show("");let code=$("#registrationCode").value.trim().replace(/\s+/g,"");const name=$("#bloxdName").value.trim(),pass=$("#password").value,repeat=$("#passwordRepeat").value;if(!code) return show("Bitte gib deinen Registrierungscode ein.","error");if(pass.length<8)return show("Das Passwort muss mindestens 8 Zeichen lang sein.","error");if(pass!==repeat)return show("Die Passwörter stimmen nicht überein.","error");if(!code.startsWith("SGR1.")){code=cleanShort(code);if(code.length!==8)return show("Der normale Code muss 8 Zeichen lang sein.","error");if(name.length<2)return show("Bitte gib deinen aktuellen Bloxd-Namen ein.","error");}const btn=$("#submitBloxd");btn.disabled=true;try{await signup({registrationCode:code,username:name,password:pass});}catch(err){show(err.message||"Fehler","error");btn.disabled=false;}});
 
-    const legacyValid = /^SG-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(registrationCode);
-    const signedValid = /^SGR1\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,40}$/.test(registrationCode);
-    if (!legacyValid && !signedValid) {
-      show("Bitte gib den vollständigen Registrierungscode aus Bloxd ein.", "error");
-      return;
-    }
-    if (password.length < 8) {
-      show("Das Passwort muss mindestens 8 Zeichen lang sein.", "error");
-      return;
-    }
-    if (password !== repeat) {
-      show("Die beiden Passwörter stimmen nicht überein.", "error");
-      return;
-    }
+  webForm.addEventListener("submit",async(e)=>{e.preventDefault();show("");const name=$("#webBloxdName").value.trim(),pass=$("#webPassword").value,repeat=$("#webPasswordRepeat").value;if(name.length<2)return show("Bitte gib deinen aktuellen Bloxd-Namen ein.","error");if(pass.length<8)return show("Das Passwort muss mindestens 8 Zeichen lang sein.","error");if(pass!==repeat)return show("Die Passwörter stimmen nicht überein.","error");const btn=$("#submitWeb");btn.disabled=true;try{await signup({mode:"web_first",username:name,password:pass});}catch(err){show(err.message||"Fehler","error");btn.disabled=false;}});
 
-    submitButton.disabled = true;
-    submitButton.textContent = "VERKNÜPFE…";
+  async function refreshStatus(){show("Prüfe Status…");const {data,error}=await db.rpc("get_my_registration_status");if(error)return show(error.message,"error");if(data?.status==="verified"){show(`Verifiziert als ${data.current_name||"Bloxd-Spieler"}.`,"success");setTimeout(()=>location.href="index.html#profile",700);return;}if(data?.status==="pending")show("Verifizierung steht noch aus.");else if(data?.status==="rejected")show(data.failure_reason||"Verifizierung wurde abgelehnt.","error");else show(`Status: ${data?.status||"unbekannt"}`);}
+  $("#checkStatus").onclick=refreshStatus;
 
-    try {
-      const response = await fetch(SIGNUP_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_KEY
-        },
-        body: JSON.stringify({ registrationCode, password })
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || "Account konnte nicht verknüpft werden.");
+  $("#instantVerify").onclick=async()=>{show("");const token=$("#instantCode").value.trim();if(!token.startsWith("SGR1."))return show("Bitte füge den vollständigen Sofort-Code aus /instantcode ein.","error");const {data:{session}}=await db.auth.getSession();if(!session?.access_token)return show("Bitte melde dich zuerst an.","error");const r=await fetch(VERIFY_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({instantCode:token})});const result=await r.json().catch(()=>({}));if(!r.ok)return show(result.error||"Sofort-Verifizierung fehlgeschlagen.","error");show(`Verifiziert als ${result.username||"Bloxd-Spieler"}.`,"success");setTimeout(()=>location.href="index.html#profile",800);};
 
-      const session = result.session;
-      if (!session?.access_token || !session?.refresh_token) {
-        throw new Error("Account wurde erstellt, aber die Sitzung konnte nicht gestartet werden.");
-      }
-
-      const { error: sessionError } = await db.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
-      });
-      if (sessionError) throw sessionError;
-
-      show(`Profil ${result.username || ""} erfolgreich übernommen.`, "success");
-      setTimeout(() => { location.href = "index.html#profile"; }, 900);
-    } catch (error) {
-      console.error(error);
-      show(error?.message || "Account konnte nicht verknüpft werden.", "error");
-      submitButton.disabled = false;
-      submitButton.textContent = "ACCOUNT VERKNÜPFEN";
-    }
-  });
+  const preset=new URLSearchParams(location.search).get("code");if(preset)$("#registrationCode").value=preset.trim();
 })();
