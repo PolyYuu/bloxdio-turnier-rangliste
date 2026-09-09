@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "HUB Verify",
+  "short_name": "HUB Verify",
+  "version": "0.1.0",
+  "description": "Connects your Bloxd.io session with the HUB Survival Games verification flow.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://bloxd.io/*",
+    "https://bloxdio-turnier-rangliste.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "HUB Verify",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://bloxdio-turnier-rangliste.vercel.app/*"],
+      "js": ["content/hub-content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://bloxd.io/*"],
+      "js": ["content/bloxd-content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}

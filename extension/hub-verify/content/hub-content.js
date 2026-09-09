@@ -1,0 +1,41 @@
+'use strict';
+const SOURCE_PAGE = 'HUB_WEBSITE';
+const SOURCE_EXTENSION = 'HUB_VERIFY_EXTENSION';
+function sendToPage(type, payload = {}) { window.postMessage({ source: SOURCE_EXTENSION, type, ...payload }, window.location.origin); }
+async function ping() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'HUB_EXTENSION_PING' });
+    document.documentElement.dataset.hubVerifyExtension = response?.ok ? 'installed' : 'error';
+    sendToPage('EXTENSION_READY', { ok: Boolean(response?.ok), version: response?.version || null, state: response?.state || null });
+  } catch (_) { document.documentElement.dataset.hubVerifyExtension = 'error'; }
+}
+window.addEventListener('message', async (event) => {
+  if (event.source !== window || event.origin !== window.location.origin) return;
+  const data = event.data;
+  if (!data || data.source !== SOURCE_PAGE) return;
+  try {
+    if (data.type === 'VERIFY_EXTENSION_PING') {
+      const response = await chrome.runtime.sendMessage({ type: 'HUB_EXTENSION_PING' });
+      sendToPage('EXTENSION_READY', response || { ok: false }); return;
+    }
+    if (data.type === 'VERIFY_EXTENSION_START') {
+      const response = await chrome.runtime.sendMessage({ type: 'HUB_EXTENSION_START', pendingCode: data.pendingCode || '', pairId: data.pairId || '', openBloxd: data.openBloxd !== false });
+      sendToPage('EXTENSION_PAIRING_STARTED', response || { ok: false }); return;
+    }
+    if (data.type === 'VERIFY_EXTENSION_GET_STATE') {
+      const response = await chrome.runtime.sendMessage({ type: 'HUB_EXTENSION_GET_STATE' });
+      sendToPage('EXTENSION_STATE', response || { ok: false }); return;
+    }
+    if (data.type === 'VERIFY_EXTENSION_CLEAR') {
+      const response = await chrome.runtime.sendMessage({ type: 'HUB_EXTENSION_CLEAR' });
+      sendToPage('EXTENSION_STATE', response || { ok: false });
+    }
+  } catch (error) { sendToPage('EXTENSION_ERROR', { error: String(error?.message || error) }); }
+});
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === 'EXTENSION_REGISTRATION_CODE') sendToPage('EXTENSION_REGISTRATION_CODE', { code: message.code, seenAt: message.seenAt });
+  if (message?.type === 'EXTENSION_IDENTITY') sendToPage('EXTENSION_IDENTITY', { identity: message.identity });
+  if (message?.type === 'EXTENSION_DIAGNOSTIC') sendToPage('EXTENSION_DIAGNOSTIC', { diagnostic: message.diagnostic });
+});
+ping();
+document.addEventListener('DOMContentLoaded', ping, { once: true });
