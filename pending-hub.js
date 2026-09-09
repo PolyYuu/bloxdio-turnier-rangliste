@@ -8,15 +8,22 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-  let state = null;
-  let active = false;
+  let state = live.registrationState?.status === 'pending' ? live.registrationState : null;
+  let active = !!state;
+
+  function currentPendingState() {
+    const candidate = state?.status === 'pending' ? state : (live.registrationState?.status === 'pending' ? live.registrationState : null);
+    if (candidate && candidate !== state) state = candidate;
+    return candidate;
+  }
 
   function initials(name) {
     return String(name || '?').replace(/[^A-Za-z0-9]/g, ' ').split(/\s+/).filter(Boolean).map(x => x[0]).join('').slice(0, 2).toUpperCase() || '?';
   }
 
   function pendingName() {
-    return state?.claimed_name || state?.verified_name || 'Account Preview';
+    const s = currentPendingState();
+    return s?.claimed_name || s?.verified_name || 'Account Preview';
   }
 
   function showPage(page) {
@@ -27,7 +34,7 @@
   }
 
   function renderPendingProfile() {
-    if (!state || state.status !== 'pending') return;
+    if (!currentPendingState()) return false;
     showPage('profile');
 
     const name = pendingName();
@@ -62,7 +69,7 @@
         <div class="hub-pending-profile-card">
           <span class="hub-pending-kicker">BLOXD VERIFIZIERUNG</span>
           <h2>Statistiken noch nicht sichtbar</h2>
-          <p>Deine Statistiken, dein Rating und deine bisherigen Turniere werden sichtbar, sobald du verifiziert wurdest. Die automatische Verifizierung über die HUB-Bridge kann einige Stunden dauern.</p>
+          <p>Deine Statistiken, dein Rating und deine bisherigen Turniere werden sichtbar, sobald du verifiziert wurdest. Die automatische Verifizierung über die HUB-Bridge kann einige Stunden bis Tage dauern.</p>
           <button type="button" class="secondary-button" data-hub-pending-status>VERIFIZIERUNGSSTATUS ANSEHEN</button>
         </div>`;
     }
@@ -71,6 +78,7 @@
     $('.history-panel')?.setAttribute('hidden', '');
     $('[data-page="profile"] .recent-updates')?.setAttribute('hidden', '');
     document.querySelector('[data-hub-pending-status]')?.addEventListener('click', () => location.href = 'pending.html');
+    return true;
   }
 
   function renderOverviewPendingCard() {
@@ -127,7 +135,7 @@
   }
 
   function applyUi() {
-    if (!state || state.status !== 'pending') return;
+    if (!currentPendingState()) return;
     active = true;
     live.registrationState = state;
     document.body.classList.add('hub-pending-account');
@@ -149,15 +157,17 @@
       }
       if (data?.status !== 'pending') return;
       state = data;
+      live.registrationState = data;
       applyUi();
     } catch (err) {
       console.warn('Pending HUB state could not be refreshed', err);
     }
   }
 
-  // Capture pending profile navigation BEFORE the old click-dummy profile renderer can run.
+  // Capture PROFILE before the legacy/demo renderer. Use live.registrationState immediately;
+  // do not wait for this script's own network poll.
   document.addEventListener('click', (e) => {
-    if (!state || state.status !== 'pending') return;
+    if (!currentPendingState()) return;
 
     const profileRoute = e.target.closest('[data-route="profile"], [data-hub-pending-profile]');
     if (profileRoute) {
@@ -183,10 +193,22 @@
   }, true);
 
   window.addEventListener('hashchange', () => {
-    if (state?.status === 'pending' && location.hash === '#profile') setTimeout(renderPendingProfile, 0);
+    if (currentPendingState() && location.hash === '#profile') renderPendingProfile();
   });
-  document.addEventListener('hub:auth-restored', () => setTimeout(refresh, 80));
 
-  setTimeout(refresh, 120);
+  document.addEventListener('hub:auth-restored', (e) => {
+    const incoming = e.detail?.registrationState;
+    if (incoming?.status === 'pending') {
+      state = incoming;
+      live.registrationState = incoming;
+      applyUi();
+      return;
+    }
+    setTimeout(refresh, 30);
+  });
+
+  // If restoreAuth completed before this script attached its event listener, consume its state now.
+  if (currentPendingState()) applyUi();
+  setTimeout(refresh, 80);
   setInterval(refresh, 12000);
 })();
