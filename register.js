@@ -22,15 +22,12 @@
     try{
       localStorage.setItem(PENDING_CACHE_KEY,JSON.stringify({
         status:"pending",
-        auth_user_id:result?.session?.user?.id||"",
-        claimed_name:result?.username||result?.claimed_name||"",
-        verified_name:result?.verified_name||"",
+        auth_user_id:result?.user?.id||"",
         source:result?.verification_source||"",
         cached_at:Date.now()
       }));
     }catch(_){}
   }
-
   function clearPendingCache(){try{localStorage.removeItem(PENDING_CACHE_KEY);}catch(_){}}
 
   async function setSession(result){const s=result.session;if(!s?.access_token||!s?.refresh_token)throw new Error("Account erstellt, aber Sitzung konnte nicht gestartet werden.");const {error}=await db.auth.setSession({access_token:s.access_token,refresh_token:s.refresh_token});if(error)throw error;}
@@ -40,8 +37,8 @@
     bloxdForm.classList.add("hidden");webForm.classList.add("hidden");document.querySelector(".tabs").classList.add("hidden");pendingPanel.classList.remove("hidden");
     const webFirst=result.verification_source==="web_first";
     pendingText.textContent=webFirst
-      ?"Gib den 8-Zeichen-Code in der Bloxd.io Lobby ein, um dich zu verifizieren. Anschließend muss dein Account noch manuell durch den Admin bestätigt werden. Das kann einige Zeit dauern."
-      :"Dein Account ist angelegt. Die endgültige Freigabe erfolgt nach der manuellen Admin-Verifizierung. Wenn du nicht warten möchtest, kannst du dich mit /instantcode direkt verifizieren.";
+      ?"Gib den 8-Zeichen-Code jetzt in der Bloxd.io Lobby mit /verify DEINCODE ein. Bis deine echte Bloxd-ID bestätigt wurde, heißt dein HUB-Account nur Pending."
+      :"Dein Account ist angelegt. Bis deine echte Bloxd-ID bestätigt wurde, heißt dein HUB-Account nur Pending. Deine Stats und dein echter Name werden danach automatisch übernommen.";
     if(result.verification_code){pendingCode.textContent=result.verification_code;pendingCodeWrap.classList.remove("hidden");}else pendingCodeWrap.classList.add("hidden");
 
     let verify=document.querySelector('#pendingOpenVerify');
@@ -60,17 +57,58 @@
     await setSession(result);
     if(result.pending){showPending(result);return result;}
     clearPendingCache();
-    show(`Profil ${result.username||""} erfolgreich verifiziert.`,"success");setTimeout(()=>location.href="index.html#profile",900);return result;
+    show(`Profil ${result.username||"Bloxd-Spieler"} erfolgreich verifiziert.`,"success");setTimeout(()=>location.href="index.html#profile",900);return result;
   }
 
-  bloxdForm.addEventListener("submit",async(e)=>{e.preventDefault();show("");let code=$("#registrationCode").value.trim().replace(/\s+/g,"");const name=$("#bloxdName").value.trim(),pass=$("#password").value,repeat=$("#passwordRepeat").value;if(!code) return show("Bitte gib deinen Registrierungscode ein.","error");if(pass.length<8)return show("Das Passwort muss mindestens 8 Zeichen lang sein.","error");if(pass!==repeat)return show("Die Passwörter stimmen nicht überein.","error");if(!code.startsWith("SGR1.")){code=cleanShort(code);if(code.length!==8)return show("Der normale Code muss 8 Zeichen lang sein.","error");if(name.length<2)return show("Bitte gib deinen aktuellen Bloxd-Namen ein.","error");}const btn=$("#submitBloxd");btn.disabled=true;try{await signup({registrationCode:code,username:name,password:pass});}catch(err){show(err.message||"Fehler","error");btn.disabled=false;}});
+  bloxdForm.addEventListener("submit",async(e)=>{
+    e.preventDefault();show("");
+    let code=$("#registrationCode").value.trim().replace(/\s+/g,"");
+    const pass=$("#password").value,repeat=$("#passwordRepeat").value;
+    if(!code)return show("Bitte gib deinen Registrierungscode ein.","error");
+    if(pass.length<8)return show("Das Passwort muss mindestens 8 Zeichen lang sein.","error");
+    if(pass!==repeat)return show("Die Passwörter stimmen nicht überein.","error");
+    if(!code.startsWith("SGR1.")){code=cleanShort(code);if(code.length!==8)return show("Der normale Code muss 8 Zeichen lang sein.","error");}
+    const btn=$("#submitBloxd");btn.disabled=true;
+    try{await signup({registrationCode:code,password:pass});}catch(err){show(err.message||"Fehler","error");btn.disabled=false;}
+  });
 
-  webForm.addEventListener("submit",async(e)=>{e.preventDefault();show("");const name=$("#webBloxdName").value.trim(),pass=$("#webPassword").value,repeat=$("#webPasswordRepeat").value;if(name.length<2)return show("Bitte gib deinen aktuellen Bloxd-Namen ein.","error");if(pass.length<8)return show("Das Passwort muss mindestens 8 Zeichen lang sein.","error");if(pass!==repeat)return show("Die Passwörter stimmen nicht überein.","error");const btn=$("#submitWeb");btn.disabled=true;try{await signup({mode:"web_first",username:name,password:pass});btn.disabled=false;}catch(err){show(err.message||"Fehler","error");btn.disabled=false;}});
+  webForm.addEventListener("submit",async(e)=>{
+    e.preventDefault();show("");
+    const pass=$("#webPassword").value,repeat=$("#webPasswordRepeat").value;
+    if(pass.length<8)return show("Das Passwort muss mindestens 8 Zeichen lang sein.","error");
+    if(pass!==repeat)return show("Die Passwörter stimmen nicht überein.","error");
+    const btn=$("#submitWeb");btn.disabled=true;
+    try{await signup({mode:"web_first",password:pass});btn.disabled=false;}catch(err){show(err.message||"Fehler","error");btn.disabled=false;}
+  });
 
-  async function refreshStatus(){show("Prüfe Status…");const {data,error}=await db.rpc("get_my_registration_status");if(error)return show(error.message,"error");if(data?.status==="verified"){clearPendingCache();show(`Verifiziert als ${data.current_name||"Bloxd-Spieler"}.`,"success");setTimeout(()=>location.href="index.html#profile",700);return;}if(data?.status==="pending")show("Verifizierung steht noch aus. Die endgültige Freigabe erfolgt nach der manuellen Admin-Bestätigung.");else if(data?.status==="rejected")show(data.failure_reason||"Verifizierung wurde abgelehnt.","error");else show(`Status: ${data?.status||"unbekannt"}`);}
+  async function refreshStatus(){
+    show("Prüfe Status…");
+    const {data,error}=await db.rpc("get_my_registration_status");
+    if(error)return show(error.message,"error");
+    if(data?.status==="verified"){
+      clearPendingCache();
+      show(`Verifiziert als ${data.current_name||"Bloxd-Spieler"}.`,"success");
+      setTimeout(()=>location.href="index.html#profile",700);return;
+    }
+    if(data?.status==="pending")show("Verifizierung steht noch aus. Dein Account bleibt bis dahin Pending.");
+    else if(data?.status==="rejected")show(data.failure_reason||"Verifizierung wurde abgelehnt.","error");
+    else show(`Status: ${data?.status||"unbekannt"}`);
+  }
   $("#checkStatus").onclick=refreshStatus;
 
-  $("#instantVerify").onclick=async()=>{show("");const token=$("#instantCode").value.trim().replace(/\s+/g,"");if(!token.startsWith("SGR1."))return show("Bitte füge den vollständigen Sofort-Code aus /instantcode ein.","error");const {data:{session}}=await db.auth.getSession();if(!session?.access_token)return show("Bitte melde dich zuerst an.","error");const r=await fetch(VERIFY_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({instantCode:token})});const result=await r.json().catch(()=>({}));if(!r.ok)return show(result.error||"Sofort-Verifizierung fehlgeschlagen.","error");clearPendingCache();show(`Verifiziert als ${result.username||"Bloxd-Spieler"}.`,"success");setTimeout(()=>location.href="index.html#profile",800);};
+  $("#instantVerify").onclick=async()=>{
+    show("");
+    const token=$("#instantCode").value.trim().replace(/\s+/g,"");
+    if(!token.startsWith("SGR1."))return show("Bitte füge den vollständigen Sofort-Code aus /instantcode ein.","error");
+    const {data:{session}}=await db.auth.getSession();
+    if(!session?.access_token)return show("Bitte melde dich zuerst an.","error");
+    const r=await fetch(VERIFY_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({instantCode:token})});
+    const result=await r.json().catch(()=>({}));
+    if(!r.ok)return show(result.error||"Sofort-Verifizierung fehlgeschlagen.","error");
+    clearPendingCache();
+    show(`Verifiziert als ${result.username||"Bloxd-Spieler"}.`,"success");
+    setTimeout(()=>location.href="index.html#profile",800);
+  };
 
   const preset=new URLSearchParams(location.search).get("code");if(preset)$("#registrationCode").value=preset.trim();
 })();
