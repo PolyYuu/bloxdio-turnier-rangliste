@@ -1,0 +1,377 @@
+
+===== languagePicker @ 197097 =====
+{background:var(--red)!important}.v3-form-chips i.draw{background:#73698a!important}
+  .v3-real-ranking-row .player-with-avatar{display:flex;align-items:center;gap:10px}.v3-real-ranking-row .list-avatar{width:34px;height:34px;border-radius:6px;flex:0 0 34px}.compact-list .v3-real-ranking-row .rank-cell img{width:34px;height:34px}.compact-list .v3-real-ranking-row .trend{text-align:left}
+  .placement-connector.arriving:after{animation:placementLineFill 2.08s cubic-bezier(.2,.7,.2,1) .58s forwards!important}
+  .placement-node.arriving{animation:placementNodeArrive .92s cubic-bezier(.2,1.45,.35,1) 2.58s forwards!important}
+  .placement-node.arriving b{animation:placementCheckAppear .5s ease 2.87s forwards!important}
+  #placementModal.placement-ranked-complete .unranked-badge-wrap{animation:v3PlacementRankReveal 1.2s cubic-bezier(.2,1.1,.3,1) both}
+  #placementModal.placement-ranked-complete .placement-rank-name{color:#fff;text-shadow:0 0 28px rgba(56,240,219,.38)}
+  @keyframes v3PlacementRankReveal{0%{opacity:.15;transform:scale(.72)}65%{opacity:1;transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+  .rank-update-modal.rank-up{animation-duration:2.33s!important;animation-delay:3.67s!important}.rank-update-modal.rank-up .rankup-flare{animation-duration:2.5s!important;animation-delay:3.67s!important}.rank-update-modal.rank-up .update-rank-icon{animation-duration:3s!important;animation-delay:3.42s!important}
+</style>
+
+
+<style id="hub-ranked-followup-fixes">
+  #overviewRankingRows.compact-list .v3-real-ranking-row{grid-template-columns:50px 1.55fr 1fr .8fr .7fr!important}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.placement{text-align:center}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.player-name{min-width:0}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.rank-cell{min-width:0;justify-content:flex-start}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.rating{text-align:left}
+  #overviewRankingRows.compact-list .v3-real-ranking-row>.trend{text-align:left!important;display:block!important}
+  .v3-history-more{display:flex;justify-content:center;padding:14px 0 2px}
+  .v3-history-more-button{min-width:190px}
+  .history-panel .panel-header .mode-tag{pointer-events:none}
+  @media(max-width:760px){
+    #overviewRankingRows.compact-list .v3-real-ranking-row{grid-template-columns:44px minmax(150px,1fr) 120px 70px!important}
+    #overviewRankingRows.compact-list .v3-real-ranking-row>.trend{display:none!important}
+  }
+</style>
+
+
+<style id="hub-offline-catchup-export-fixes">
+  [hidden]{display:none!important}
+  .v3-registration-export{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 4px 14px;color:#8f88a5;font-size:11px}
+  .v3-registration-export button{white-space:nowrap}
+  @media(max-width:700px){.v3-registration-export{align-items:stretch;flex-direction:column}.v3-registration-export button{width:100%}}
+</style>
+
+
+<style id="hub-header-action-order-fix">
+  .header-actions #languagePicker{order:-2}
+  .header-actions #communityButton{order:-1}
+</style>
+
+
+<style id="hub-cup-registration-ux-fixes">
+  .cup-selector{min-width:267px!important;padding:18px 21px!important;border-radius:11px!important}.cup-selector>span{font-size:10px!important}.cup-selector select{margin-top:9px!important;padding:12px!important;font-size:13px!important;border-radius:7px!important}
+  .registered-list-card{padding:24px 0 18px!important}.registered-list-card>.eyebrow,.registered-list-card>h2{margin-left:22px!important;margin-right:22px!important}.registered-list-card .registration-list{padding:12px 18px 0!important}
+  .v3-public-registration-row{display:flex!important;align-items:center!important;gap:14px!important;padding:11px 13px!important}.v3-registration-members{display:flex;align-items:center;gap:10px;flex:1;min-width:0}.v3-registration-player{display:grid!important;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:9px;flex:1;min-width:0;color:#fff!important}.v3-registration-player .cup-list-avatar{width:34px!important;height:34px!important;margin:0!important}.v3-registration-player strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.v3-registration-plus{flex:0 0 20px;text-align:center;color:#8d81a7!important}.v3-registration-check{flex:0 0 18px;color:var(--green);font-style:normal;font-weight:900;text-align:center}
+  .registration-hero .cta-button.registration-cancel{border:1px solid rgba(255,104,126,.55)!important;color:#ffdce3!important;background:linear-gradient(90deg,rgba(117,32,62,.72),rgba(85,28,68,.8))!important}
+</style>
+
+
+<style id="hub-live-language-cup-column-fix">
+  #upcomingCupView .upcoming-grid{align-items:start!important}
+  #upcomingCupView .v3-upcoming-left{display:grid;gap:16px;align-self:start;min-width:0}
+  #upcomingCupView .v3-upcoming-left>.registration-hero,
+  #upcomingCupView .v3-upcoming-left>.rules-card{width:100%;align-self:start}
+  #upcomingCupView .registered-list-card{align-self:start!important;min-width:0}
+  @media(max-width:1080px){#upcomingCupView .v3-upcoming-left{gap:16px}}
+</style>
+
+
+<style id="hub-prelaunch-animation-ux">
+  #placementModal .placement-connector.arriving:after{animation-duration:var(--hub-placement-line-duration,2.08s)!important;animation-delay:var(--hub-placement-line-delay,.58s)!important}
+  #placementModal .placement-node.arriving{animation-duration:var(--hub-placement-node-duration,.92s)!important;animation-delay:var(--hub-placement-node-delay,2.58s)!important}
+  #placementModal .placement-node.arriving b{animation-duration:var(--hub-placement-check-duration,.5s)!important;animation-delay:var(--hub-placement-check-delay,2.87s)!important}
+  #rankUpdateCard.rank-up{animation-duration:var(--hub-rank-pulse-duration,2.33s)!important;animation-delay:var(--hub-rank-pulse-delay,3.67s)!important}
+  #rankUpdateCard.rank-up .rankup-flare{animation-duration:var(--hub-flare-duration,2.5s)!important;animation-delay:var(--hub-flare-delay,3.67s)!important}
+  #rankUpdate
+
+===== languagePicker @ 268668 =====
+jy8/M84Xn4PBGWJSLWazT868+b0d1bDNL8Qtej+ywBQt9xyyz2k1KOWLRGUedE8jGO9JzGpLsaQHqvSWpCHL5W50vSkZAcRIyAs5GQtGs7Moe5dml6e/C5luUmxtJPZ8AAE+0GymdIIFHE8Jx49llimAyFcCRHYEZF99jCtNd43Eswucgz/fTI9Tt8jCisZNBQBy2BRU4hPQFpYYbz6vzmrIGbxIklkMkS/tUF19SzQXyXqbhKJE2sX2tg5EiBKiiUSXgKHs5TuuSJZ1+fq7IOb51J5rNDjZaxX2/By9yAO9e6FJmVIsdaZ/vZHb7zxS6tlml8oEz3xxTudzo3dbvc+Y0xJRFmHxvC7nVvRUCP4Qe+pqo0RMqVVBU5k2qYv7EwM2xcVpT5zliHNv6gdo6tK4RAmlN/ENaNUeJtci8SyHDqmlnxYWgWKXZFyEnPmxH3g2qg1J7rmhgdB5emTJZudczkGmdShI6pPolG42IkrX+dJZyTgi4kvH7mWaxQ4aViaQx8CnSMhQxCgAUmMg2qkfmlsILXdWcZGqG7e14niBPAICzLM4E0QDAo0VAeXqKtw2+IfYIanAJDJMk3tdvu6+fn5VdXeF8pED2mzoij+u9VqXQa2l4NR9nhFHSufxKV6PwrqocuLSCngPAZ15HeuFj+C9FvU6W05Da+xNxkjuKM05wLgo/iMNINrHMQJKWJwA7huNjvMbD+7cNDZYY9Xz2XHV+3BFKKpX6u8kmY7BOm9EpcINtTzo+aseAPWQwnHlbMugm4ckAMLq0OSUIjx/XoGmC1p0lthnst/48RcD/8X7ouPq3ConOGA0c6CdIGTn1eFQ2Due2tZj2Dl51nizKX73e9GYYAbF89WlxewKduOx7r/gpP2OWjSRmnoZrP5T0uLS1/EOyAPfK9q8DD27t27h1555ZWvdLvdXweTYVi9OduFX8t/H2ftW9DQQXqGIgWfHiOXPhLR5AAa6MyoOrdnuHw+AOUr5YLmYfQ5XkBNm9Y1F9Xi1baPoy0iQce0niISRTO1hLIMIoUUXE1ZJwFdSnimBwXspCYSGMiJtcBJFNvPRkFWCFFaVpKGslgKkVgII4NXqHGuJua9wHivIQRE10rwuMp98YKGkuS9LOxJCx6SNaJo8UgtziSYTR0nm03CdNXzDJdoqiamcRwHu3dBQVkiVnmz8dzmzVsOHD16dGG1AmvvlgseVn/z5s0TU1NTDxZlcQ2BDDPrNXQRWjRSSWSkkWCuGajUj/9S1ZQLiZtE4AW3Fmo2AmoHT1oCRCpWU4lIK0IElRI+cErMT2nWkbhoEIGneumnYKkjqmmRQTGJtKJL2qM80MMVVMz/C5MrDVafo8MxyUE5OEVBHpl8lEWKkAbl7qQoYfHeqjZ/UaFG6dVFMjYPjp4PzvDXZkGSnaQ/8A8goxzT9lV0eYUBtlpr0263P7ywsPDoavve76YvBQATExOb8zw/7sI3PUDYyO/VP/Qenvv//3ln+02wBBRKKW42m3/vznh2ITXou+FLAzDjw+MHFlYWvmZMuUZqlcF5TZwz5/rjXpZXYVEZ5xlNbzVNrJ8BLfKTvMc7fWdvjyml0Gg0vrlt+/aPHz58eOlCmObvtgseLnm7PbK/KJb/1Fp7BSog7Ty28/i+glC2ROdhPc4lB96pnKl3sthzpCnlIVADxg7ByR9xBs+VXeL+OHvffPxz7QA5RWmEse+5dI53V7XPDKqjq//cDpDHco6qNgaf473lvM05Pluf248LgPWdCa5qpT1jbsnA23me3zc6OvoZR/F1QWXk/wAzKB3HAiVD/wAAAABJRU5ErkJggg==" alt="HUB Survival Games" width="124" height="61" style="width:124px;height:61px;object-fit:contain;display:block">
+    </a>
+
+    <nav class="primary-nav" aria-label="Main navigation">
+      <a href="#overview" data-route="overview" class="active" data-i18n="nav.overview">Overview</a>
+      <a href="#ranking" data-route="ranking" data-i18n="nav.ranking">Ranking</a>
+      <a href="#cup" data-route="cup" class="cup-priority"><span data-i18n="nav.cup">Cup</span><em data-i18n="nav.live">LIVE</em></a>
+      <a href="#profile" data-route="profile" data-i18n="nav.profile">Profile</a>
+    </nav>
+
+    <div class="header-actions">
+      <button class="community-button" id="communityButton" type="button" aria-label="Friends and Cup invitations" aria-expanded="false">
+        <svg class="community-people-icon" viewBox="0 0 32 24" aria-hidden="true"><circle cx="10" cy="7" r="4"></circle><circle cx="22" cy="7" r="4"></circle><path d="M2.5 22c.7-6 3.2-9 7.5-9s6.8 3 7.5 9"></path><path d="M14.5 22c.7-6 3.2-9 7.5-9s6.8 3 7.5 9"></path></svg>
+        <i class="community-notice-dot" id="communityNoticeDot" hidden></i>
+      </button>
+      <div class="language-picker" id="languagePicker">
+        <button class="language-button" id="languageButton" type="button" aria-haspopup="true" aria-expanded="false"><span id="languageFlag">🇬🇧</span><b id="languageCode">EN</b><i>⌄</i></button>
+        <div class="language-menu" id="languageMenu" hidden>
+          <button type="button" data-lang="en">🇬🇧 <span>English</span></button>
+          <button type="button" data-lang="fr">🇫🇷 <span>Français</span></button>
+          <button type="button" data-lang="de">🇩🇪 <span>Deutsch</span></button>
+        </div>
+      </div>
+      <button class="icon-only admin-launch" id="adminLaunchButton" type="button" data-route="admin" aria-label="Admin panel" hidden>⚙</button>
+      <button class="ghost-button" id="loginDemoButton" type="button" data-i18n="actions.login">Log in</button>
+      <button class="cta-button next-cup-cta" type="button" data-route="cup"><span data-i18n="actions.nextCup">Register for next Cup</span> <span>→</span></button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <!-- OVERVIEW -->
+    <section class="page active" data-page="overview">
+      <section class="hero hero-overview">
+        <div class="hero-copy">
+          <span class="hero-kicker">HUB · Survival Games</span>
+          <h1>Survival Games</h1>
+          <p data-i18n="overview.subtitle">Your Cups. Your rank. Your competitive history.</p>
+        </div>
+        <div class="hero-chip-row">
+          <span class="status-chip"><i></i> <span data-i18n="overview.seasonActive">Season 1 active</span></span>
+          <span class="status-chip muted">24 <span data-i18n="common.players">players</span></span>
+        </div>
+      </section>
+
+      <div class="overview-grid">
+        <section class="panel leaderboard-preview">
+          <header class="panel-header">
+            <div><span class="eyebrow" data-i18n="overview.crossCup">Cross-Cup</span><h2 data-i18n="nav.ranking">Ranking</h2></div>
+            <button class="text-button" type="button" data-route="ranking"><span data-i18n="actions.viewAll">View all</span> →</button>
+          </header>
+          <div class="table-head compact">
+            <span>#</span><span data-i18n="table.player">Player</span><span data-i18n="table.rank">Rank</span><span>Rating</span><span data-i18n="table.trend">Trend</span>
+          </div>
+          <div id="overviewRankingRows" class="ranking-list compact-list"></div>
+        </section>
+
+        <section class="panel my-rank-card">
+          <header class="panel-header tight">
+            <div><span class="eyebrow" data-i18n="overview.yourRank">Your rank</span><h2>Competitive</h2></div>
+            <button class="icon-only" type="button" data-route="profile" aria-label="Open profile">↗</button>
+          </header>
+          <div class="my-rank-main">
+            <div class="rank-halo"><img id="overviewRankIcon" alt="Master rank icon"></div>
+            <div class="rank-copy"><span class="rank-name" id="overviewRankName">Master</span><strong id="overviewRating">1908</strong>
+
+===== languagePicker @ 589415 =====
+und(oldB.high-before))});
+  const factors=document.querySelector('#rankUpdateCard .factor-grid');if(factors)factors.hidden=true;
+  const finish=()=>{
+    clearTimeout(openRankUpdate._switchTimer);clearTimeout(openRankUpdate._finishTimer);card.classList.remove('rank-up');
+    updateMeta(newKey,newB,afterPct);document.querySelector('#newRankName').textContent=rankName(newKey);message.hidden=!rankUp;
+    bar.style.transition='none';bar.style.width=`${afterPct}%`;
+    window.HubAnimationUX.final(modal);
+  };
+  modal.hidden=false;window.HubAnimationUX.begin(modal,finish);
+  if(instant){finish();return;}
+  bar.style.transition='none';bar.style.width=`${beforePct}%`;
+  const firstTarget=rankChanged?(after>before?100:0):afterPct;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.transition=`width ${3.5/speed}s cubic-bezier(.2,.75,.2,1)`;bar.style.width=`${firstTarget}%`;document.querySelector('#updateProgressPct').textContent=`${Math.round(firstTarget)}%`;}));
+  if(rankChanged){
+    openRankUpdate._switchTimer=setTimeout(()=>{
+      icon.src=RANK_ICONS[newKey];document.querySelector('#updateRankName').textContent=rankName(newKey);document.querySelector('#newRankName').textContent=rankName(newKey);message.hidden=!rankUp;
+      bar.style.transition='none';bar.style.width=after>before?'0%':'100%';document.querySelector('#updateLow').textContent=newB.low;document.querySelector('#updateHigh').textContent=newB.high;document.querySelector('#updateProgressTitle').textContent=newB.next?t('overlay.progressTo',{rank:rankName(newB.next)}):rankName(newKey);document.querySelector('#updateRemaining').textContent=t('overlay.left',{n:Math.max(0,Math.round(newB.high-after))});
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{bar.style.transition=`width ${3.5/speed}s cubic-bezier(.2,.75,.2,1)`;bar.style.width=`${afterPct}%`;document.querySelector('#updateProgressPct').textContent=`${Math.round(afterPct)}%`;}));
+    },3850/speed);
+    openRankUpdate._finishTimer=setTimeout(finish,(3850+3500)/speed+80);
+  }else openRankUpdate._finishTimer=setTimeout(finish,3500/speed+80);
+}
+window.simulateRealtimeRatingEvent=(payload={})=>openRankUpdate(payload);
+
+document.addEventListener("click",e=>{
+  const route=e.target.closest("[data-route]");if(route){e.preventDefault();if(route.dataset.route==="profile"){state.profilePlayer=state.ownPlayer;renderProfile();}setPage(route.dataset.route);}
+  const profile=e.target.closest("[data-profile-player]");if(profile){e.stopPropagation();setProfilePlayer(profile.dataset.profilePlayer);}
+  const team=e.target.closest("[data-team-index]");if(team){e.stopPropagation();openTeamDetail(Number(team.dataset.teamIndex));}
+  const close=e.target.closest("[data-close-modal]");if(close)document.getElementById(close.dataset.closeModal).hidden=true;
+  if(e.target.matches(".modal-backdrop"))e.target.hidden=true;
+  if(e.target.closest("[data-open-register]"))document.querySelector("#registerModal").hidden=false;
+  if(!e.target.closest("#languagePicker"))document.querySelector("#languageMenu").hidden=true;
+});
+document.querySelector("#languageButton").addEventListener("click",()=>{const m=document.querySelector("#languageMenu");m.hidden=!m.hidden;document.querySelector("#languageButton").setAttribute("aria-expanded",String(!m.hidden));});
+document.querySelectorAll("[data-lang]").forEach(btn=>btn.addEventListener("click",()=>{applyLanguage(btn.dataset.lang);document.querySelector("#languageMenu").hidden=true;}));
+document.querySelector("#rankingSearch").addEventListener("input",renderFullRanking);document.querySelector("#rankFilter").addEventListener("change",renderFullRanking);
+document.querySelectorAll("[data-cup-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll("[data-cup-tab]").forEach(b=>b.classList.toggle("active",b===btn));document.querySelectorAll(".cup-tab-content").forEach(t=>t.classList.remove("active"));document.querySelector(btn.dataset.cupTab==="teams"?"#cupTeamsTab":btn.dataset.cupTab==="individual"?"#cupIndividualTab":"#cupRoundsTab").classList.add("active");}));
+document.querySelector("#roundPicker").addEventListener("click",e=>{const b=e.target.closest("[data-round]");if(!b)return;document.querySelectorAll("#roundPicker button").forEach(x=>x.classList.toggle("active",x===b));showRound(Number(b.dataset.round));});
+document.querySelector("#cupSelect").addEventListener("change",e=>{const upcoming=e.target.value==="upcoming";document.querySelector("#pastCupView").hidden=upcoming;document.querySelector("#upcomingCupView").hidden=!upcoming;});
+document.querySelector("#showRoundUpdateButton").addEventListener("click",()=>openRankUpdate(false));document.querySelector("#profileRoundUpdateButton").addEventListener("click",()=>openRankUpdate(false));document.querySelector("#rankUpDemoButton").addEventListener("click",()=>openRankUpdate(true));
+document.querySelector("#adminLaunchButton").addEventListener("click",()=>setPage("admin"));document.querySelector("#profileAdminButton").addEventListener("click",()=>setPage("admin"));
+document.querySelectorAll("[data-admin-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll("[data-admin-tab]").forEach(b=>b.classList.toggle("active",b===btn));document.querySelector("#adminParticipantsTab").classList.toggle("active",btn.dataset.adminTab==="participants");document.querySelector("#adminRegistrationsTab").classList.toggle("active",btn.dataset.adminTab==="registrations");}));
+const mateSelect=document.querySelector("#mateSelect"),matePreview=document.querySelector("#matePreview"),mateName=document.querySelector("#mateName"),sendInviteButton=document.querySelector("#sendInviteButton");
+mateSelect.addEventListener("change",()=>{const has=!!mateSelect.value;matePreview.hidden=!has;sendInviteButton.disabled=!has;if(has)mateName.textContent=mateSelect.value;});
+sendInviteButton.addEventListener("click",()=>{document.querySelector("#inviteSuccess").hidden=false;sendInviteButton.textConte
+
+===== data-route @ 213451 =====
+x(0,1fr))!important}.bloxd-processing.processed{color:#62f2ad!important;background:rgba(65,225,169,.08)!important}.bloxd-processing.unbound{color:#ffc65c!important;background:rgba(255,198,92,.08)!important}.bloxd-processing.error{color:#ff7189!important;background:rgba(255,113,137,.08)!important}.bloxd-processing.ignored{color:#a68cff!important;background:rgba(166,140,255,.08)!important}@media(max-width:760px){.v3-live-sync-copy{grid-template-columns:1fr}.v3-live-sync-actions{display:grid}.bloxd-debug-event-meta{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+.v3-live-health{display:grid;gap:10px;margin:14px 0;padding:14px;border:1px solid rgba(126,101,190,.3);border-radius:12px;background:rgba(255,255,255,.02)}.v3-live-health.ready{border-color:rgba(65,225,169,.32);background:rgba(65,225,169,.045)}.v3-live-health.attention{border-color:rgba(255,113,137,.35);background:rgba(255,113,137,.045)}.v3-live-health-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.v3-live-health-head span{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:#8f879f}.v3-live-health-head strong{font-size:11px}.v3-live-health.ready .v3-live-health-head strong{color:#62f2ad}.v3-live-health.attention .v3-live-health-head strong{color:#ff7189}.v3-live-health-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.v3-live-health-grid article{display:grid;gap:3px;padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(126,101,190,.16)}.v3-live-health-grid article span{font-size:8px;font-weight:900;letter-spacing:.08em;color:#80778d}.v3-live-health-grid article b{font-size:11px;color:#d6cfdf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v3-live-health-grid article b.ok{color:#62f2ad}.v3-live-health-grid article b.bad{color:#ff7189}.v3-live-health-grid article small{font-size:8px;color:#756d80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v3-live-health-warning{padding:8px 9px;border-radius:8px;background:rgba(255,113,137,.08);color:#ff9aac;font-size:9px}.v3-auto-finalize-toggle{margin-top:2px;padding:10px 11px;border:1px solid rgba(255,198,92,.22);border-radius:9px;background:rgba(255,198,92,.035)}.v3-auto-finalize-toggle>span{display:grid;gap:3px!important}.v3-auto-finalize-toggle b{color:#ffc65c}.v3-auto-finalize-toggle small{font-weight:500!important;color:#8c8295!important;line-height:1.4}@media(max-width:620px){.v3-live-health-grid{grid-template-columns:1fr}}
+</style>
+
+<style id="hub-no-manual-ingame-rename">
+#renameButton{display:none!important}
+</style>
+</head>
+<body>
+  <div class="wallpaper" aria-hidden="true"></div>
+  <div class="ambient" aria-hidden="true">
+    <i class="ambient-block b1"></i><i class="ambient-block b2"></i><i class="ambient-block b3"></i>
+    <i class="ambient-block b4"></i><i class="ambient-block b5"></i><i class="ambient-block b6"></i>
+  </div>
+
+  <header class="site-header">
+    <a class="brand hub-brand" href="#overview" data-route="overview" aria-label="HUB – Survival Games">
+      <img class="hub-logo" src="data:image/png;base64,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
+
+===== location.hash @ 217 =====
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="hub-live-debug-route-guard">
+(function(){
+  'use strict';
+  const DEBUG_HASH='#live-debug';
+  const SAFE_HASH='#admin';
+  function captureLiveDebugRequest(){
+    if(location.hash!==DEBUG_HASH)return;
+    window.__hubLiveDebugRequested=true;
+    history.replaceState(null,'',location.pathname+location.search+SAFE_HASH);
+    window.dispatchEvent(new CustomEvent('hub:live-debug-requested'));
+  }
+  captureLiveDebugRequest();
+  window.addEventListener('hashchange',captureLiveDebugRequest);
+})();
+</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Survival Games Competitive Hub">
+  <title>HUB – Survival Games</title>
+  <link id="hub-favicon" rel="icon" type="image/png" href="data:image/png;base64,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
+
+===== location.hash @ 581652 =====
+:rankName(bounds.next)}); document.querySelector("#profileRatingRemaining").textContent=t("overlay.left",{n:bounds.high-p.rating}); }
+  else{ document.querySelector("#profileProgressTitle").textContent=rankName("grandmaster"); document.querySelector("#profileRatingRemaining").textContent=`${p.rating} / 3000`; }
+  const statItems=[
+    ["stats.rankedGames",c.rankedGames],["stats.cups",c.cups],["stats.avgPoints",c.avgPoints],["stats.kills",c.kills],["stats.cupWins",c.cupWins],
+    ["stats.roundWins",c.roundWins],["stats.kd",c.kd],["stats.mostCupPoints",c.mostCupPoints],["stats.mostRoundPoints",c.mostRoundPoints]
+  ];
+  document.querySelector("#profileStatGrid").innerHTML=statItems.map(([k,v])=>`<div><span>${t(k)}</span><strong>${v}</strong></div>`).join("");
+}
+function renderOverviewRank(){
+  const p=playerByName("Stalker_Curry"),key=getRankKey(p.rating),b=getBounds(p.rating),progress=pct(p.rating,b);
+  document.querySelector("#overviewRankIcon").src=RANK_ICONS[key]; document.querySelector("#overviewRankName").textContent=rankName(key);document.querySelector("#overviewRating").textContent=p.rating;document.querySelector("#overviewProgressBar").style.width=`${progress}%`;document.querySelector("#overviewProgressLabel").textContent=`${Math.round(progress)}%`;
+  document.querySelector("#overviewProgressText").textContent=t("overlay.progressTo",{rank:rankName(b.next)});document.querySelector("#overviewRatingLeft").textContent=t("overlay.left",{n:b.high-p.rating});
+}
+function renderAdmin(){
+  document.querySelector("#adminRoundPicker").innerHTML=Array.from({length:8},(_,i)=>`<button class="${i===7?"active":""}">${i+1}</button>`).join("");
+  const teamMap={};CUP_TEAMS.forEach((team,i)=>team.players.forEach(n=>teamMap[n]=`#${i+1} · ${team.players.join(" + ")}`));
+  document.querySelector("#adminParticipantRows").innerHTML=PLAYERS.map(p=>`<div class="admin-player-row"><strong>${p.name}</strong><span>${teamMap[p.name]||"—"}</span><b>${cupStats(p.name).points}</b><span>Round 8</span><span><button>${t("misc.edit")}</button> <button>${t("misc.remove")}</button></span></div>`).join("");
+  document.querySelector("#adminRegistrationRows").innerHTML=UPCOMING_REGISTRATIONS.map((x,i)=>`<div class="admin-registration-row"><strong>${x.team.join(" + ")}</strong><span class="${x.status==="confirmed"?"status-confirmed":"status-pending"}">${t(x.status==="confirmed"?"misc.confirmed":"misc.pending")}</span><span>${x.team[0]}</span><span><button>${t("misc.edit")}</button></span></div>`).join("");
+}
+function setProfilePlayer(name){ if(!playerByName(name))return; state.profilePlayer=name; renderProfile(); setPage("profile"); }
+function setPage(page){
+  const valid=["overview","ranking","cup","profile","admin"]; if(!valid.includes(page))page="overview";
+  document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.dataset.page===page));
+  document.querySelectorAll(".primary-nav [data-route]").forEach(a=>a.classList.toggle("active",a.dataset.route===page));
+  if(location.hash!==`#${page}`)history.replaceState(null,"",`#${page}`); window.scrollTo({top:0,behavior:"smooth"});
+}
+function applyLanguage(lang){
+  if(!I18N[lang])lang="en";state.lang=lang;localStorage.setItem("sg-lang",lang);document.documentElement.lang=lang;
+  const [flag,code]=FLAGS[lang];document.querySelector("#languageFlag").textContent=flag;document.querySelector("#languageCode").textContent=code;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{const key=el.dataset.i18n;if(I18N[lang][key])el.textContent=I18N[lang][key]});
+  document.querySelector("#rankingSearch").placeholder=t("ranking.search");
+  renderRankFilter();
+}
+window.HubAnimationUX=window.HubAnimationUX||{
+  current:null,atFinal:true,
+  label(final=false){
+    const lang=(window.state?.lang||document.documentElement.lang||'de');
+    if(final)return lang==='de'?'WEITER':lang==='fr'?'CONTINUER':'CONTINUE';
+    return lang==='de'?'ANIMATION ÜBERSPRINGEN':lang==='fr'?"PASSER L’ANIMATION":'SKIP ANIMATION';
+  },
+  button(modal){return modal?.querySelector('.cta-button[data-close-modal]')||null;},
+  begin(modal,finish){this.current={modal,finish};this.atFinal=false;const b=this.button(modal);if(b)b.textContent=this.label(false);},
+  final(modal){this.atFinal=true;const b=this.button(modal);if(b)b.textContent=this.label(true);},
+  finishNow(){if(this.atFinal)return false;const fn=this.current?.finish;if(typeof fn==='function')fn(true);return true;}
+};
+
+function openRankUpdate(payload={}){
+  const legacy=typeof payload==='boolean';
+  const before=legacy?(payload?1988:1908):Number(payload.before??payload.ratingBefore);
+  const after=legacy?(payload?2015:1935):Number(payload.after??payload.ratingAfter);
+  if(!Number.isFinite(before)||!Number.isFinite(after))return;
+  const speed=Math.max(1,Number(payload.speed)||1),instant=!!payload.instant;
+  const modal=document.querySelector('#roundUpdateModal'),card=document.querySelector('#rankUpdateCard'),icon=document.querySelector('#updateRankIcon'),bar=document.querySelector('#animatedUpdateBar'),message=document.querySelector('#rankUpMessage');
+  if(!modal||!card||!icon||!bar||!message)return;
+  clearTimeout(openRankUpdate._switchTimer);clearTimeout(openRankUpdate._finishTimer);
+  const oldKey=(!legacy&&payload.rankBefore)||getRankKey(before),newKey=(!legacy&&payload.rankAfter)||getRankKey(after);
+  const rankChanged=oldKey!==newKey,rankUp=rankChanged&&after>before,oldB=getBounds(before),newB=getBounds(after),beforePct=pct(before,oldB),afterPct=pct(after,newB),delta=after-before;
+  const updateMeta=(key,bounds,p)=>{
+    icon.src=RANK_ICONS[key];document.querySelector('#updateRankName').textContent=rankName(key);
+    document.querySelector('#updateLow').textContent=bounds.low;document.querySelector('#updateHigh').textContent=bounds.high;
+    document.querySelector('#updateProgressTitle').textContent=bounds.next?t('overlay.progressTo',{rank:rankName(bounds.next)}):rankName(key);
+    document.querySelector('#updateProgressPct').textContent=`$
+
+===== location.hash @ 593257 =====
+ent.querySelectorAll(".cup-tab-content").forEach(t=>t.classList.remove("active"));document.querySelector(btn.dataset.cupTab==="teams"?"#cupTeamsTab":btn.dataset.cupTab==="individual"?"#cupIndividualTab":"#cupRoundsTab").classList.add("active");}));
+document.querySelector("#roundPicker").addEventListener("click",e=>{const b=e.target.closest("[data-round]");if(!b)return;document.querySelectorAll("#roundPicker button").forEach(x=>x.classList.toggle("active",x===b));showRound(Number(b.dataset.round));});
+document.querySelector("#cupSelect").addEventListener("change",e=>{const upcoming=e.target.value==="upcoming";document.querySelector("#pastCupView").hidden=upcoming;document.querySelector("#upcomingCupView").hidden=!upcoming;});
+document.querySelector("#showRoundUpdateButton").addEventListener("click",()=>openRankUpdate(false));document.querySelector("#profileRoundUpdateButton").addEventListener("click",()=>openRankUpdate(false));document.querySelector("#rankUpDemoButton").addEventListener("click",()=>openRankUpdate(true));
+document.querySelector("#adminLaunchButton").addEventListener("click",()=>setPage("admin"));document.querySelector("#profileAdminButton").addEventListener("click",()=>setPage("admin"));
+document.querySelectorAll("[data-admin-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll("[data-admin-tab]").forEach(b=>b.classList.toggle("active",b===btn));document.querySelector("#adminParticipantsTab").classList.toggle("active",btn.dataset.adminTab==="participants");document.querySelector("#adminRegistrationsTab").classList.toggle("active",btn.dataset.adminTab==="registrations");}));
+const mateSelect=document.querySelector("#mateSelect"),matePreview=document.querySelector("#matePreview"),mateName=document.querySelector("#mateName"),sendInviteButton=document.querySelector("#sendInviteButton");
+mateSelect.addEventListener("change",()=>{const has=!!mateSelect.value;matePreview.hidden=!has;sendInviteButton.disabled=!has;if(has)mateName.textContent=mateSelect.value;});
+sendInviteButton.addEventListener("click",()=>{document.querySelector("#inviteSuccess").hidden=false;sendInviteButton.textContent=t("register.sent");sendInviteButton.disabled=true;matePreview.querySelector("small").textContent=t("register.pending");});
+document.querySelector("#renameButton").addEventListener("click",()=>alert(state.lang==="de"?"Klick-Dummy: Hier wird später der Bloxd.io Name geändert.":state.lang==="fr"?"Démo : le nom Bloxd.io pourra être modifié ici.":"Click dummy: the Bloxd.io name will be changed here later."));
+document.querySelector("#loginDemoButton").addEventListener("click",()=>{state.isAdmin=true;document.querySelector("#adminLaunchButton").hidden=false;state.profilePlayer=state.ownPlayer;renderProfile();setPage("profile");});
+
+renderRounds();renderCupTeams();renderCupIndividual();renderRegistrations();renderOverviewRanking();renderFullRanking();renderProfile();renderOverviewRank();renderAdmin();applyLanguage(state.lang);setPage(location.hash.replace("#","")||"overview");
+window.addEventListener("hashchange",()=>setPage(location.hash.replace("#","")||"overview"));
+
+</script>
+<script>
+/* V2.2 click-dummy behavior */
+(() => {
+  const UNRANKED_ICON = "data:image/png;base64,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
+
+===== location.hash @ 710402 =====
+Activer le mode classé ?'))}</h2><p>${copy('Your rating is calculated either way. This setting only decides whether you can see ranks, rating changes, statistics and the cross-Cup ranking.','Dein Rating wird in jedem Fall berechnet. Diese Einstellung entscheidet nur, ob du Ränge, Rating-Änderungen, Statistiken und die Cup-übergreifende Rangliste sehen kannst.','Ton rating est calculé dans tous les cas. Ce réglage contrôle uniquement l’affichage du classement, des rangs et des statistiques.')}</p><div class="v3-choice-actions"><button class="ghost-button wide" id="v3RankingNo">${firstTime?copy('No, hide it','Nein, ausblenden','Non, masquer'):copy('Cancel','Abbrechen','Annuler')}</button><button class="cta-button wide" id="v3RankingYes">${firstTime?copy('Yes, show ranking','Ja, Ranking anzeigen','Oui, afficher'):enabled?copy('Yes, hide ranking','Ja, Ranking ausblenden','Oui, masquer'):copy('Yes, enable ranking','Ja, Ranking aktivieren','Oui, activer')}</button></div></section>`);
+    $('#v3RankingNo',m).onclick=async()=>{
+      if(firstTime){await setRanking(false);m.remove();setPage('cup');} else m.remove();
+    };
+    $('#v3RankingYes',m).onclick=async()=>{await setRanking(firstTime?true:!enabled);m.remove(); if(!live.player.ranking_experience_enabled)setPage('cup');};
+  }
+
+  async function setRanking(enabled) {
+    try { await api.setRankingExperience(enabled); live.player.ranking_experience_enabled=enabled; applyRankingVisibility(); if(enabled) await syncOwnProfileToUi(); toast(enabled?copy('Ranked experience enabled.','Ranglisten-Modus aktiviert.','Mode classé activé.'):copy('Ranked experience hidden. Rating still continues in the background.','Ranglisten-Modus ausgeblendet. Das Rating läuft im Hintergrund weiter.','Mode classé masqué. Le rating continue en arrière-plan.')); }
+    catch(err){toast(err.message||String(err),true);}
+  }
+
+  function addRankingPreferenceButton() {
+    let b=$('#v3RankingPreference');
+    if(!live.session || !live.player){b?.remove();return;}
+    if(!b){b=document.createElement('button');b.id='v3RankingPreference';b.type='button';b.className='ghost-button';$('.profile-actions')?.prepend(b);b.onclick=()=>openRankingChoice(false);}
+    b.textContent=live.player.ranking_experience_enabled===false?copy("I'm interested in ranked mode after all","Ich bin doch am Ranglisten-Modus interessiert","Je veux finalement voir le mode classé"):copy("I don't want to see ranked mode","Ich will den Ranglisten-Modus nicht mehr sehen","Je ne veux plus voir le mode classé");
+  }
+
+  function applyRankingVisibility() {
+    const off=!!live.player && live.player.ranking_experience_enabled===false;
+    document.body.classList.toggle('ranking-experience-hidden',off);
+    const overviewNav=$('.primary-nav [data-route="overview"]'), rankingNav=$('.primary-nav [data-route="ranking"]');
+    if(overviewNav) overviewNav.hidden=off; if(rankingNav) rankingNav.hidden=off;
+    addRankingPreferenceButton();
+    if(off && ['overview','ranking'].includes(location.hash.replace('#',''))) setPage('cup');
+  }
+
+  function syncDemoPlayerName(oldName,newName){
+    try { const p=PLAYERS.find(x=>x.name===oldName); if(p)p.name=newName; } catch(_){}
+    try { if(state){state.ownPlayer=newName;state.profilePlayer=newName;} } catch(_){}
+  }
+
+  function pixelDataUrl(pixels) {
+    const c=document.createElement('canvas');c.width=16;c.height=16;const x=c.getContext('2d');
+    (pixels||[]).forEach((color,i)=>{x.fillStyle=color||'#ffffff';x.fillRect(i%16,Math.floor(i/16),1,1);});
+    return c.toDataURL('image/png');
+  }
+
+  function cacheAvatar(player) {
+    if(!player?.avatar_pixels || !Array.isArray(player.avatar_pixels)) return;
+    try { localStorage.setItem(`sg-hub-avatar-${player.current_name}`,JSON.stringify(player.avatar_pixels)); } catch(_){}
+  }
+
+  function ensureDemoPlayer(player){
+    if(!player) return null;
+    let p=PLAYERS.find(x=>x.name===player.current_name);
+    if(!p){p={name:player.current_name,rating:Number(player.rating||1150),peak:Number(player.peak_rating||player.rating||1150),games:Number(player.placement_games||0),trend:0,form:[]};PLAYERS.push(p);}
+    p.rating=Number(player.rating||1150);p.peak=Number(player.peak_rating||player.rating||1150);p.games=Number(player.placement_games||0);
+    return p;
+  }
+
+  function renderPlacementOwnProfile() {
+    const card=$('.profile-rank-card'); if(!card||!live.player)return;
+    let place=$('#v3ProfilePlacement',card);
+    const isPlacement=!live.player.is_ranked;
+    $$('.profile-rank-card > :not(#v3ProfilePlacement)',card).forEach(el=>el.hidden=isPlacement);
+    if(!isPlacement){place?.remove(); return;}
+    if(!place){place=document.createElement('div');place.id='v3ProfilePlacement';place.className='v3-profile-placement';card.appendChild(place);}
+    const done=Math.max(0,Math.min(15,Number(live.player.placement_games||0)));
+    place.innerHTML=`<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAABmUklEQVR42u29eZxdR3Unfk5V3fvuey3Z4LBnSICQQOzMJCwhJCHIDosNSSAJeQoxm9e2LWtvS/Kqp2djrZZkI9vYbWMMJAa6ITEBJgSMcbPN/AaYLATNTIb58Qthx2Asd/dbblWd3x/3VtWp20omCyCpXWc+HqJWq5f3bp0653u+5/sFSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJEiRYoUKVKkSJHiuA65XH4RIsLTTjtNdqErZg/Ppnc2xQ81er2eOP300+UTnvAE3LFjhzj11FNxbm6O0itznLw5zY91u12ZXpkUP4z4Z54lPNF/N1wG7w8CAG2bnDw5f9wTX6ykWrTC/pd+v7/Y6/VEv98nAEiZOsW/KWZmZuTq1atNr9f7KYnyXAv2l60xXx+X5b7du3d/uX7GbEoAx+jm7/f7tH79Zf+x08o+UHSKpxlrgIz9irZ27+7dO29jn2fT45ziX3M2ut2umJ2dNdu2bXtjprKDSmWnWLKQKQXz8/P/OC6LXzpwYMdDiAgn6iUjlkP7n2XiQF60njY/Pz8eLA6sBXp6u2i9dduWbXetW7eu1e/3bWoJUvxrW8rZ2Vmz9bKt1+RZ6x3W0ikLCwt6NBiahYX5UafTeWqno1+BiNTr9U7YZ0udsKeeCBHR7tmzZ+WD333wFxcHixYIMiERx6ORLcdj2253zkXEn7n00kv/6JZbbvlGr9dT/X5fp0c8xf+lqrQzMzPyC5/7wi1Fu33RcDg0lqxAIRQRgTVEWhvSI/2YE/33PeErgMXFxYw
