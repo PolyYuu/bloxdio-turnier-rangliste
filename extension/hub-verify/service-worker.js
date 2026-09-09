@@ -1,35 +1,54 @@
 'use strict';
 
-const HUB_URL = 'https://bloxdio-turnier-rangliste.vercel.app/pending.html';
-const BLOXD_URL = 'https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1';
-const MAX_PAIR_AGE_MS = 15 * 60 * 1000;
-const DEFAULT_STATE = {hubSeenAt:0,bloxdSeenAt:0,pairing:null,latestRegistrationCode:null,latestIdentity:null,latestSignedProof:null,latestDiagnostic:null};
+const HUB_URL='https://bloxdio-turnier-rangliste.vercel.app/pending.html';
+const BLOXD_URL='https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1';
+const MAX_RECENT=40;
+const DEFAULT_STATE={
+  bloxdSeenAt:0,
+  totalAssertionsObserved:0,
+  recentAssertions:[],
+  latestRegistrationCode:null,
+  relayMode:'global-observer',
+  uploadEnabled:false
+};
 
-async function getState(){const stored=await chrome.storage.local.get(DEFAULT_STATE);const state={...DEFAULT_STATE,...stored};if(state.pairing&&Date.now()-Number(state.pairing.startedAt||0)>MAX_PAIR_AGE_MS){state.pairing=null;await chrome.storage.local.set({pairing:null});}return state;}
+async function getState(){return{...DEFAULT_STATE,...await chrome.storage.local.get(DEFAULT_STATE)};}
 async function setState(patch){await chrome.storage.local.set(patch);return getState();}
-function cleanShortCode(value){const code=String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');return /^[A-Z0-9]{8}$/.test(code)?code:'';}
-function cleanPairId(value){const pairId=String(value||'').trim();return /^[A-Za-z0-9_-]{12,96}$/.test(pairId)?pairId:'';}
-function cleanIdentity(identity){if(!identity||typeof identity!=='object')return null;const dbId=String(identity.dbId||'').trim().slice(0,180);const name=String(identity.name||'').trim().slice(0,64);const code=cleanShortCode(identity.code);const ts=Number(identity.ts||Date.now());if(!dbId||!name||!Number.isFinite(ts))return null;return{dbId,name,code:code||null,ts};}
-function cleanSignedProof(token){const value=String(token||'').trim();return /^SGR1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(value)?value:'';}
-async function broadcastToHub(message){const tabs=await chrome.tabs.query({url:'https://bloxdio-turnier-rangliste.vercel.app/*'});await Promise.allSettled(tabs.map((tab)=>tab.id?chrome.tabs.sendMessage(tab.id,message):Promise.resolve()));}
-async function updateBadge(){const state=await getState();let text='';if(state.latestSignedProof||state.latestIdentity)text='ID';else if(state.pairing)text='ON';await chrome.action.setBadgeText({text});if(text)await chrome.action.setBadgeBackgroundColor({color:'#36dbe1'});}
-chrome.runtime.onInstalled.addListener(async()=>{await chrome.storage.local.set(DEFAULT_STATE);await updateBadge();});
+function cleanCode(value){const code=String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');return /^[A-Z0-9]{8}$/.test(code)?code:'';}
+function cleanRaw(value){const raw=String(value||'').trim();if(!raw.startsWith('__SG_EVT__|REGASSERT|')||raw.length>4000)return'';return raw;}
+function rawKey(raw){let h=2166136261;for(let i=0;i<raw.length;i+=1)h=Math.imul(h^raw.charCodeAt(i),16777619);return String(h>>>0);}
+async function badge(){const state=await getState();const active=Date.now()-Number(state.bloxdSeenAt||0)<120000;const text=active?'ON':'';await chrome.action.setBadgeText({text});if(text)await chrome.action.setBadgeBackgroundColor({color:'#55e6b1'});}
+
+chrome.runtime.onInstalled.addListener(async()=>{const old=await chrome.storage.local.get(null);await chrome.storage.local.set({...DEFAULT_STATE,totalAssertionsObserved:Number(old.totalAssertionsObserved||0),recentAssertions:Array.isArray(old.recentAssertions)?old.recentAssertions.slice(0,MAX_RECENT):[]});await badge();});
+chrome.runtime.onStartup.addListener(badge);
 
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   (async()=>{
     const type=String(message?.type||'');
-    if(type==='HUB_EXTENSION_PING'){const state=await setState({hubSeenAt:Date.now()});sendResponse({ok:true,version:chrome.runtime.getManifest().version,state});return;}
-    if(type==='HUB_EXTENSION_START'){const pendingCode=cleanShortCode(message.pendingCode);const pairId=cleanPairId(message.pairId)||crypto.randomUUID().replace(/-/g,'');const pairing={pairId,pendingCode:pendingCode||null,startedAt:Date.now()};const state=await setState({pairing,latestIdentity:null,latestSignedProof:null,latestDiagnostic:null});await updateBadge();if(message.openBloxd!==false)await chrome.tabs.create({url:BLOXD_URL});sendResponse({ok:true,pairing,state});return;}
-    if(type==='HUB_EXTENSION_CLEAR'){const state=await setState({pairing:null,latestRegistrationCode:null,latestIdentity:null,latestSignedProof:null,latestDiagnostic:null});await updateBadge();sendResponse({ok:true,state});return;}
+    if(type==='BLOXD_EXTENSION_READY'){
+      const state=await setState({bloxdSeenAt:Date.now(),relayMode:'global-observer'});await badge();sendResponse({ok:true,state});return;
+    }
+    if(type==='BLOXD_GLOBAL_REGASSERT'){
+      const raw=cleanRaw(message.raw);if(!raw){sendResponse({ok:false,error:'invalid_regassert'});return;}
+      const state=await getState();const key=rawKey(raw);const recent=Array.isArray(state.recentAssertions)?state.recentAssertions:[];
+      const already=recent.some((x)=>x&&x.key===key);
+      let total=Number(state.totalAssertionsObserved||0);
+      let next=recent;
+      if(!already){total+=1;next=[{key,raw,seenAt:Date.now(),frameUrl:String(sender?.url||'').slice(0,500)},...recent].slice(0,MAX_RECENT);}
+      const updated=await setState({bloxdSeenAt:Date.now(),totalAssertionsObserved:total,recentAssertions:next});await badge();
+      // v0.3 intentionally observes only. Publicly distributed extensions must
+      // never contain the production x-sg-relay-key.
+      sendResponse({ok:true,duplicate:already,totalObserved:updated.totalAssertionsObserved,uploadEnabled:false});return;
+    }
+    if(type==='BLOXD_REGISTRATION_CODE'){
+      const code=cleanCode(message.code);if(!code){sendResponse({ok:false,error:'invalid_code'});return;}
+      const state=await setState({bloxdSeenAt:Date.now(),latestRegistrationCode:{code,seenAt:Date.now()}});await badge();sendResponse({ok:true,state});return;
+    }
     if(type==='HUB_EXTENSION_GET_STATE'){sendResponse({ok:true,version:chrome.runtime.getManifest().version,state:await getState()});return;}
-    if(type==='BLOXD_EXTENSION_READY'){const state=await setState({bloxdSeenAt:Date.now()});sendResponse({ok:true,state});return;}
-    if(type==='BLOXD_REGISTRATION_CODE'){const code=cleanShortCode(message.code);if(!code){sendResponse({ok:false,error:'invalid_code'});return;}const state=await setState({latestRegistrationCode:{code,seenAt:Date.now()}});await broadcastToHub({type:'EXTENSION_REGISTRATION_CODE',code,seenAt:Date.now()});sendResponse({ok:true,state});return;}
-    if(type==='BLOXD_SIGNED_PROOF'){const token=cleanSignedProof(message.token);if(!token){sendResponse({ok:false,error:'invalid_signed_proof'});return;}const payload={token,seenAt:Date.now()};const state=await setState({latestSignedProof:payload});await updateBadge();await broadcastToHub({type:'EXTENSION_SIGNED_PROOF',token,seenAt:payload.seenAt});sendResponse({ok:true,state});return;}
-    if(type==='BLOXD_IDENTITY_MARKER'){const identity=cleanIdentity(message.identity);if(!identity){sendResponse({ok:false,error:'invalid_identity'});return;}const state=await getState();if(state.pairing?.pendingCode&&identity.code&&state.pairing.pendingCode!==identity.code){sendResponse({ok:false,error:'code_mismatch'});return;}const payload={...identity,pairId:state.pairing?.pairId||null,source:'world-code-marker',seenAt:Date.now()};const next=await setState({latestIdentity:payload});await updateBadge();await broadcastToHub({type:'EXTENSION_IDENTITY',identity:payload});sendResponse({ok:true,state:next});return;}
-    if(type==='BLOXD_DIAGNOSTIC'){const diagnostic={foundMarker:Boolean(message.foundMarker),foundRegistrationCode:Boolean(message.foundRegistrationCode),candidateKeys:Array.isArray(message.candidateKeys)?message.candidateKeys.slice(0,30):[],frameUrl:String(sender?.url||'').slice(0,500),seenAt:Date.now()};const state=await setState({latestDiagnostic:diagnostic});await broadcastToHub({type:'EXTENSION_DIAGNOSTIC',diagnostic});sendResponse({ok:true,state});return;}
+    if(type==='HUB_EXTENSION_CLEAR'){const state=await setState({totalAssertionsObserved:0,recentAssertions:[],latestRegistrationCode:null});sendResponse({ok:true,state});return;}
     if(type==='OPEN_HUB'){await chrome.tabs.create({url:HUB_URL});sendResponse({ok:true});return;}
     if(type==='OPEN_BLOXD'){await chrome.tabs.create({url:BLOXD_URL});sendResponse({ok:true});return;}
     sendResponse({ok:false,error:'unknown_message'});
-  })().catch((error)=>{console.error('[HUB Verify]',error);try{sendResponse({ok:false,error:String(error?.message||error)});}catch(_){}});
+  })().catch((error)=>{console.error('[HUB Verify Global Relay]',error);try{sendResponse({ok:false,error:String(error?.message||error)});}catch(_){}});
   return true;
 });
