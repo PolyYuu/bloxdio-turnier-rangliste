@@ -12,19 +12,25 @@
     <section class="register-card">
       <div class="register-topbar">
         <a class="back-link" href="index.html#overview" id="backHub">← HUB</a>
-        <div class="register-language" id="registerLanguage" aria-label="Language">
-          <button type="button" data-lang="de">DE</button>
-          <button type="button" data-lang="en">EN</button>
-          <button type="button" data-lang="fr">FR</button>
+        <div class="topbar-actions">
+          <button type="button" class="tutorial-trigger" id="tutorialTrigger" aria-haspopup="dialog" aria-controls="verifyTutorial">
+            <span class="tutorial-trigger-icon">?</span>
+            <span id="tutorialTriggerLabel">WIE VERIFIZIERE ICH MICH?</span>
+          </button>
+          <div class="register-language" id="registerLanguage" aria-label="Language">
+            <button type="button" data-lang="de">DE</button>
+            <button type="button" data-lang="en">EN</button>
+            <button type="button" data-lang="fr">FR</button>
+          </div>
         </div>
       </div>
+
       <p class="eyebrow" id="eyebrow">HUB · BLOXD ACCOUNT</p>
       <h1 id="title">ACCOUNT VERKNÜPFEN</h1>
       <p class="intro" id="intro">Vor der Bloxd-Verifizierung bekommt dein HUB-Account noch keinen Spielernamen. Dein echter Name wird erst übernommen, wenn deine permanente Bloxd-ID bestätigt wurde.</p>
 
-      <div class="tabs">
+      <div class="tabs single-tab" id="registrationMode">
         <button class="tab active" id="tabBloxd" type="button">ICH HABE EINEN BLOXD-CODE</button>
-        <button class="tab" id="tabWeb" type="button">AUF WEBSITE STARTEN</button>
       </div>
 
       <form id="bloxdForm" novalidate>
@@ -37,19 +43,12 @@
         <label><span id="passwordRepeatLabel">PASSWORT WIEDERHOLEN</span>
           <input id="passwordRepeat" type="password" autocomplete="new-password" minlength="8" required>
         </label>
-        <button id="submitBloxd" type="submit">ACCOUNT ERSTELLEN</button>
-        <p class="small-help" id="bloxdHelp">Standard: <strong>/register</strong> gibt dir einen kurzen 8-Zeichen-Code. Dein echter Bloxd-Name wird erst nach der Verifizierung übernommen.</p>
-      </form>
 
-      <form id="webForm" class="hidden" novalidate>
-        <label><span id="webPasswordLabel">PASSWORT</span>
-          <input id="webPassword" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <label><span id="webPasswordRepeatLabel">PASSWORT WIEDERHOLEN</span>
-          <input id="webPasswordRepeat" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <button id="submitWeb" type="submit">CODE ERSTELLEN</button>
-        <p class="small-help" id="webHelp">Danach bekommst du einen 8-Zeichen-Code. Gib ihn in Bloxd mit <strong>/verify DEINCODE</strong> ein. Bis zur Bestätigung heißt dein HUB-Account nur <strong>Pending</strong>.</p>
+        <div class="form-actions">
+          <button id="submitBloxd" type="submit">ACCOUNT ERSTELLEN</button>
+          <button id="getBloxdCode" type="button" class="get-code">CODE HOLEN</button>
+        </div>
+        <p class="small-help" id="bloxdHelp">Standard: <strong>/register</strong> gibt dir einen kurzen 8-Zeichen-Code. Dein echter Bloxd-Name wird erst nach der Verifizierung übernommen.</p>
       </form>
 
       <section id="pendingPanel" class="pending-panel hidden">
@@ -72,6 +71,29 @@
       <p class="hint" id="hint">Unverifizierte Accounts haben noch keinen Spielernamen und können keine bestehenden Stats übernehmen, keine Freunde verwalten und sich nicht selbst für Turniere anmelden. Name und Stats werden erst aus Bloxd übernommen.</p>
     </section>
   </main>
+
+  <div class="tutorial-overlay hidden" id="verifyTutorial" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+    <div class="tutorial-modal">
+      <button type="button" class="tutorial-close" id="tutorialClose" aria-label="Close">×</button>
+
+      <div class="tutorial-progress-row">
+        <span class="tutorial-kicker" id="tutorialKicker">BLOXD VERIFIZIERUNG</span>
+        <span class="tutorial-count" id="tutorialCount">1 / 5</span>
+      </div>
+      <div class="tutorial-progress" aria-hidden="true"><span id="tutorialProgressFill"></span></div>
+
+      <div class="tutorial-visual" id="tutorialVisual" aria-hidden="true"></div>
+      <p class="tutorial-step-label" id="tutorialStepLabel">SCHRITT 1</p>
+      <h2 id="tutorialTitle">HOL DIR DEINEN CODE</h2>
+      <p class="tutorial-copy" id="tutorialCopy"></p>
+
+      <div class="tutorial-nav">
+        <button type="button" class="secondary tutorial-back" id="tutorialBack">ZURÜCK</button>
+        <button type="button" class="tutorial-next" id="tutorialNext">WEITER</button>
+      </div>
+    </div>
+  </div>
+
   <script src="register.js"></script>
 </body>
 </html>
