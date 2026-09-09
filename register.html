@@ -31,7 +31,7 @@
       <p class="intro" id="intro">Vor der Bloxd-Verifizierung bekommt dein HUB-Account noch keinen Spielernamen. Dein echter Name wird erst übernommen, wenn deine permanente Bloxd-ID bestätigt wurde.</p>
 
       <div class="tabs single-tab" id="registrationMode">
-        <button class="tab active" id="tabBloxd" type="button">ICH HABE EINEN BLOXD-CODE</button>
+        <button class="tab active" id="tabBloxd" type="button" aria-haspopup="dialog" aria-controls="verifyTutorial">TUTORIAL</button>
       </div>
 
       <form id="bloxdForm" novalidate>
@@ -97,5 +97,28 @@
 
   <script src="register.js"></script>
   <script src="register-tutorial-media.js"></script>
+  <script>
+    (() => {
+      const tutorialTab = document.getElementById('tabBloxd');
+      const tutorialTrigger = document.getElementById('tutorialTrigger');
+      if (!tutorialTab || !tutorialTrigger) return;
+
+      const keepTutorialLabel = () => {
+        tutorialTab.textContent = 'TUTORIAL';
+        tutorialTab.style.cursor = 'pointer';
+      };
+
+      tutorialTab.addEventListener('click', (event) => {
+        event.preventDefault();
+        tutorialTrigger.click();
+      });
+
+      document.querySelectorAll('[data-lang]').forEach((button) => {
+        button.addEventListener('click', () => requestAnimationFrame(keepTutorialLabel));
+      });
+
+      keepTutorialLabel();
+    })();
+  </script>
 </body>
 </html>
