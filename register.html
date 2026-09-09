@@ -36,7 +36,7 @@
 
       <form id="bloxdForm" novalidate>
         <label><span id="registrationCodeLabel">REGISTRIERUNGSCODE</span>
-          <input id="registrationCode" autocomplete="one-time-code" placeholder="8 Zeichen oder SGR1.…" maxlength="900" required>
+          <input id="registrationCode" autocomplete="one-time-code" placeholder="8 Zeichen" maxlength="8" required>
         </label>
         <label><span id="passwordLabel">PASSWORT</span>
           <input id="password" type="password" autocomplete="new-password" minlength="8" required>
@@ -49,45 +49,25 @@
           <button id="submitBloxd" type="submit">ACCOUNT ERSTELLEN</button>
           <button id="getBloxdCode" type="button" class="get-code">CODE HOLEN</button>
         </div>
-        <p class="small-help" id="bloxdHelp">Standard: <strong>/register</strong> gibt dir einen kurzen 8-Zeichen-Code. Dein echter Bloxd-Name wird erst nach der Verifizierung übernommen.</p>
+        <p class="small-help" id="bloxdHelp">In Bloxd: <strong>/register</strong> → 8-Zeichen-Code hier eingeben.</p>
       </form>
 
-      <section id="pendingPanel" class="pending-panel hidden">
-        <p class="status-pill" id="pendingPill">VERIFIZIERUNG AUSSTEHEND</p>
-        <h2 id="pendingTitle">Account erstellt</h2>
-        <p id="pendingText"></p>
-        <div id="pendingCodeWrap" class="code-wrap hidden">
-          <span id="yourCodeLabel">DEIN CODE</span>
-          <strong id="pendingCode"></strong>
-        </div>
-        <button id="checkStatus" type="button" class="secondary">STATUS PRÜFEN</button>
-        <div class="instant-box">
-          <p id="instantHelp"><strong>Sofort freischalten?</strong> Gib in Bloxd <code>/instantcode</code> ein und füge den längeren Code hier ein.</p>
-          <input id="instantCode" placeholder="SGR1.…" maxlength="900">
-          <button id="instantVerify" type="button">SOFORT VERIFIZIEREN</button>
-        </div>
-      </section>
-
       <div id="message" class="message" aria-live="polite"></div>
-      <p class="hint" id="hint">Unverifizierte Accounts haben noch keinen Spielernamen und können keine bestehenden Stats übernehmen, keine Freunde verwalten und sich nicht selbst für Turniere anmelden. Name und Stats werden erst aus Bloxd übernommen.</p>
     </section>
   </main>
 
   <div class="tutorial-overlay hidden" id="verifyTutorial" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
     <div class="tutorial-modal">
       <button type="button" class="tutorial-close" id="tutorialClose" aria-label="Close">×</button>
-
       <div class="tutorial-progress-row">
         <span class="tutorial-kicker" id="tutorialKicker">BLOXD VERIFIZIERUNG</span>
         <span class="tutorial-count" id="tutorialCount">1 / 5</span>
       </div>
       <div class="tutorial-progress" aria-hidden="true"><span id="tutorialProgressFill"></span></div>
-
       <div class="tutorial-visual" id="tutorialVisual"></div>
       <p class="tutorial-step-label" id="tutorialStepLabel">SCHRITT 1</p>
       <h2 id="tutorialTitle">HOL DIR DEINEN CODE</h2>
       <p class="tutorial-copy" id="tutorialCopy"></p>
-
       <div class="tutorial-nav">
         <button type="button" class="secondary tutorial-back" id="tutorialBack">ZURÜCK</button>
         <button type="button" class="tutorial-next" id="tutorialNext">WEITER</button>
@@ -97,28 +77,5 @@
 
   <script src="register.js"></script>
   <script src="register-tutorial-media.js"></script>
-  <script>
-    (() => {
-      const tutorialTab = document.getElementById('tabBloxd');
-      const tutorialTrigger = document.getElementById('tutorialTrigger');
-      if (!tutorialTab || !tutorialTrigger) return;
-
-      const keepTutorialLabel = () => {
-        tutorialTab.textContent = 'TUTORIAL';
-        tutorialTab.style.cursor = 'pointer';
-      };
-
-      tutorialTab.addEventListener('click', (event) => {
-        event.preventDefault();
-        tutorialTrigger.click();
-      });
-
-      document.querySelectorAll('[data-lang]').forEach((button) => {
-        button.addEventListener('click', () => requestAnimationFrame(keepTutorialLabel));
-      });
-
-      keepTutorialLabel();
-    })();
-  </script>
 </body>
 </html>
