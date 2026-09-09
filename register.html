@@ -13,7 +13,7 @@
       <a class="back-link" href="index.html#overview">← HUB</a>
       <p class="eyebrow">HUB · BLOXD ACCOUNT</p>
       <h1>ACCOUNT VERKNÜPFEN</h1>
-      <p class="intro">Du kannst in Bloxd starten oder zuerst auf der Website. Dein Spielerprofil wird erst freigeschaltet, wenn deine permanente Bloxd-ID bestätigt wurde.</p>
+      <p class="intro">Vor der Bloxd-Verifizierung bekommt dein HUB-Account noch keinen Spielernamen. Dein echter Name wird erst übernommen, wenn deine permanente Bloxd-ID bestätigt wurde.</p>
 
       <div class="tabs">
         <button class="tab active" id="tabBloxd" type="button">ICH HABE EINEN BLOXD-CODE</button>
@@ -24,9 +24,6 @@
         <label>REGISTRIERUNGSCODE
           <input id="registrationCode" autocomplete="one-time-code" placeholder="8 Zeichen oder SGR1.…" maxlength="900" required>
         </label>
-        <label id="bloxdNameLabel">AKTUELLER BLOXD-NAME
-          <input id="bloxdName" autocomplete="username" placeholder="z. B. KingMeister56" maxlength="32">
-        </label>
         <label>PASSWORT
           <input id="password" type="password" autocomplete="new-password" minlength="8" required>
         </label>
@@ -34,13 +31,10 @@
           <input id="passwordRepeat" type="password" autocomplete="new-password" minlength="8" required>
         </label>
         <button id="submitBloxd" type="submit">ACCOUNT ERSTELLEN</button>
-        <p class="small-help">Standard: <strong>/register</strong> gibt dir einen kurzen 8-Zeichen-Code. Für eine sofortige Verifizierung ohne Bridge kannst du optional <strong>/instantcode</strong> nutzen.</p>
+        <p class="small-help">Standard: <strong>/register</strong> gibt dir einen kurzen 8-Zeichen-Code. Dein echter Bloxd-Name wird erst nach der Verifizierung übernommen.</p>
       </form>
 
       <form id="webForm" class="hidden" novalidate>
-        <label>AKTUELLER BLOXD-NAME
-          <input id="webBloxdName" autocomplete="username" placeholder="z. B. KingMeister56" maxlength="32" required>
-        </label>
         <label>PASSWORT
           <input id="webPassword" type="password" autocomplete="new-password" minlength="8" required>
         </label>
@@ -48,7 +42,7 @@
           <input id="webPasswordRepeat" type="password" autocomplete="new-password" minlength="8" required>
         </label>
         <button id="submitWeb" type="submit">CODE ERSTELLEN</button>
-        <p class="small-help">Danach bekommst du hier einen 8-Zeichen-Code. Gib ihn in Bloxd mit <strong>/verify DEINCODE</strong> ein.</p>
+        <p class="small-help">Danach bekommst du einen 8-Zeichen-Code. Gib ihn in Bloxd mit <strong>/verify DEINCODE</strong> ein. Bis zur Bestätigung heißt dein HUB-Account nur <strong>Pending</strong>.</p>
       </form>
 
       <section id="pendingPanel" class="pending-panel hidden">
@@ -61,14 +55,14 @@
         </div>
         <button id="checkStatus" type="button" class="secondary">STATUS PRÜFEN</button>
         <div class="instant-box">
-          <p><strong>Sofort freischalten?</strong> Gib in Bloxd <code>/instantcode</code> ein und füge den langen Code hier ein.</p>
+          <p><strong>Sofort freischalten?</strong> Gib in Bloxd <code>/instantcode</code> ein und füge den längeren Code hier ein.</p>
           <input id="instantCode" placeholder="SGR1.…" maxlength="900">
           <button id="instantVerify" type="button">SOFORT VERIFIZIEREN</button>
         </div>
       </section>
 
       <div id="message" class="message" aria-live="polite"></div>
-      <p class="hint">Unverifizierte Accounts können keine bestehenden Stats übernehmen, keinen Namen ändern, keine Freunde verwalten und sich nicht selbst für Turniere anmelden. Der HUB-Name wird nach der Bestätigung automatisch aus Bloxd übernommen.</p>
+      <p class="hint">Unverifizierte Accounts haben noch keinen Spielernamen und können keine bestehenden Stats übernehmen, keine Freunde verwalten und sich nicht selbst für Turniere anmelden. Name und Stats werden erst aus Bloxd übernommen.</p>
     </section>
   </main>
   <script src="register.js"></script>
