@@ -1,0 +1,38 @@
+name: Phase 11 registration routing patch
+on:
+  push:
+    paths:
+      - '.github/scripts/phase11_registration_routing.py'
+      - '.github/workflows/phase11-registration-routing.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch HUB registration routing
+        run: python3 .github/scripts/phase11_registration_routing.py
+      - name: Validate inline JavaScript
+        run: |
+          python3 -m pip install beautifulsoup4
+          python3 - <<'PY'
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          import subprocess,tempfile
+          soup=BeautifulSoup(Path('index.html').read_text(),'html.parser')
+          for s in soup.find_all('script'):
+              if s.get('src'): continue
+              js=s.string if s.string is not None else s.get_text()
+              if not js.strip(): continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False)
+              f.write(js);f.close()
+              subprocess.run(['node','--check',f.name],check=True)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git diff --cached --quiet || git commit -m "Route registration and pending accounts to Phase 11 pages"
+          git push
