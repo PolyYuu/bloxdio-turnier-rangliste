@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0b0811">
+  <meta name="theme-color" content="#07040d">
   <title>HUB · Verifizierung</title>
   <link rel="stylesheet" href="pending.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -11,7 +11,9 @@
 <body>
   <header class="hub-header">
     <div class="hub-header-inner">
-      <a href="index.html#overview" class="brand" aria-label="HUB Home">HUB</a>
+      <a href="index.html#overview" class="brand" aria-label="HUB Home">
+        <span class="brand-main">HUB</span><span class="brand-sub">SURVIVAL GAMES</span>
+      </a>
       <nav class="primary-nav" aria-label="HUB Navigation">
         <a href="index.html#overview" data-nav-key="overview">OVERVIEW</a>
         <a href="index.html#ranking" data-nav-key="ranking">RANKING</a>
@@ -25,87 +27,82 @@
           <button type="button" data-lang="fr">FR</button>
         </div>
         <button id="accountStatusButton" class="account-status" type="button">
-          <span class="info-circle small">i</span>
-          <span id="accountStatusText">VERIFIZIERUNG AUSSTEHEND</span>
+          <span class="info-circle small">i</span><span id="accountStatusText">VERIFIZIERUNG AUSSTEHEND</span>
         </button>
-        <a id="openGameTop" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="header-cta">JETZT VERIFIZIEREN ↗</a>
       </div>
     </div>
   </header>
 
-  <main class="page">
-    <section class="profile-card">
-      <div class="avatar" id="avatar">?</div>
-      <div class="identity">
-        <div class="status-wrap">
-          <span class="status-badge"><span class="info-circle tiny">i</span><span id="statusBadgeText">VERIFIZIERUNG AUSSTEHEND</span></span>
+  <main class="hub-background">
+    <div class="page">
+      <section class="profile-card">
+        <div class="avatar" id="avatar">…</div>
+        <div class="identity">
+          <div class="status-wrap"><span class="status-badge"><span class="info-circle tiny">i</span><span id="statusBadgeText">VERIFIZIERUNG AUSSTEHEND</span></span></div>
+          <h1 id="playerName">PENDING</h1>
+          <p class="sub" id="profileIntro">Dein HUB-Account ist angelegt, hat aber noch keinen Spielernamen. Name, Stats, Rating und Turnierhistorie werden erst nach der Bloxd-Verifizierung übernommen.</p>
         </div>
-        <h1 id="playerName">Account Preview</h1>
-        <p class="sub" id="profileIntro">Dein HUB-Account ist bereits angelegt. Stats, Rating und bestehende Turnierhistorie werden sichtbar, sobald deine permanente Bloxd-ID bestätigt wurde.</p>
-      </div>
-    </section>
+      </section>
 
-    <section class="verify-layout">
-      <article class="verify-card primary-card">
-        <div class="card-head">
-          <div>
-            <span class="eyebrow" id="normalEyebrow">NORMALE VERIFIZIERUNG</span>
-            <h2 id="normalTitle">8-Zeichen-Code</h2>
+      <section class="verify-layout">
+        <article class="verify-card primary-card">
+          <div class="card-head">
+            <div><span class="eyebrow" id="normalEyebrow">NORMALE VERIFIZIERUNG</span><h2 id="normalTitle">8-Zeichen-Code</h2></div>
+            <button id="whyButton" class="info-button" type="button" aria-label="Info zur Verifizierung" title="Info zur Verifizierung"><span class="info-circle">i</span></button>
           </div>
-          <button id="whyButton" class="info-button" type="button" aria-label="Info zur Verifizierung" title="Info zur Verifizierung"><span class="info-circle">i</span></button>
-        </div>
 
-        <p id="normalInstruction" class="lead">Gib den 8-Zeichen-Code in der Bloxd.io Lobby ein, um dich zu verifizieren. Dies kann einige Zeit dauern, weil du anschließend noch eine manuelle Bestätigung durch den Admin brauchst.</p>
+          <p id="normalInstruction" class="lead">Gib den 8-Zeichen-Code in der Bloxd.io Lobby ein, um dich zu verifizieren. Danach wartet dein Account noch auf die manuelle Admin-Bestätigung. Das kann einige Stunden oder Tage dauern.</p>
 
-        <div class="code-box" id="codeBox">
-          <span id="yourCodeLabel">DEIN CODE</span>
-          <strong id="codeValue">--------</strong>
-          <div class="code-actions">
-            <button id="copyCode" type="button" class="secondary">CODE KOPIEREN</button>
-            <button id="showCode" type="button" class="secondary">CODE ANZEIGEN</button>
+          <div class="code-box" id="codeBox">
+            <span id="yourCodeLabel">DEIN CODE</span>
+            <strong id="codeValue">--------</strong>
+            <div class="code-actions">
+              <button id="copyCode" type="button" class="secondary">CODE KOPIEREN</button>
+              <button id="showCode" type="button" class="secondary">CODE ANZEIGEN</button>
+            </div>
           </div>
-        </div>
 
-        <div class="command-box">
-          <span id="commandLabel">IN BLOXD EINGEBEN</span>
-          <strong id="commandValue">/verify DEINCODE</strong>
-        </div>
+          <div class="command-box">
+            <span id="commandLabel">IN BLOXD EINGEBEN</span>
+            <strong id="commandValue">/verify DEINCODE</strong>
+          </div>
 
-        <div class="actions">
-          <a id="openGame" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="primary">JETZT VERIFIZIEREN ↗</a>
-          <button id="refreshStatus" class="secondary" type="button">STATUS PRÜFEN</button>
-        </div>
-        <p id="statusText" class="status-text">Status wird geladen…</p>
-      </article>
+          <div class="actions">
+            <a id="openGame" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="primary">JETZT VERIFIZIEREN ↗</a>
+            <button id="refreshStatus" class="secondary" type="button">STATUS PRÜFEN</button>
+          </div>
+          <p id="statusText" class="status-text">Status wird geladen…</p>
+        </article>
 
-      <article class="verify-card instant-card">
-        <span class="eyebrow instant" id="instantEyebrow">SOFORT-VERIFIZIERUNG</span>
-        <h2 id="instantTitle">Direkt freischalten</h2>
-        <p id="instantDescription">Wenn du nicht auf die manuelle Admin-Verifizierung warten möchtest, gib auf dem Server <code>/instantcode</code> ein. Du bekommst einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt. Du musst nicht auf den Admin warten, der Code ist aber länger.</p>
+        <article class="verify-card instant-card">
+          <span class="eyebrow instant" id="instantEyebrow">SOFORT-VERIFIZIERUNG</span>
+          <h2 id="instantTitle">Direkt freischalten</h2>
+          <p id="instantDescription">Wenn du nicht auf die manuelle Admin-Verifizierung warten möchtest, gib auf dem Server <code>/instantcode</code> ein. Du bekommst einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt. Du musst nicht auf den Admin warten, der Code ist aber länger.</p>
 
-        <div class="instant-steps">
-          <div><b>1</b><span id="instantStep1">Server öffnen</span></div>
-          <div><b>2</b><span id="instantStep2"><code>/instantcode</code> eingeben</span></div>
-          <div><b>3</b><span id="instantStep3">Langen Code hier einfügen</span></div>
-        </div>
+          <div class="instant-steps">
+            <div><b>1</b><span id="instantStep1">Instant-Code anfordern</span></div>
+            <div><b>2</b><span id="instantStep2"><code>/instantcode</code> eingeben</span></div>
+            <div><b>3</b><span id="instantStep3">Langen Code hier einfügen</span></div>
+          </div>
 
-        <label class="instant-input-label" for="instantCode" id="instantCodeLabel">INSTANT-CODE</label>
-        <textarea id="instantCode" rows="4" placeholder="SGR1.…"></textarea>
-        <div class="actions">
-          <button id="instantVerify" class="primary" type="button">SOFORT VERIFIZIEREN</button>
-          <a id="instantOpenGame" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="secondary">JETZT VERIFIZIEREN ↗</a>
-        </div>
-        <p id="instantMessage" class="status-text"></p>
-      </article>
-    </section>
+          <div class="actions request-actions">
+            <a id="instantOpenGame" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="primary">INSTANT-CODE ANFORDERN ↗</a>
+          </div>
 
-    <section class="info-strip">
-      <div>
-        <strong id="availableTitle">Was ist bis dahin möglich?</strong>
-        <p id="availableText">Overview, Rangliste, Cups und öffentliche Spielerprofile kannst du bereits normal nutzen. Eigene Stats, Profilbearbeitung, Freunde und eigene Turnieranmeldungen bleiben bis zur Verifizierung gesperrt.</p>
-      </div>
-      <a href="index.html#overview" class="secondary" id="backToHub">ZUM HUB</a>
-    </section>
+          <label class="instant-input-label" for="instantCode" id="instantCodeLabel">INSTANT-CODE</label>
+          <textarea id="instantCode" rows="4" placeholder="SGR1.…"></textarea>
+          <div class="actions">
+            <button id="instantVerify" class="secondary strong" type="button">CODE BESTÄTIGEN</button>
+          </div>
+          <p id="instantMessage" class="status-text"></p>
+        </article>
+      </section>
+
+      <section class="info-strip">
+        <div><strong id="availableTitle">Was ist bis dahin möglich?</strong><p id="availableText">Overview, Rangliste, Cups und öffentliche Spielerprofile kannst du bereits normal nutzen. Eigene Stats, Profilbearbeitung, Freunde und eigene Turnieranmeldungen bleiben bis zur Verifizierung gesperrt.</p></div>
+        <a href="index.html#overview" class="secondary" id="backToHub">ZUM HUB</a>
+      </section>
+    </div>
   </main>
 
   <div id="whyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="whyTitle">
@@ -113,9 +110,9 @@
       <button id="closeWhy" class="close" type="button" aria-label="Schließen">×</button>
       <p class="eyebrow" id="whyEyebrow">WIE FUNKTIONIERT DIE VERIFIZIERUNG?</p>
       <h2 id="whyTitle">Zwei Wege zur Verifizierung</h2>
-      <p id="whyText">Der normale 8-Zeichen-Code ist kurz und bequem. Nachdem du ihn in der Bloxd.io Lobby eingegeben hast, muss ein Admin deine Registrierung noch manuell bestätigen. Das kann einige Zeit dauern. Mit <code>/instantcode</code> bekommst du einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt und keine manuelle Admin-Freigabe benötigt.</p>
+      <p id="whyText">Der normale 8-Zeichen-Code ist kurz und bequem. Nachdem du ihn in der Bloxd.io Lobby eingegeben hast, wartet dein Account noch auf die manuelle Admin-Bestätigung. Das kann einige Stunden oder Tage dauern. Mit <code>/instantcode</code> bekommst du einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt und keine Wartezeit auf den Admin benötigt.</p>
       <div class="why-grid">
-        <div><strong id="whyShortTitle">8-Zeichen-Code</strong><span id="whyShortText">Kurz und bequem. Nach der Eingabe ist noch eine manuelle Admin-Verifizierung nötig.</span></div>
+        <div><strong id="whyShortTitle">8-Zeichen-Code</strong><span id="whyShortText">Kurz und bequem. Danach ist noch die manuelle Admin-Bestätigung nötig.</span></div>
         <div><strong id="whyInstantTitle">Instant-Code</strong><span id="whyInstantText">Länger, dafür direkte Bestätigung deiner permanenten Bloxd-ID ohne Warten auf den Admin.</span></div>
       </div>
     </div>
