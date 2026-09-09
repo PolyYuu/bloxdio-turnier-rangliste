@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HUB · Account Preview</title>
+  <link rel="stylesheet" href="pending.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html#overview" class="brand">HUB</a>
+    <a href="play.html" class="play">SURVIVAL GAMES ÖFFNEN</a>
+  </header>
+  <main class="page">
+    <section class="profile-card">
+      <div class="avatar" id="avatar">?</div>
+      <div class="identity">
+        <div class="status-wrap">
+          <button id="statusBadge" class="status-badge">● VERIFIZIERUNG AUSSTEHEND</button>
+        </div>
+        <h1 id="playerName">Account Preview</h1>
+        <p class="sub">Dein HUB-Account ist angelegt. Dein endgültiges Spielerprofil wird freigeschaltet, sobald deine permanente Bloxd-ID bestätigt wurde.</p>
+      </div>
+    </section>
+
+    <section class="preview-grid">
+      <article><span>RATING</span><strong>—</strong><small>Nach Verifizierung verfügbar</small></article>
+      <article><span>TURNIERE</span><strong>—</strong><small>Bestehende Historie wird übernommen</small></article>
+      <article><span>FREUNDE</span><strong>GESPERRT</strong><small>Bis zur Verifizierung</small></article>
+      <article><span>PROFIL BEARBEITEN</span><strong>GESPERRT</strong><small>Name kommt automatisch aus Bloxd</small></article>
+    </section>
+
+    <section class="locked-panel">
+      <h2>Account Preview</h2>
+      <p>Du kannst den HUB bereits ansehen und Survival Games öffnen. Änderungen am Profil, Freunde und eigene Turnieranmeldungen bleiben gesperrt, bis bestätigt ist, welcher Bloxd-Spieler wirklich zu diesem Account gehört.</p>
+      <div class="actions">
+        <a href="index.html#overview" class="secondary">HUB ANSEHEN</a>
+        <a href="play.html" class="primary">SURVIVAL GAMES SPIELEN</a>
+      </div>
+    </section>
+  </main>
+
+  <div id="statusModal" class="modal hidden">
+    <div class="modal-card">
+      <button id="closeModal" class="close">×</button>
+      <p class="eyebrow">BLOXD VERIFIZIERUNG</p>
+      <h2>Verifizierung ausstehend</h2>
+      <p id="statusText">Status wird geladen…</p>
+      <div id="codeBox" class="code-box hidden"><span>DEIN CODE</span><strong id="codeValue"></strong></div>
+      <button id="refreshStatus" class="primary full">STATUS PRÜFEN</button>
+      <p class="hint">Wenn ein HUB-Bridge-Account online kommt, werden gespeicherte Registrierungen automatisch nachgeholt. Du musst dafür nicht gleichzeitig online sein.</p>
+    </div>
+  </div>
+
+  <script src="pending.js"></script>
+</body>
+</html>
