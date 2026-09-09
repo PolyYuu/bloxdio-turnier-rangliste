@@ -736,6 +736,9 @@ body:before{z-index:-4;opacity:.44}
 .v3-live-health{display:grid;gap:10px;margin:14px 0;padding:14px;border:1px solid rgba(126,101,190,.3);border-radius:12px;background:rgba(255,255,255,.02)}.v3-live-health.ready{border-color:rgba(65,225,169,.32);background:rgba(65,225,169,.045)}.v3-live-health.attention{border-color:rgba(255,113,137,.35);background:rgba(255,113,137,.045)}.v3-live-health-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.v3-live-health-head span{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:#8f879f}.v3-live-health-head strong{font-size:11px}.v3-live-health.ready .v3-live-health-head strong{color:#62f2ad}.v3-live-health.attention .v3-live-health-head strong{color:#ff7189}.v3-live-health-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.v3-live-health-grid article{display:grid;gap:3px;padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(126,101,190,.16)}.v3-live-health-grid article span{font-size:8px;font-weight:900;letter-spacing:.08em;color:#80778d}.v3-live-health-grid article b{font-size:11px;color:#d6cfdf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v3-live-health-grid article b.ok{color:#62f2ad}.v3-live-health-grid article b.bad{color:#ff7189}.v3-live-health-grid article small{font-size:8px;color:#756d80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v3-live-health-warning{padding:8px 9px;border-radius:8px;background:rgba(255,113,137,.08);color:#ff9aac;font-size:9px}.v3-auto-finalize-toggle{margin-top:2px;padding:10px 11px;border:1px solid rgba(255,198,92,.22);border-radius:9px;background:rgba(255,198,92,.035)}.v3-auto-finalize-toggle>span{display:grid;gap:3px!important}.v3-auto-finalize-toggle b{color:#ffc65c}.v3-auto-finalize-toggle small{font-weight:500!important;color:#8c8295!important;line-height:1.4}@media(max-width:620px){.v3-live-health-grid{grid-template-columns:1fr}}
 </style>
 
+<style id="hub-no-manual-ingame-rename">
+#renameButton{display:none!important}
+</style>
 </head>
 <body>
   <div class="wallpaper" aria-hidden="true"></div>
@@ -906,7 +909,7 @@ body:before{z-index:-4;opacity:.44}
           </div>
           <div><span class="eyebrow" data-i18n="profile.playerProfile">Player profile</span><h1 id="profilePlayerName">Stalker_Curry</h1><p><span data-i18n="profile.bloxdName">Bloxd.io name</span> · <span id="profileGlobalRank">#1 global</span></p></div>
         </div>
-        <div class="profile-actions"><button class="ghost-button" id="renameButton" type="button" data-i18n="profile.rename">Change Bloxd.io name</button><button class="secondary-button" id="profileAdminButton" type="button" data-route="admin" data-i18n="profile.adminPanel">Admin panel</button></div>
+        <div class="profile-actions"><button class="secondary-button" id="profileAdminButton" type="button" data-route="admin" data-i18n="profile.adminPanel">Admin panel</button></div>
       </section>
 
       <div class="profile-grid">
