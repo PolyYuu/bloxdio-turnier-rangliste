@@ -2303,7 +2303,7 @@ window.HubAPI = (() => {
       </form>
       <button class="text-button v3-auth-switch" type="button" id="v3AuthSwitch">${isLogin?copy('No account yet? Register','Noch kein Account? Registrieren','Pas encore de compte ? S’inscrire'):copy('Already registered? Log in','Bereits registriert? Anmelden','Déjà inscrit ? Se connecter')}</button>
     </section>`);
-    $('#v3AuthSwitch',m).onclick=()=>openAuth(isLogin?'register':'login');
+    $('#v3AuthSwitch',m).onclick=()=>{if(isLogin){location.href='register.html';return;}openAuth('login');};
     $('#v3AuthForm',m).addEventListener('submit',async e=>{
       e.preventDefault();
       const user=$('#v3Username',m).value.trim(), pass=$('#v3Password',m).value;
@@ -2510,6 +2510,15 @@ window.HubAPI = (() => {
       live.session=await api.currentSession();
       if(!live.session){live.player=null;live.stats=null;live.isAdmin=false;document.body.classList.remove('ranking-experience-hidden');updateHeader();addRankingPreferenceButton();document.dispatchEvent(new CustomEvent('hub:auth-restored',{detail:{loggedIn:false}}));return;}
       const id=await api.currentPlayerId();
+      if(!id){
+        try{
+          const {data:registrationState}=await api.client.rpc('get_my_registration_status');
+          if(registrationState?.status==='pending'){
+            location.href='pending.html';
+            return;
+          }
+        }catch(_pendingRouteError){}
+      }
       live.player=id?await api.getMyProfile():null;
       live.stats=id?await api.getCareerStatsFor(id):null;
       const {data:isAdmin}=await api.client.rpc('is_admin');live.isAdmin=!!isAdmin;
