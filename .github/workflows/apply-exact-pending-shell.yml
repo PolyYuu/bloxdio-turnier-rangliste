@@ -1,0 +1,28 @@
+name: Apply exact Pending HUB shell
+on:
+  push:
+    branches:
+      - exact-hub-shell-register-i18n
+    paths:
+      - '.github/scripts/apply_exact_pending_shell.py'
+      - '.github/workflows/apply-exact-pending-shell.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact shell
+        run: python3 .github/scripts/apply_exact_pending_shell.py
+      - name: Validate standalone JS
+        run: |
+          node --check pending.js
+          node --check register.js
+      - name: Commit generated shell
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add pending.html hub-shell-shared.css
+          git diff --cached --quiet || git commit -m "Use exact HUB shell on pending page"
+          git push
