@@ -18,13 +18,16 @@ header = header.replace('</button>\n      <button class="cta-button next-cup-cta
 header = re.sub(r'\s*<button class="cta-button next-cup-cta".*?</button>', '', header, count=1, flags=re.S)
 header = re.sub(r'\s*<button class="icon-only admin-launch".*?</button>', '', header, count=1, flags=re.S)
 
-# Replace either old synthetic or already-generated exact header so the patch is idempotent.
 new_pending, n = re.subn(r'<header class="(?:hub-header|site-header)">.*?</header>', header, pending, count=1, flags=re.S)
 if n != 1:
     raise SystemExit(f'pending header replacement failed: {n}')
 pending = new_pending
+
+# Keep exact HUB core CSS, then Pending page CSS, then a tiny high-specificity header guard.
 if 'hub-shell-shared.css' not in pending:
-    pending = pending.replace('<link rel="stylesheet" href="pending.css">', '<link rel="stylesheet" href="hub-shell-shared.css">\n  <link rel="stylesheet" href="pending.css">', 1)
+    pending = pending.replace('<link rel="stylesheet" href="pending.css">', '<link rel="stylesheet" href="hub-shell-shared.css">\n  <link rel="stylesheet" href="pending.css">\n  <link rel="stylesheet" href="pending-header-fix.css">', 1)
+elif 'pending-header-fix.css' not in pending:
+    pending = pending.replace('<link rel="stylesheet" href="pending.css">', '<link rel="stylesheet" href="pending.css">\n  <link rel="stylesheet" href="pending-header-fix.css">', 1)
 if 'pending-shell.js' not in pending:
     pending = pending.replace('<script src="pending.js"></script>', '<script src="pending.js"></script>\n  <script src="pending-shell.js"></script>', 1)
 pending_path.write_text(pending, encoding='utf-8')
