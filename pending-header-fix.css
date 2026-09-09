@@ -1,0 +1,15 @@
+/* Standalone Pending page: preserve the exact HUB header after pending.css. */
+body .site-header .brand{display:flex;align-items:center;gap:12px;width:max-content;flex-direction:row;line-height:normal;transform:none;text-decoration:none}
+body .site-header .hub-logo{width:124px!important;height:61px!important;object-fit:contain!important;display:block!important}
+body .site-header .primary-nav{display:flex;align-self:stretch;justify-content:initial;gap:0}
+body .site-header .primary-nav a{position:relative;display:flex;align-items:center;padding:0 24px;color:#b7accf;font-size:12px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;text-decoration:none}
+body .site-header .primary-nav a:after{content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--magenta));transform:scaleX(0);transition:.18s ease}
+body .site-header .primary-nav a:hover,body .site-header .primary-nav a.active{color:#fff}
+body .site-header .primary-nav a.active:after{transform:scaleX(1)}
+body .site-header .header-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px}
+.hub-pending-header-status{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,198,92,.28);background:rgba(255,198,92,.11);color:#ffc65c;border-radius:999px;padding:8px 11px;font:800 9px/1 Montserrat,Arial,sans-serif;letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+.hub-pending-mini-info{display:inline-grid;place-items:center;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;font-family:Georgia,serif;font-style:italic;font-weight:800;font-size:9px;line-height:1}
+body .site-header #loginDemoButton{white-space:nowrap}
+body .site-header .language-menu button.active{color:var(--cyan)}
+@media(max-width:1080px){body .site-header .primary-nav a{padding:0 14px}}
+@media(max-width:760px){body .site-header .primary-nav{position:fixed;z-index:60;right:10px;bottom:10px;left:10px;height:58px;justify-content:space-around;border:1px solid rgba(128,87,233,.36);border-radius:12px;background:rgba(10,5,28,.94);backdrop-filter:blur(16px);box-shadow:0 12px 40px rgba(0,0,0,.45)}body .site-header .primary-nav a{padding:0 9px;font-size:8px}body .site-header .primary-nav a:after{left:8px;right:8px}body .site-header .header-actions{margin-left:auto;justify-content:flex-end;flex-wrap:nowrap}.hub-pending-header-status{display:none}}
