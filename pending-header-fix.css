@@ -1,4 +1,5 @@
 /* Standalone Pending page: preserve the exact HUB header after pending.css. */
+body .hub-background .page{display:block!important}
 body .site-header .brand{display:flex;align-items:center;gap:12px;width:max-content;flex-direction:row;line-height:normal;transform:none;text-decoration:none}
 body .site-header .hub-logo{width:124px!important;height:61px!important;object-fit:contain!important;display:block!important}
 body .site-header .primary-nav{display:flex;align-self:stretch;justify-content:initial;gap:0}
