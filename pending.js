@@ -1,62 +1,146 @@
 (() => {
   "use strict";
 
-  const SUPABASE_URL="https://nxzrgbpaxukgjyzwupjp.supabase.co";
-  const SUPABASE_KEY="sb_publishable_TawTg_9H-hw2TDWFyHH3ow_PTPPfoND";
-  const VERIFY_URL=`${SUPABASE_URL}/functions/v1/hub-verify-registration`;
-  const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-  const $=(s)=>document.querySelector(s);
-  const $$=(s)=>[...document.querySelectorAll(s)];
-  const CACHE_KEY="hub_pending_registration";
+  const SUPABASE_URL = "https://nxzrgbpaxukgjyzwupjp.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_TawTg_9H-hw2TDWFyHH3ow_PTPPfoND";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const CACHE_KEY = "hub_pending_registration";
 
-  const I18N={
-    de:{title:"HUB · Verifizierung",overview:"OVERVIEW",ranking:"RANKING",cup:"CUP",profile:"PROFILE",pending:"VERIFIZIERUNG AUSSTEHEND",pendingName:"PENDING",profileIntro:"Dein HUB-Account ist angelegt, hat aber noch keinen Spielernamen. Name, Stats, Rating und Turnierhistorie werden erst nach der Bloxd-Verifizierung übernommen.",normalEyebrow:"NORMALE VERIFIZIERUNG",normalTitle:"8-Zeichen-Code",normalInstruction:"Gib den 8-Zeichen-Code in der Bloxd.io Lobby ein, um dich zu verifizieren. Danach wartet dein Account noch auf die manuelle Admin-Bestätigung. Das kann einige Stunden oder Tage dauern.",yourCode:"DEIN CODE",copy:"CODE KOPIEREN",show:"CODE ANZEIGEN",command:"IN BLOXD EINGEBEN",verifyNow:"JETZT VERIFIZIEREN ↗",registerNow:"JETZT REGISTRIEREN ↗",check:"STATUS PRÜFEN",loading:"Status wird geladen…",instantEyebrow:"SOFORT-VERIFIZIERUNG",instantTitle:"Direkt freischalten",instantDescription:"Wenn du nicht auf die manuelle Admin-Verifizierung warten möchtest, gib auf dem Server /instantcode ein. Du bekommst einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt. Du musst nicht auf den Admin warten, der Code ist aber länger.",step1:"Instant-Code anfordern",step2:"/instantcode eingeben",step3:"Langen Code hier einfügen",requestInstant:"INSTANT-CODE ANFORDERN ↗",instantCode:"INSTANT-CODE",confirmInstant:"CODE BESTÄTIGEN",availableTitle:"Was ist bis dahin möglich?",availableText:"Overview, Rangliste, Cups und öffentliche Spielerprofile kannst du bereits normal nutzen. Eigene Stats, Profilbearbeitung, Freunde und eigene Turnieranmeldungen bleiben bis zur Verifizierung gesperrt.",back:"ZUM HUB",whyAria:"Info zur Verifizierung",whyEyebrow:"WIE FUNKTIONIERT DIE VERIFIZIERUNG?",whyTitle:"Zwei Wege zur Verifizierung",whyText:"Der normale 8-Zeichen-Code ist kurz und bequem. Nachdem du ihn in der Bloxd.io Lobby eingegeben hast, wartet dein Account noch auf die manuelle Admin-Bestätigung. Das kann einige Stunden oder Tage dauern. Mit /instantcode bekommst du einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt und keine Wartezeit auf den Admin benötigt.",whyShortTitle:"8-Zeichen-Code",whyShortText:"Kurz und bequem. Danach ist noch die manuelle Admin-Bestätigung nötig.",whyInstantTitle:"Instant-Code",whyInstantText:"Länger, dafür direkte Bestätigung deiner permanenten Bloxd-ID ohne Warten auf den Admin.",close:"Schließen",unavailable:"NICHT VERFÜGBAR",noCode:"Für diesen Account ist kein kurzer Code gespeichert.",copied:(c)=>`Code ${c} wurde kopiert.`,copyFail:(c)=>`Kopieren war nicht möglich. Dein Code ist ${c}.`,pendingStatus:"Verifizierung steht noch aus. Dein Account bleibt bis dahin Pending.",pendingBloxdStatus:"Deine Registrierung ist gespeichert. Dein Account bleibt bis zur Bestätigung Pending.",instantMissing:"Bitte füge den vollständigen Code aus /instantcode ein.",loginAgain:"Bitte melde dich erneut an.",instantChecking:"Instant-Code wird geprüft…",instantFail:"Sofort-Verifizierung fehlgeschlagen.",verifiedAs:(n)=>`Verifiziert als ${n}.`},
-    en:{title:"HUB · Verification",overview:"OVERVIEW",ranking:"RANKING",cup:"CUP",profile:"PROFILE",pending:"VERIFICATION PENDING",pendingName:"PENDING",profileIntro:"Your HUB account has been created, but it does not have a player name yet. Your name, stats, rating and tournament history are added only after Bloxd verification.",normalEyebrow:"NORMAL VERIFICATION",normalTitle:"8-character code",normalInstruction:"Enter the 8-character code in the Bloxd.io lobby to verify. Afterwards, your account still waits for manual admin confirmation. This can take a few hours or days.",yourCode:"YOUR CODE",copy:"COPY CODE",show:"SHOW CODE",command:"ENTER IN BLOXD",verifyNow:"VERIFY NOW ↗",registerNow:"REGISTER NOW ↗",check:"CHECK STATUS",loading:"Loading status…",instantEyebrow:"INSTANT VERIFICATION",instantTitle:"Unlock immediately",instantDescription:"If you do not want to wait for manual admin verification, enter /instantcode on the server. You receive a longer code that directly confirms your permanent Bloxd ID. You do not need to wait for the admin, but the code is longer.",step1:"Request instant code",step2:"Enter /instantcode",step3:"Paste the long code here",requestInstant:"REQUEST INSTANT CODE ↗",instantCode:"INSTANT CODE",confirmInstant:"CONFIRM CODE",availableTitle:"What can I use meanwhile?",availableText:"You can already use Overview, Ranking, Cups and public player profiles normally. Your own stats, profile editing, friends and cup registrations remain locked until verification.",back:"BACK TO HUB",whyAria:"Verification info",whyEyebrow:"HOW DOES VERIFICATION WORK?",whyTitle:"Two ways to verify",whyText:"The normal 8-character code is short and convenient. After entering it in the Bloxd.io lobby, your account still waits for manual admin confirmation. This can take a few hours or days. With /instantcode you receive a longer code that directly confirms your permanent Bloxd ID without waiting for the admin.",whyShortTitle:"8-character code",whyShortText:"Short and convenient. Manual admin confirmation is still required afterwards.",whyInstantTitle:"Instant code",whyInstantText:"Longer, but directly confirms your permanent Bloxd ID without waiting for the admin.",close:"Close",unavailable:"NOT AVAILABLE",noCode:"No short code is stored for this account.",copied:(c)=>`Code ${c} copied.`,copyFail:(c)=>`Could not copy. Your code is ${c}.`,pendingStatus:"Verification is still pending. Your account remains Pending until confirmation.",pendingBloxdStatus:"Your registration is saved. Your account remains Pending until confirmation.",instantMissing:"Please paste the complete code from /instantcode.",loginAgain:"Please sign in again.",instantChecking:"Checking instant code…",instantFail:"Instant verification failed.",verifiedAs:(n)=>`Verified as ${n}.`},
-    fr:{title:"HUB · Vérification",overview:"APERÇU",ranking:"CLASSEMENT",cup:"CUP",profile:"PROFIL",pending:"VÉRIFICATION EN ATTENTE",pendingName:"EN ATTENTE",profileIntro:"Ton compte HUB est créé, mais il n’a pas encore de nom de joueur. Le nom, les statistiques, le classement et l’historique sont ajoutés seulement après la vérification Bloxd.",normalEyebrow:"VÉRIFICATION NORMALE",normalTitle:"Code à 8 caractères",normalInstruction:"Entre le code à 8 caractères dans le lobby Bloxd.io. Ensuite, ton compte attend encore la confirmation manuelle de l’administrateur. Cela peut prendre quelques heures ou quelques jours.",yourCode:"TON CODE",copy:"COPIER LE CODE",show:"AFFICHER LE CODE",command:"À ENTRER DANS BLOXD",verifyNow:"VÉRIFIER MAINTENANT ↗",registerNow:"S’INSCRIRE MAINTENANT ↗",check:"VÉRIFIER LE STATUT",loading:"Chargement du statut…",instantEyebrow:"VÉRIFICATION INSTANTANÉE",instantTitle:"Débloquer immédiatement",instantDescription:"Si tu ne veux pas attendre la vérification manuelle de l’administrateur, entre /instantcode sur le serveur. Tu recevras un code plus long qui confirme directement ton identifiant Bloxd permanent. Tu n’as pas besoin d’attendre l’administrateur, mais le code est plus long.",step1:"Demander un code instantané",step2:"Entrer /instantcode",step3:"Coller le long code ici",requestInstant:"DEMANDER UN CODE INSTANTANÉ ↗",instantCode:"CODE INSTANTANÉ",confirmInstant:"CONFIRMER LE CODE",availableTitle:"Que puis-je utiliser en attendant ?",availableText:"Tu peux déjà utiliser normalement l’aperçu, le classement, les cups et les profils publics. Tes propres statistiques, la modification du profil, les amis et les inscriptions restent bloqués jusqu’à la vérification.",back:"RETOUR AU HUB",whyAria:"Infos sur la vérification",whyEyebrow:"COMMENT FONCTIONNE LA VÉRIFICATION ?",whyTitle:"Deux façons de se vérifier",whyText:"Le code normal à 8 caractères est court et pratique. Après l’avoir entré dans le lobby Bloxd.io, ton compte attend encore la confirmation manuelle de l’administrateur. Cela peut prendre quelques heures ou quelques jours. Avec /instantcode, tu reçois un code plus long qui confirme directement ton identifiant Bloxd permanent sans attendre l’administrateur.",whyShortTitle:"Code à 8 caractères",whyShortText:"Court et pratique. La confirmation manuelle de l’administrateur reste nécessaire ensuite.",whyInstantTitle:"Code instantané",whyInstantText:"Plus long, mais il confirme directement ton identifiant Bloxd permanent sans attendre l’administrateur.",close:"Fermer",unavailable:"INDISPONIBLE",noCode:"Aucun code court n’est enregistré pour ce compte.",copied:(c)=>`Code ${c} copié.`,copyFail:(c)=>`Impossible de copier. Ton code est ${c}.`,pendingStatus:"La vérification est toujours en attente. Ton compte reste en attente jusqu’à la confirmation.",pendingBloxdStatus:"Ton inscription est enregistrée. Ton compte reste en attente jusqu’à la confirmation.",instantMissing:"Colle le code complet obtenu avec /instantcode.",loginAgain:"Reconnecte-toi.",instantChecking:"Vérification du code instantané…",instantFail:"La vérification instantanée a échoué.",verifiedAs:(n)=>`Vérifié en tant que ${n}.`}
+  const COPY = {
+    de: {
+      title:"HUB · Verifizierung",pending:"VERIFIZIERUNG AUSSTEHEND",pendingName:"PENDING",
+      profileIntro:"Dein HUB-Account ist angelegt, hat aber noch keinen Spielernamen. Name, Stats, Rating und Turnierhistorie werden erst nach der Bloxd-Verifizierung übernommen.",
+      pendingEyebrow:"DEINE REGISTRIERUNG",pendingTitle:"Verifizierung ausstehend",
+      pendingText:"Dein Account wurde erfolgreich erstellt. Dieser Registrierungscode gehört zu deinem Pending-Account und bleibt sichtbar, solange die Verifizierung noch nicht abgeschlossen ist.",
+      yourCode:"DEIN REGISTRIERUNGSCODE",copy:"CODE KOPIEREN",check:"STATUS PRÜFEN",loading:"Status wird geladen…",
+      pendingStatus:"Deine Verifizierung steht noch aus. Sobald deine permanente Bloxd-ID bestätigt wurde, wird dein Profil automatisch freigeschaltet.",
+      copied:"Code kopiert.",copyFail:"Kopieren war nicht möglich.",noCode:"Für diesen Account ist kein Registrierungscode verfügbar.",
+      bridgeEyebrow:"DIREKTE VERIFIZIERUNG",bridgeTitle:"HUB Verify Extension",bridgeBadge:"IN VORBEREITUNG",
+      bridgeText:"Als zweite Verifizierungsart bauen wir eine eigene Chrome-Erweiterung. Sie läuft direkt auf Bloxd.io und kann die für den HUB benötigte Spieler-Identität sicher an unsere Website weiterreichen – ohne langen Code zum Abtippen.",
+      bridgeStep1:"HUB Verify Extension installieren",bridgeStep2:"Mit deinem HUB-Account verbinden",bridgeStep3:"Bloxd öffnen und automatisch bestätigen",bridgeButton:"EXTENSION BALD VERFÜGBAR",
+      bridgeNote:"Die Erweiterung ist noch nicht freigeschaltet. Wir zeigen den Download erst an, sobald die komplette Verifizierungskette getestet ist.",
+      availableTitle:"Bis dahin",availableText:"Du kannst den HUB bereits nutzen. Dein eigener Spielername, deine Stats und accountgebundene Funktionen werden automatisch freigeschaltet, sobald die Verifizierung abgeschlossen ist.",back:"ZUM HUB",
+      error:"Status konnte nicht geladen werden."
+    },
+    en: {
+      title:"HUB · Verification",pending:"VERIFICATION PENDING",pendingName:"PENDING",
+      profileIntro:"Your HUB account has been created, but it does not have a player name yet. Your name, stats, rating and tournament history are added only after Bloxd verification.",
+      pendingEyebrow:"YOUR REGISTRATION",pendingTitle:"Verification pending",
+      pendingText:"Your account was created successfully. This registration code belongs to your Pending account and stays visible until verification has been completed.",
+      yourCode:"YOUR REGISTRATION CODE",copy:"COPY CODE",check:"CHECK STATUS",loading:"Loading status…",
+      pendingStatus:"Your verification is still pending. Once your permanent Bloxd ID has been confirmed, your profile is unlocked automatically.",
+      copied:"Code copied.",copyFail:"Could not copy the code.",noCode:"No registration code is available for this account.",
+      bridgeEyebrow:"DIRECT VERIFICATION",bridgeTitle:"HUB Verify Extension",bridgeBadge:"IN DEVELOPMENT",
+      bridgeText:"As a second verification method, we are building our own Chrome extension. It runs directly on Bloxd.io and can securely pass the player identity required by the HUB to our website – without typing a long code.",
+      bridgeStep1:"Install the HUB Verify Extension",bridgeStep2:"Connect it to your HUB account",bridgeStep3:"Open Bloxd and confirm automatically",bridgeButton:"EXTENSION COMING SOON",
+      bridgeNote:"The extension is not enabled yet. The download will appear only after the complete verification flow has been tested.",
+      availableTitle:"Until then",availableText:"You can already use the HUB. Your player name, stats and account-bound features unlock automatically once verification is complete.",back:"BACK TO HUB",
+      error:"Could not load verification status."
+    },
+    fr: {
+      title:"HUB · Vérification",pending:"VÉRIFICATION EN ATTENTE",pendingName:"EN ATTENTE",
+      profileIntro:"Ton compte HUB est créé, mais il n’a pas encore de nom de joueur. Le nom, les statistiques, le classement et l’historique sont ajoutés seulement après la vérification Bloxd.",
+      pendingEyebrow:"TON INSCRIPTION",pendingTitle:"Vérification en attente",
+      pendingText:"Ton compte a bien été créé. Ce code d’inscription appartient à ton compte en attente et reste visible jusqu’à la fin de la vérification.",
+      yourCode:"TON CODE D’INSCRIPTION",copy:"COPIER LE CODE",check:"VÉRIFIER LE STATUT",loading:"Chargement du statut…",
+      pendingStatus:"Ta vérification est toujours en attente. Dès que ton identifiant Bloxd permanent est confirmé, ton profil est débloqué automatiquement.",
+      copied:"Code copié.",copyFail:"Impossible de copier le code.",noCode:"Aucun code d’inscription n’est disponible pour ce compte.",
+      bridgeEyebrow:"VÉRIFICATION DIRECTE",bridgeTitle:"HUB Verify Extension",bridgeBadge:"EN PRÉPARATION",
+      bridgeText:"Comme deuxième méthode, nous préparons notre propre extension Chrome. Elle fonctionne directement sur Bloxd.io et transmet au HUB l’identité joueur nécessaire, sans long code à recopier.",
+      bridgeStep1:"Installer HUB Verify Extension",bridgeStep2:"La connecter à ton compte HUB",bridgeStep3:"Ouvrir Bloxd et confirmer automatiquement",bridgeButton:"EXTENSION BIENTÔT DISPONIBLE",
+      bridgeNote:"L’extension n’est pas encore activée. Le téléchargement sera proposé après le test complet du processus de vérification.",
+      availableTitle:"En attendant",availableText:"Tu peux déjà utiliser le HUB. Ton nom de joueur, tes statistiques et les fonctions liées au compte seront débloqués automatiquement après la vérification.",back:"RETOUR AU HUB",
+      error:"Impossible de charger le statut de vérification."
+    }
   };
 
-  let current=null;
-  let lang=detectLanguage();
-  function detectLanguage(){const raw=String(localStorage.getItem("hub_language")||localStorage.getItem("hubLang")||navigator.language||"de").toLowerCase();if(raw.startsWith("fr"))return"fr";if(raw.startsWith("en"))return"en";return"de";}
-  const t=(key,...args)=>{const value=I18N[lang]?.[key]??I18N.de[key]??key;return typeof value==="function"?value(...args):value;};
+  let lang = detectLanguage();
+  let current = null;
 
-  function setLanguage(next){
-    lang=["de","en","fr"].includes(next)?next:"de";
-    localStorage.setItem("hub_language",lang);localStorage.setItem("hubLang",lang);document.documentElement.lang=lang;document.title=t("title");
-    $$('[data-lang]').forEach(btn=>btn.classList.toggle('active',btn.dataset.lang===lang));
-    $$('[data-nav-key]').forEach(link=>{link.textContent=t(link.dataset.navKey);});
-    $("#accountStatusText").textContent=t("pending");$("#statusBadgeText").textContent=t("pending");$("#playerName").textContent=t("pendingName");$("#profileIntro").textContent=t("profileIntro");
-    $("#normalEyebrow").textContent=t("normalEyebrow");$("#normalTitle").textContent=t("normalTitle");$("#normalInstruction").textContent=t("normalInstruction");$("#yourCodeLabel").textContent=t("yourCode");$("#copyCode").textContent=t("copy");$("#showCode").textContent=t("show");$("#commandLabel").textContent=t("command");$("#refreshStatus").textContent=t("check");
-    $("#instantEyebrow").textContent=t("instantEyebrow");$("#instantTitle").textContent=t("instantTitle");$("#instantDescription").textContent=t("instantDescription");$("#instantStep1").textContent=t("step1");$("#instantStep2").textContent=t("step2");$("#instantStep3").textContent=t("step3");$("#instantOpenGame").textContent=t("requestInstant");$("#instantCodeLabel").textContent=t("instantCode");$("#instantVerify").textContent=t("confirmInstant");
-    $("#availableTitle").textContent=t("availableTitle");$("#availableText").textContent=t("availableText");$("#backToHub").textContent=t("back");$("#whyButton").setAttribute("aria-label",t("whyAria"));$("#whyButton").title=t("whyAria");$("#whyEyebrow").textContent=t("whyEyebrow");$("#whyTitle").textContent=t("whyTitle");$("#whyText").textContent=t("whyText");$("#whyShortTitle").textContent=t("whyShortTitle");$("#whyShortText").textContent=t("whyShortText");$("#whyInstantTitle").textContent=t("whyInstantTitle");$("#whyInstantText").textContent=t("whyInstantText");$("#closeWhy").setAttribute("aria-label",t("close"));
-    if(current)render(current,false);else setStatusText(t("loading"));
+  function detectLanguage(){const raw=String(localStorage.getItem("hub_language")||localStorage.getItem("hubLang")||navigator.language||"de").toLowerCase();if(raw.startsWith("fr"))return"fr";if(raw.startsWith("en"))return"en";return"de";}
+  const t = (key) => COPY[lang]?.[key] || COPY.de[key] || key;
+  function cleanCode(value){return String(value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);}
+  function cachedCode(){try{return cleanCode(JSON.parse(localStorage.getItem(CACHE_KEY)||"null")?.code||"");}catch(_){return"";}}
+  function clearCache(){try{localStorage.removeItem(CACHE_KEY);}catch(_){}}
+  function writeCache(data,session){try{localStorage.setItem(CACHE_KEY,JSON.stringify({status:"pending",auth_user_id:session?.user?.id||"",source:data?.source||"",code:cleanCode(data?.code||cachedCode()),cached_at:Date.now()}));}catch(_){}}
+
+  function injectStyles(){
+    if($("#pendingV2Styles"))return;
+    const style=document.createElement("style");style.id="pendingV2Styles";style.textContent=`
+      .pending-v2-code{display:grid;gap:12px;margin:18px 0;padding:20px;border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.035)}
+      .pending-v2-code span{font-size:8px;letter-spacing:.13em;color:#837a91;font-weight:1000}.pending-v2-code strong{font-size:32px;letter-spacing:.18em;word-break:break-all}
+      .pending-v2-actions{display:flex;gap:10px;flex-wrap:wrap}.pending-v2-actions button{min-width:150px}.pending-v2-note{margin-top:15px;padding-top:15px;border-top:1px solid rgba(255,255,255,.06)}
+      .bridge-badge{display:inline-flex;width:max-content;margin:4px 0 12px;border:1px solid rgba(244,189,79,.3);background:rgba(244,189,79,.1);color:#f4bd4f;border-radius:999px;padding:7px 10px;font-size:8px;font-weight:1000;letter-spacing:.08em}
+      .bridge-card .instant-steps{margin-top:20px}.bridge-card .secondary[disabled]{opacity:.48;cursor:not-allowed}.bridge-note{margin-top:16px!important;font-size:11px!important}
+      @media(max-width:480px){.pending-v2-actions{display:grid}.pending-v2-actions button{width:100%}.pending-v2-code strong{font-size:24px}}
+    `;document.head.appendChild(style);
   }
 
-  function writePendingCache(data,session){try{localStorage.setItem(CACHE_KEY,JSON.stringify({status:"pending",auth_user_id:session?.user?.id||"",source:data?.source||"",cached_at:Date.now()}));}catch(_){}}
-  function clearPendingCache(){try{localStorage.removeItem(CACHE_KEY);}catch(_){}}
-  function setStatusText(text,type=""){const el=$("#statusText");if(!el)return;el.textContent=text;el.className=`status-text ${type}`.trim();}
+  function rebuildVerificationArea(){
+    const layout=$(".verify-layout");if(!layout)return;
+    layout.innerHTML=`
+      <article class="verify-card primary-card">
+        <span class="eyebrow" id="pendingEyebrow"></span>
+        <h2 id="pendingTitle"></h2>
+        <p class="lead" id="pendingDescription"></p>
+        <div class="pending-v2-code">
+          <span id="yourCodeLabel"></span>
+          <strong id="codeValue">--------</strong>
+          <div class="pending-v2-actions">
+            <button id="copyCode" type="button" class="secondary"></button>
+            <button id="refreshStatus" type="button" class="secondary"></button>
+          </div>
+        </div>
+        <p id="statusText" class="status-text"></p>
+        <p class="pending-v2-note" id="pendingNote"></p>
+      </article>
+      <article class="verify-card bridge-card">
+        <span class="eyebrow instant" id="bridgeEyebrow"></span>
+        <h2 id="bridgeTitle"></h2>
+        <span class="bridge-badge" id="bridgeBadge"></span>
+        <p id="bridgeDescription"></p>
+        <div class="instant-steps">
+          <div><b>1</b><span id="bridgeStep1"></span></div>
+          <div><b>2</b><span id="bridgeStep2"></span></div>
+          <div><b>3</b><span id="bridgeStep3"></span></div>
+        </div>
+        <div class="actions"><button class="secondary strong" id="bridgeButton" type="button" disabled></button></div>
+        <p class="bridge-note" id="bridgeNote"></p>
+      </article>`;
+    $("#whyModal")?.remove();
+    $("#copyCode").onclick=copyCode;
+    $("#refreshStatus").onclick=status;
+  }
+
+  function setStatus(text,type=""){const el=$("#statusText");if(!el)return;el.textContent=text;el.className=`status-text ${type}`.trim();}
+
+  function setLanguage(next){
+    lang=["de","en","fr"].includes(next)?next:"de";localStorage.setItem("hub_language",lang);localStorage.setItem("hubLang",lang);document.documentElement.lang=lang;document.title=t("title");
+    $$('[data-lang]').forEach(btn=>btn.classList.toggle('active',btn.dataset.lang===lang));
+    $("#accountStatusText")&&( $("#accountStatusText").textContent=t("pending") );$("#statusBadgeText")&&( $("#statusBadgeText").textContent=t("pending") );$("#playerName")&&( $("#playerName").textContent=t("pendingName") );$("#profileIntro")&&( $("#profileIntro").textContent=t("profileIntro") );
+    $("#pendingEyebrow").textContent=t("pendingEyebrow");$("#pendingTitle").textContent=t("pendingTitle");$("#pendingDescription").textContent=t("pendingText");$("#yourCodeLabel").textContent=t("yourCode");$("#copyCode").textContent=t("copy");$("#refreshStatus").textContent=t("check");$("#pendingNote").textContent=t("pendingStatus");
+    $("#bridgeEyebrow").textContent=t("bridgeEyebrow");$("#bridgeTitle").textContent=t("bridgeTitle");$("#bridgeBadge").textContent=t("bridgeBadge");$("#bridgeDescription").textContent=t("bridgeText");$("#bridgeStep1").textContent=t("bridgeStep1");$("#bridgeStep2").textContent=t("bridgeStep2");$("#bridgeStep3").textContent=t("bridgeStep3");$("#bridgeButton").textContent=t("bridgeButton");$("#bridgeNote").textContent=t("bridgeNote");
+    $("#availableTitle")&&( $("#availableTitle").textContent=t("availableTitle") );$("#availableText")&&( $("#availableText").textContent=t("availableText") );$("#backToHub")&&( $("#backToHub").textContent=t("back") );
+    if(current)render(current,false);else setStatus(t("loading"));
+  }
 
   function render(data,updateStatus=true){
-    current=data;$("#playerName").textContent=t("pendingName");$("#avatar").textContent="…";
-    const code=String(data.code||"").replace(/[^A-Z0-9]/gi,"").toUpperCase();$("#codeValue").textContent=code||t("unavailable");
-    const isWebFirst=data.source==="web_first";$("#commandValue").textContent=isWebFirst?(code?`/verify ${code}`:"/verify DEINCODE"):"/register";$("#openGame").textContent=isWebFirst?t("verifyNow"):t("registerNow");
-    if(updateStatus)setStatusText(isWebFirst?t("pendingStatus"):t("pendingBloxdStatus"));
+    current=data;const code=cleanCode(data?.code||cachedCode());$("#codeValue").textContent=code||"--------";if(updateStatus)setStatus(code?t("pendingStatus"):t("noCode"),code?"":"error");
   }
 
   async function status(){
-    const {data:{session}}=await db.auth.getSession();if(!session){clearPendingCache();location.href="index.html#overview";return;}
-    const {data,error}=await db.rpc("get_my_registration_status");if(error){setStatusText(error.message,"error");return;}
-    if(data?.status==="verified"){clearPendingCache();location.href="index.html#profile";return;}
-    if(!data||data.status==="unlinked"||data.status==="logged_out"){location.href="register.html";return;}
-    writePendingCache(data,session);render(data);if(data.status!=="pending")setStatusText(data.failure_reason||`Status: ${data.status}`,"error");
+    try{
+      const {data:{session}}=await db.auth.getSession();if(!session){clearCache();location.href="index.html#overview";return;}
+      const {data,error}=await db.rpc("get_my_registration_status");if(error)throw error;
+      if(data?.status==="verified"){clearCache();location.href="index.html#profile";return;}
+      if(!data||data.status==="unlinked"||data.status==="logged_out"){location.href="register.html";return;}
+      writeCache(data,session);render(data);if(data.status!=="pending")setStatus(data.failure_reason||`Status: ${data.status}`,"error");
+    }catch(err){console.warn("Pending status failed",err);setStatus(t("error"),"error");}
   }
 
-  $("#showCode").onclick=()=>{const code=String(current?.code||"").replace(/[^A-Z0-9]/gi,"").toUpperCase();$("#codeValue").textContent=code||t("unavailable");$("#codeBox").scrollIntoView({behavior:"smooth",block:"center"});};
-  $("#copyCode").onclick=async()=>{const code=String(current?.code||"").replace(/[^A-Z0-9]/gi,"").toUpperCase();if(!code){setStatusText(t("noCode"),"error");return;}try{await navigator.clipboard.writeText(code);setStatusText(t("copied",code),"success");}catch(_){setStatusText(t("copyFail",code),"error");}};
-  $("#refreshStatus").onclick=status;
-  $("#instantVerify").onclick=async()=>{const output=$("#instantMessage");output.textContent="";output.className="status-text";const token=$("#instantCode").value.trim().replace(/\s+/g,"");if(!token.startsWith("SGR1.")){output.textContent=t("instantMissing");output.classList.add("error");return;}const {data:{session}}=await db.auth.getSession();if(!session?.access_token){output.textContent=t("loginAgain");output.classList.add("error");return;}output.textContent=t("instantChecking");try{const r=await fetch(VERIFY_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({instantCode:token})});const result=await r.json().catch(()=>({}));if(!r.ok)throw new Error(result.error||t("instantFail"));clearPendingCache();output.textContent=t("verifiedAs",result.username||"Bloxd player");output.classList.add("success");setTimeout(()=>location.href="index.html#profile",700);}catch(err){output.textContent=err.message||t("instantFail");output.classList.add("error");}};
-  $("#whyButton").onclick=()=>$("#whyModal").classList.remove("hidden");$("#accountStatusButton").onclick=()=>$("#whyModal").classList.remove("hidden");$("#closeWhy").onclick=()=>$("#whyModal").classList.add("hidden");$("#whyModal").addEventListener("click",e=>{if(e.target===$("#whyModal"))$("#whyModal").classList.add("hidden");});
-  $$('[data-lang]').forEach(btn=>btn.addEventListener('click',()=>setLanguage(btn.dataset.lang)));
+  async function copyCode(){const code=cleanCode(current?.code||cachedCode());if(!code)return setStatus(t("noCode"),"error");try{await navigator.clipboard.writeText(code);setStatus(t("copied"),"success");}catch(_){setStatus(t("copyFail"),"error");}}
 
-  setLanguage(lang);status();setInterval(status,15000);
+  injectStyles();rebuildVerificationArea();$$('[data-lang]').forEach(btn=>btn.addEventListener('click',()=>setLanguage(btn.dataset.lang)));setLanguage(lang);status();setInterval(status,15000);
 })();
