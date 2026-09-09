@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Connects your Bloxd.io session with the HUB Survival Games verification flow.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "tabs"],
