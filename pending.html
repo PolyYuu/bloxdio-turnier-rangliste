@@ -3,53 +3,101 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HUB · Account Preview</title>
+  <title>HUB · Verifizierung</title>
   <link rel="stylesheet" href="pending.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header class="topbar">
     <a href="index.html#overview" class="brand">HUB</a>
-    <a href="play.html" class="play">SURVIVAL GAMES ÖFFNEN</a>
+    <a id="openGameTop" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="play">MINIGAME ÖFFNEN ↗</a>
   </header>
+
   <main class="page">
     <section class="profile-card">
       <div class="avatar" id="avatar">?</div>
       <div class="identity">
         <div class="status-wrap">
-          <button id="statusBadge" class="status-badge">● VERIFIZIERUNG AUSSTEHEND</button>
+          <span class="status-badge">● VERIFIZIERUNG AUSSTEHEND</span>
         </div>
         <h1 id="playerName">Account Preview</h1>
-        <p class="sub">Dein HUB-Account ist angelegt. Dein endgültiges Spielerprofil wird freigeschaltet, sobald deine permanente Bloxd-ID bestätigt wurde.</p>
+        <p class="sub">Dein HUB-Account ist bereits angelegt. Stats, Rating und bestehende Turnierhistorie werden sichtbar, sobald deine permanente Bloxd-ID bestätigt wurde.</p>
       </div>
     </section>
 
-    <section class="preview-grid">
-      <article><span>RATING</span><strong>—</strong><small>Nach Verifizierung verfügbar</small></article>
-      <article><span>TURNIERE</span><strong>—</strong><small>Bestehende Historie wird übernommen</small></article>
-      <article><span>FREUNDE</span><strong>GESPERRT</strong><small>Bis zur Verifizierung</small></article>
-      <article><span>PROFIL BEARBEITEN</span><strong>GESPERRT</strong><small>Name kommt automatisch aus Bloxd</small></article>
+    <section class="verify-layout">
+      <article class="verify-card primary-card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">NORMALE VERIFIZIERUNG</span>
+            <h2>8-Zeichen-Code</h2>
+          </div>
+          <button id="whyButton" class="why-button" type="button" aria-label="Warum dauert die Verifizierung?">i <span>Warum?</span></button>
+        </div>
+
+        <p id="normalInstruction" class="lead">Lade deinen Verifizierungsstatus…</p>
+
+        <div class="code-box" id="codeBox">
+          <span>DEIN CODE</span>
+          <strong id="codeValue">--------</strong>
+          <div class="code-actions">
+            <button id="copyCode" type="button" class="secondary">CODE KOPIEREN</button>
+            <button id="showCode" type="button" class="secondary">CODE ANZEIGEN</button>
+          </div>
+        </div>
+
+        <div class="command-box">
+          <span>IN BLOXD EINGEBEN</span>
+          <strong id="commandValue">/verify DEINCODE</strong>
+        </div>
+
+        <div class="actions">
+          <a id="openGame" href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="primary">MINIGAME ÖFFNEN ↗</a>
+          <button id="refreshStatus" class="secondary" type="button">STATUS PRÜFEN</button>
+        </div>
+        <p id="statusText" class="status-text">Status wird geladen…</p>
+      </article>
+
+      <article class="verify-card instant-card">
+        <span class="eyebrow instant">SOFORT-VERIFIZIERUNG</span>
+        <h2>Direkt freischalten</h2>
+        <p>Wenn du nicht auf die normale Bridge-Verifizierung warten möchtest, öffne das Minigame und gib <code>/instantcode</code> ein. Du bekommst einen längeren Code, der deine permanente Bloxd-ID direkt bestätigt.</p>
+
+        <div class="instant-steps">
+          <div><b>1</b><span>Minigame öffnen</span></div>
+          <div><b>2</b><span><code>/instantcode</code> eingeben</span></div>
+          <div><b>3</b><span>Langen Code hier einfügen</span></div>
+        </div>
+
+        <label class="instant-input-label" for="instantCode">INSTANT-CODE</label>
+        <textarea id="instantCode" rows="4" placeholder="SGR1.…"></textarea>
+        <div class="actions">
+          <button id="instantVerify" class="primary" type="button">SOFORT VERIFIZIEREN</button>
+          <a href="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1" target="_blank" rel="noopener" class="secondary">MINIGAME ÖFFNEN ↗</a>
+        </div>
+        <p id="instantMessage" class="status-text"></p>
+      </article>
     </section>
 
-    <section class="locked-panel">
-      <h2>Account Preview</h2>
-      <p>Du kannst den HUB bereits ansehen und Survival Games öffnen. Änderungen am Profil, Freunde und eigene Turnieranmeldungen bleiben gesperrt, bis bestätigt ist, welcher Bloxd-Spieler wirklich zu diesem Account gehört.</p>
-      <div class="actions">
-        <a href="index.html#overview" class="secondary">HUB ANSEHEN</a>
-        <a href="play.html" class="primary">SURVIVAL GAMES SPIELEN</a>
+    <section class="info-strip">
+      <div>
+        <strong>Was ist bis dahin möglich?</strong>
+        <p>Overview, Rangliste, Cups und öffentliche Spielerprofile kannst du bereits normal nutzen. Eigene Stats, Profilbearbeitung, Freunde und eigene Turnieranmeldungen bleiben bis zur Verifizierung gesperrt.</p>
       </div>
+      <a href="index.html#overview" class="secondary">ZUM HUB</a>
     </section>
   </main>
 
-  <div id="statusModal" class="modal hidden">
+  <div id="whyModal" class="modal hidden">
     <div class="modal-card">
-      <button id="closeModal" class="close">×</button>
-      <p class="eyebrow">BLOXD VERIFIZIERUNG</p>
-      <h2>Verifizierung ausstehend</h2>
-      <p id="statusText">Status wird geladen…</p>
-      <div id="codeBox" class="code-box hidden"><span>DEIN CODE</span><strong id="codeValue"></strong></div>
-      <button id="refreshStatus" class="primary full">STATUS PRÜFEN</button>
-      <p class="hint">Wenn ein HUB-Bridge-Account online kommt, werden gespeicherte Registrierungen automatisch nachgeholt. Du musst dafür nicht gleichzeitig online sein.</p>
+      <button id="closeWhy" class="close" type="button">×</button>
+      <p class="eyebrow">WARUM MUSS ICH WARTEN?</p>
+      <h2>Zwei Wege zur Verifizierung</h2>
+      <p id="whyText">Beim normalen 8-Zeichen-Code wird deine Registrierung zunächst gespeichert. Sobald ein HUB-Bridge/Admin-Browser online ist, wird deine echte Bloxd-ID automatisch mit deinem HUB-Account abgeglichen. Je nachdem, wann eine Bridge online ist, kann das einige Stunden oder auch Tage dauern.</p>
+      <div class="why-grid">
+        <div><strong>8-Zeichen-Code</strong><span>Kurz und bequem. Die endgültige Bestätigung erfolgt später automatisch über die HUB-Bridge.</span></div>
+        <div><strong>Instant-Code</strong><span>Länger, dafür direkt an deine permanente Bloxd-ID gebunden und ohne Wartezeit verifizierbar.</span></div>
+      </div>
     </div>
   </div>
 
