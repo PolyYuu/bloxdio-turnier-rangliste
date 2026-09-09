@@ -2,38 +2,40 @@ from pathlib import Path
 import re
 
 src = Path('index.html').read_text(encoding='utf-8')
-needles = [
-    'languagePicker', 'communityButton', 'loginDemoButton', 'header-actions',
-    'data-route="overview"', 'data-route="ranking"', 'data-route="cup"',
-    'data-route="profile"', 'location.hash', 'localStorage', 'language',
-    'SURVIVAL GAMES', 'header-logo', 'hub-logo', '<header'
-]
 
-out = []
-for needle in needles:
-    positions = [m.start() for m in re.finditer(re.escape(needle), src, flags=re.I)]
-    out.append(f'\n===== {needle} ({len(positions)}) =====\n')
-    for i, pos in enumerate(positions[:8]):
-        a = max(0, pos - 5000)
-        b = min(len(src), pos + 10000)
-        out.append(f'\n--- occurrence {i+1} @ {pos} ---\n')
-        out.append(src[a:b])
-        out.append('\n')
+def write(name, text):
+    Path(name).write_text(text, encoding='utf-8')
+    print(name, len(text))
 
-# Also extract the first full header element using a tolerant range.
+# Exact first header markup.
 h = re.search(r'<header\b', src, flags=re.I)
+header = ''
 if h:
     close = src.find('</header>', h.start())
     if close != -1:
-        out.append('\n===== FIRST FULL HEADER =====\n')
-        out.append(src[h.start():close+9])
+        header = src[h.start():close+9]
+write('hub-header-exact.html', header)
 
-# Extract style blocks that mention key header selectors / font faces.
-for m in re.finditer(r'<style\b[^>]*>(.*?)</style>', src, flags=re.I|re.S):
-    block = m.group(0)
-    if any(k.lower() in block.lower() for k in ['header-actions','languagepicker','main-header','site-header','@font-face','logo']):
-        out.append('\n===== RELEVANT STYLE BLOCK =====\n')
-        out.append(block)
+# Compact windows around selectors / language / route logic.
+def windows(needles, radius=3500, limit=4):
+    chunks=[]
+    seen=[]
+    for needle in needles:
+        for m in list(re.finditer(re.escape(needle), src, flags=re.I))[:limit]:
+            a=max(0,m.start()-radius); b=min(len(src),m.start()+radius)
+            # avoid near-duplicate windows
+            if any(abs(a-x)<radius for x in seen):
+                continue
+            seen.append(a)
+            chunks.append(f'\n===== {needle} @ {m.start()} =====\n{src[a:b]}\n')
+    return ''.join(chunks)
 
-Path('hub-shell-extract.txt').write_text(''.join(out), encoding='utf-8')
-print('wrote', Path('hub-shell-extract.txt').stat().st_size, 'bytes')
+write('hub-header-css-snippets.txt', windows([
+    '.header-actions', '#languagePicker', '.language-picker', '.primary-nav', '.logo', '.hub-logo', '@font-face'
+], radius=2500, limit=3))
+write('hub-language-router-snippets.txt', windows([
+    'languagePicker', 'hub_language', 'hubLang', 'data-route', 'location.hash', 'showPage(', 'setLanguage('
+], radius=3000, limit=5))
+write('hub-logo-font-snippets.txt', windows([
+    'SURVIVAL GAMES', 'logo', 'Montserrat', 'font-family', 'font-face'
+], radius=2200, limit=4))
