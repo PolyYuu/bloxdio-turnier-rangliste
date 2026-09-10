@@ -26,8 +26,6 @@ function extractRegasserts(text){
     const newline=text.indexOf('\n',start);
     if(newline>=0)end=Math.min(end,newline);
     let raw=text.slice(start,end).trim();
-    // Wrapped chat text can include surrounding UI text. REGASSERT currently has
-    // no spaces outside encoded fields, so a whitespace boundary safely ends it.
     const ws=raw.search(/\s/);
     if(ws>0)raw=raw.slice(0,ws);
     if(raw.length>=REGASSERT_START.length+10&&raw.length<=4000)out.push(raw);
@@ -51,7 +49,8 @@ async function processText(value){
     seenAssertions.add(key);
     if(seenAssertions.size>800)seenAssertions.clear();
     const response=await chrome.runtime.sendMessage({type:'BLOXD_GLOBAL_REGASSERT',raw}).catch(()=>null);
-    if(response?.ok)toast(`HUB RELAY · REGASSERT #${response.totalObserved} erkannt`,'#55e6b1',3000);
+    if(response?.ok)toast(`HUB RELAY · REGASSERT #${response.totalObserved} hochgeladen`,'#55e6b1',3000);
+    else if(response?.error)toast(`HUB RELAY · Uploadfehler: ${response.error}`,'#ff6b6b',5000);
   }
 
   for(const pattern of SHORT_CODE_PATTERNS){
