@@ -2,12 +2,13 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Global Bloxd.io relay bridge for HUB Survival Games verification events.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://bloxd.io/*",
+    "https://nxzrgbpaxukgjyzwupjp.supabase.co/*",
     "https://bloxdio-turnier-rangliste.vercel.app/*"
   ],
   "background": {"service_worker": "service-worker.js"},
