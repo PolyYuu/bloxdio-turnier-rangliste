@@ -60,6 +60,13 @@
 
   function addStyles(){if($('#hubPendingIntegratedStyles'))return;const style=document.createElement('style');style.id='hubPendingIntegratedStyles';style.textContent=`.hub-pending-header-status{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,198,92,.28);background:rgba(255,198,92,.11);color:#ffc65c;border-radius:999px;padding:8px 11px;font:800 9px/1 Montserrat,Arial;letter-spacing:.06em;cursor:pointer;white-space:nowrap}.hub-pending-mini-info,.hub-pending-info{display:inline-grid;place-items:center;border:1px solid currentColor;border-radius:50%;font-family:Georgia,serif;font-style:italic;font-weight:800;line-height:1}.hub-pending-mini-info{width:15px;height:15px;font-size:9px}.hub-pending-info{width:32px;height:32px;color:#ffc65c;background:rgba(255,198,92,.08);font-size:14px;cursor:pointer}.hub-pending-overview{display:grid;gap:12px;padding:8px 2px 4px}.hub-pending-overview strong{font-size:18px}.hub-pending-overview p{margin:0;color:#9892a8;line-height:1.55;font-size:13px}.hub-pending-overview .secondary-button{width:max-content}body.hub-pending-account [data-open-register],body.hub-pending-account .next-cup-cta,body.hub-pending-account [data-register-next-cup],body.hub-pending-account [data-next-cup-register]{display:none!important}body.hub-pending-account [data-page="profile"] .profile-grid{grid-template-columns:1fr!important}body.hub-pending-account [data-page="profile"] .profile-rank-card{width:100%;box-sizing:border-box}.hub-pending-profile-card{display:grid;gap:14px;padding:18px 12px}.hub-pending-profile-card h2{margin:0;font-size:30px}.hub-pending-profile-card p{max-width:760px;margin:0;color:#a29bad;line-height:1.65}.hub-pending-profile-card button{width:max-content}.hub-pending-kicker{color:#ffc65c;font:900 10px/1 Montserrat;letter-spacing:.12em}body.hub-pending-account #editAvatarButton,body.hub-pending-account #renameButton,body.hub-pending-account #profileAdminButton{display:none!important}body.hub-pending-account [data-page="profile"] .stats-panel,body.hub-pending-account [data-page="profile"] .history-panel,body.hub-pending-account [data-page="profile"] .recent-updates{display:none!important}@media(max-width:900px){.hub-pending-header-status{max-width:170px;overflow:hidden;text-overflow:ellipsis}.hub-pending-overview .secondary-button,.hub-pending-profile-card button{width:100%}}`;document.head.appendChild(style);}
 
+  function patchLoginModal(){
+    const m=$('#v3AuthModal');if(!m)return;const form=$('#v3AuthForm',m);if(!form)return;
+    const first=$('label',form),label=first?.querySelector('span'),intro=$('p',m),l=language();
+    if(label)label.textContent=l==='de'?'Ingame-Name oder 8-Zeichen-Code':l==='fr'?'Pseudo ou code à 8 caractères':'Ingame name or 8-character code';
+    if(intro)intro.textContent=l==='de'?'Nutze deinen aktuellen Bloxd.io Ingame-Namen oder deinen 8-Zeichen-Code.':l==='fr'?'Utilise ton pseudo Bloxd.io actuel ou ton code à 8 caractères.':'Use your current Bloxd.io ingame name or your 8-character code.';
+  }
+
   function applyUi(){if(!currentPendingState())return;active=true;live.registrationState=state;document.body.classList.add('hub-pending-account');addStyles();hideUnverifiedActions();installHeader();renderOverviewPendingCard();if(location.hash==='#profile')renderPendingProfile();}
   function clearPendingUi(){
     state=null;active=false;live.registrationState=null;document.body.classList.remove('hub-pending-account');$('#hubPendingHeaderStatus')?.remove();
@@ -85,6 +92,7 @@
 
   addViewportSafety();
   document.addEventListener('pointerdown',interceptPendingAction,true);document.addEventListener('click',interceptPendingAction,true);
+  document.addEventListener('click',e=>{if(e.target.closest?.('#loginDemoButton')&&!currentPendingState())setTimeout(patchLoginModal,0);},true);
   window.addEventListener('hashchange',()=>{if(currentPendingState()&&location.hash==='#profile')renderPendingProfile();});
   document.addEventListener('hub:auth-restored',(e)=>{
     const detail=e.detail||{};
