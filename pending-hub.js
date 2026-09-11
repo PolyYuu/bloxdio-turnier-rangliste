@@ -21,7 +21,7 @@
 
   function storedAuthUserId(){try{for(let i=0;i<localStorage.length;i+=1){const key=localStorage.key(i);if(!key||!key.startsWith('sb-')||!key.endsWith('-auth-token'))continue;const parsed=JSON.parse(localStorage.getItem(key)||'null');const id=parsed?.user?.id||parsed?.currentSession?.user?.id||parsed?.session?.user?.id;if(id)return String(id);}}catch(_){}return'';}
   function readCache(){try{const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(!cached||cached.status!=='pending')return null;const authId=storedAuthUserId();if(!authId)return null;if(cached.auth_user_id&&cached.auth_user_id!==authId)return null;return cached;}catch(_){return null;}}
-  function writeCache(data,authUserId){try{const id=authUserId||storedAuthUserId();if(!id)return;localStorage.setItem(CACHE_KEY,JSON.stringify({status:'pending',auth_user_id:id,source:data?.source||data?.verification_source||'',cached_at:Date.now()}));}catch(_){}}
+  function writeCache(data,authUserId){try{const id=authUserId||storedAuthUserId();if(!id)return;localStorage.setItem(CACHE_KEY,JSON.stringify({status:'pending',auth_user_id:id,source:data?.source||data?.verification_source||'',cached_at:Date.now()}));}catch(_){} }
   function clearCache(){try{localStorage.removeItem(CACHE_KEY);}catch(_){} }
 
   let state=live.registrationState?.status==='pending'?live.registrationState:null;
@@ -31,7 +31,7 @@
 
   function addViewportSafety(){
     if($('#hubViewportSafetyStyles'))return;
-    const style=document.createElement('style');style.id='hubViewportSafetyStyles';style.textContent=`html{width:100%!important;max-width:none!important;overflow-x:hidden}body{width:100vw!important;max-width:none!important;overflow-x:hidden}.site-header{width:100%!important;max-width:none!important}.app-shell{width:min(calc(100vw - 40px),var(--max))!important;max-width:var(--max)!important}@media(max-width:760px){.app-shell{width:min(calc(100vw - 22px),var(--max))!important}}`;document.head.appendChild(style);
+    const style=document.createElement('style');style.id='hubViewportSafetyStyles';style.textContent=`:root{--max:calc(100vw - 40px)!important}html{width:100%!important;max-width:none!important;overflow-x:hidden}body{width:100vw!important;max-width:none!important;overflow-x:hidden}.site-header{width:100%!important;max-width:none!important}.app-shell{width:calc(100vw - 40px)!important;max-width:none!important}@media(max-width:760px){:root{--max:calc(100vw - 22px)!important}.app-shell{width:calc(100vw - 22px)!important}}`;document.head.appendChild(style);
   }
 
   function showPage(page){$$('.page').forEach(p=>p.classList.toggle('active',p.dataset.page===page));$$('.primary-nav [data-route]').forEach(a=>a.classList.toggle('active',a.dataset.route===page));if(location.hash!==`#${page}`)history.replaceState(null,'',`#${page}`);window.scrollTo({top:0,behavior:'smooth'});}
