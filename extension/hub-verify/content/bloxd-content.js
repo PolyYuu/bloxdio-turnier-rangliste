@@ -1,146 +1,24 @@
 'use strict';
 
-const SHORT_CODE_PATTERNS=[
-  /HUB\s*Registrierungscode\s*:\s*([A-Z0-9]{8})/ig,
-  /HUB\s*Registration\s*code\s*:\s*([A-Z0-9]{8})/ig,
-  /HUB\s*Code\s*:\s*([A-Z0-9]{8})/ig
-];
-const REGASSERT_START='__SG_EVT__|REGASSERT|';
-const REGSELF_START='__SG_EVT__|REGSELF|';
-const seenText=new Set();
-const seenAssertions=new Set();
-const ownWatchers=new Map();
-let statusBox=null;
-let observer=null;
-let scanTimer=null;
-
+const SHORT_CODE_PATTERNS=[/HUB\s*Registrierungscode\s*:\s*([A-Z0-9]{8})/ig,/HUB\s*Registration\s*code\s*:\s*([A-Z0-9]{8})/ig,/HUB\s*Code\s*:\s*([A-Z0-9]{8})/ig];
+const REGASSERT_START='__SG_EVT__|REGASSERT|',REGSELF_START='__SG_EVT__|REGSELF|',DEFAULT_LANGUAGE='en';
+const COPY={en:{title:n=>`${n||'Your player'} is now verified`,subtitle:'All features on The HUB are now available to you.'},de:{title:n=>`${n||'Dein Spieler'} ist jetzt verifiziert`,subtitle:'Alle Funktionen auf The HUB stehen dir jetzt zur Verfügung.'},fr:{title:n=>`${n||'Ton joueur'} est maintenant vérifié`,subtitle:'Toutes les fonctionnalités de The HUB sont maintenant disponibles.'}};
+const seenText=new Set(),seenAssertions=new Set(),ownWatchers=new Map();let uiLanguage=DEFAULT_LANGUAGE,statusBox=null,observer=null,scanTimer=null;
 function hash(text){let h=2166136261;for(let i=0;i<text.length;i+=1)h=Math.imul(h^text.charCodeAt(i),16777619);return String(h>>>0);}
-function ensureStatus(){if(statusBox||window.top!==window||!document.documentElement)return;statusBox=document.createElement('div');statusBox.id='hub-verify-extension-status';Object.assign(statusBox.style,{position:'fixed',right:'14px',bottom:'14px',zIndex:'2147483647',padding:'13px 15px',border:'1px solid rgba(85,230,177,.68)',borderRadius:'11px',background:'rgba(7,4,13,.95)',color:'#f7ffff',font:'700 12px/1.45 Arial,sans-serif',boxShadow:'0 12px 34px rgba(0,0,0,.38)',pointerEvents:'none',opacity:'0',transform:'translateY(8px)',transition:'opacity .2s ease, transform .2s ease',whiteSpace:'pre-line',maxWidth:'340px'});document.documentElement.appendChild(statusBox);}
-function toast(text,accent='#55e6b1',timeout=15000){ensureStatus();if(!statusBox)return;statusBox.textContent=text;statusBox.style.borderColor=accent;statusBox.style.opacity='1';statusBox.style.transform='translateY(0)';if(statusBox._hubTimer)clearTimeout(statusBox._hubTimer);if(timeout)statusBox._hubTimer=setTimeout(()=>{if(statusBox){statusBox.style.opacity='0';statusBox.style.transform='translateY(8px)';}},timeout);}
-
+async function loadLanguage(){try{const data=await chrome.storage.local.get({hubLanguage:DEFAULT_LANGUAGE});uiLanguage=['en','de','fr'].includes(data.hubLanguage)?data.hubLanguage:DEFAULT_LANGUAGE;}catch(_){uiLanguage=DEFAULT_LANGUAGE;}}
+function ensureStatus(){if(statusBox||window.top!==window||!document.documentElement)return;statusBox=document.createElement('div');statusBox.id='hub-verify-extension-status';Object.assign(statusBox.style,{position:'fixed',right:'14px',bottom:'14px',zIndex:'2147483647',minWidth:'260px',maxWidth:'360px',padding:'14px 16px',border:'1px solid rgba(85,230,177,.68)',borderRadius:'11px',background:'rgba(7,4,13,.95)',color:'#f7ffff',fontFamily:'Arial,sans-serif',boxShadow:'0 12px 34px rgba(0,0,0,.38)',pointerEvents:'none',opacity:'0',transform:'translateY(8px)',transition:'opacity .2s ease, transform .2s ease'});document.documentElement.appendChild(statusBox);}
+function toast(title,subtitle,accent='#55e6b1',timeout=15000){ensureStatus();if(!statusBox)return;statusBox.textContent='';const heading=document.createElement('strong');heading.textContent=String(title||'');Object.assign(heading.style,{display:'block',fontSize:'13px',lineHeight:'1.35',fontWeight:'800',color:'#fff'});const detail=document.createElement('span');detail.textContent=String(subtitle||'');Object.assign(detail.style,{display:'block',marginTop:'4px',fontSize:'10px',lineHeight:'1.45',fontWeight:'600',color:'rgba(247,255,255,.72)'});statusBox.append(heading,detail);statusBox.style.borderColor=accent;statusBox.style.opacity='1';statusBox.style.transform='translateY(0)';if(statusBox._hubTimer)clearTimeout(statusBox._hubTimer);if(timeout)statusBox._hubTimer=setTimeout(()=>{if(statusBox){statusBox.style.opacity='0';statusBox.style.transform='translateY(8px)';}},timeout);}
 async function getNotifiedCodes(){try{const data=await chrome.storage.local.get({ownVerifiedNotifications:[]});return Array.isArray(data.ownVerifiedNotifications)?data.ownVerifiedNotifications:[];}catch(_){return[];}}
-async function setNotified(code,value){try{const list=await getNotifiedCodes();const next=value?[...new Set([...list,code])]:list.filter((x)=>x!==code);await chrome.storage.local.set({ownVerifiedNotifications:next.slice(-30)});}catch(_){}}
-async function showOwnVerified(code,name){const notified=await getNotifiedCodes();if(notified.includes(code))return;await setNotified(code,true);toast(`Spieler ${String(name||'Dein Spieler')} ist nun verifiziert\nKehre zurück zur Website, um dein Profil zu sehen.`,'#55e6b1',15000);}
-
-async function checkOwnCode(code){
-  const response=await chrome.runtime.sendMessage({type:'BLOXD_REGISTRATION_CODE',code}).catch(()=>null);
-  if(response?.notifySelf){
-    await showOwnVerified(code,response.verifiedPlayerName||null);
-    const watcher=ownWatchers.get(code);if(watcher){clearInterval(watcher.timer);ownWatchers.delete(code);}return true;
-  }
-  await setNotified(code,false);
-  return false;
-}
-
-function watchOwnCode(code){
-  if(!code||ownWatchers.has(code))return;
-  let attempts=0;
-  const tick=async()=>{
-    attempts+=1;
-    const done=await checkOwnCode(code);
-    if(done||attempts>=180){const watcher=ownWatchers.get(code);if(watcher)clearInterval(watcher.timer);ownWatchers.delete(code);}
-  };
-  const timer=setInterval(tick,2000);
-  ownWatchers.set(code,{timer});
-  tick();
-}
-
-function extractRegself(text){
-  const start=text.indexOf(REGSELF_START);
-  if(start<0)return null;
-  let raw=text.slice(start).trim();
-  const newline=raw.indexOf('\n');if(newline>=0)raw=raw.slice(0,newline);
-  const ws=raw.search(/\s/);if(ws>0)raw=raw.slice(0,ws);
-  const parts=raw.split('|');
-  if(parts.length!==5)return null;
-  const code=String(parts[4]||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-  if(!/^[A-Z0-9]{8}$/.test(code))return null;
-  return {code};
-}
-
-function extractRegasserts(text){
-  const out=[];let from=0;
-  while(true){
-    const start=text.indexOf(REGASSERT_START,from);if(start<0)break;
-    let end=text.length;
-    const next=text.indexOf('__SG_EVT__|',start+REGASSERT_START.length);if(next>=0)end=Math.min(end,next);
-    const newline=text.indexOf('\n',start);if(newline>=0)end=Math.min(end,newline);
-    let raw=text.slice(start,end).trim();
-    const ws=raw.search(/\s/);if(ws>0)raw=raw.slice(0,ws);
-    if(raw.length>=REGASSERT_START.length+10&&raw.length<=4000)out.push(raw);
-    from=start+REGASSERT_START.length;
-  }
-  return out;
-}
-
-async function processText(value){
-  const text=String(value||'');if(!text||text.length>50000)return;
-  const self=extractRegself(text);if(self?.code)watchOwnCode(self.code);
-  const textKey=hash(text);if(seenText.has(textKey))return;seenText.add(textKey);if(seenText.size>2400)seenText.clear();
-
-  const assertions=extractRegasserts(text);
-  for(const raw of assertions){
-    const key=hash(raw);if(seenAssertions.has(key))continue;seenAssertions.add(key);if(seenAssertions.size>1200)seenAssertions.clear();
-    const response=await chrome.runtime.sendMessage({type:'BLOXD_GLOBAL_REGASSERT',raw}).catch(()=>null);
-    if(response?.notifySelf){
-      const parts=String(raw).split('|');
-      const code=parts.length===8?String(parts[5]||'').toUpperCase():'';
-      await showOwnVerified(code,response.verifiedPlayerName||null);
-    }
-  }
-
-  for(const pattern of SHORT_CODE_PATTERNS){
-    pattern.lastIndex=0;let match;
-    while((match=pattern.exec(text))){
-      const code=String(match[1]||'').toUpperCase();
-      watchOwnCode(code);
-    }
-  }
-}
-
-function inspect(node){
-  if(!node)return;
-  if(node.nodeType===Node.TEXT_NODE){processText(node.textContent||'');return;}
-  if(node.nodeType!==Node.ELEMENT_NODE&&node.nodeType!==Node.DOCUMENT_FRAGMENT_NODE&&node.nodeType!==Node.DOCUMENT_NODE)return;
-  const text=String(node.textContent||'');
-  if(text.includes(REGASSERT_START)||text.includes(REGSELF_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);
-}
-
-function scanExisting(){
-  try{
-    if(!document.body)return;
-    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-    let n,count=0;
-    while((n=walker.nextNode())&&count<12000){
-      const text=String(n.textContent||'');
-      if(text.includes(REGASSERT_START)||text.includes(REGSELF_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);
-      count++;
-    }
-  }catch(_){}
-}
-
-function attachObserver(){
-  if(observer||!document.documentElement)return;
-  observer=new MutationObserver((mutations)=>{
-    for(const mutation of mutations){
-      if(mutation.type==='characterData')inspect(mutation.target);
-      for(const node of mutation.addedNodes)inspect(node);
-    }
-  });
-  observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
-}
-
-async function boot(){
-  attachObserver();
-  await chrome.runtime.sendMessage({type:'BLOXD_EXTENSION_READY',url:location.href}).catch(()=>null);
-  scanExisting();
-  let scans=0;
-  scanTimer=setInterval(()=>{
-    scanExisting();
-    scans++;
-    if(scans>=12){clearInterval(scanTimer);scanTimer=null;}
-  },750);
-}
-
-if(document.documentElement)boot();
-else document.addEventListener('readystatechange',()=>{if(document.documentElement&&!observer)boot();});
+async function setNotified(code,value){try{const list=await getNotifiedCodes(),next=value?[...new Set([...list,code])]:list.filter(x=>x!==code);await chrome.storage.local.set({ownVerifiedNotifications:next.slice(-30)});}catch(_){}}
+async function showOwnVerified(code,name){const notified=await getNotifiedCodes();if(notified.includes(code))return;await setNotified(code,true);const copy=COPY[uiLanguage]||COPY.en;toast(copy.title(String(name||'')),copy.subtitle,'#55e6b1',15000);}
+async function checkOwnCode(code){const response=await chrome.runtime.sendMessage({type:'BLOXD_REGISTRATION_CODE',code}).catch(()=>null);if(response?.notifySelf){await showOwnVerified(code,response.verifiedPlayerName||null);const watcher=ownWatchers.get(code);if(watcher){clearInterval(watcher.timer);ownWatchers.delete(code);}return true;}await setNotified(code,false);return false;}
+function watchOwnCode(code){if(!code||ownWatchers.has(code))return;let attempts=0;const tick=async()=>{attempts+=1;const done=await checkOwnCode(code);if(done||attempts>=180){const watcher=ownWatchers.get(code);if(watcher)clearInterval(watcher.timer);ownWatchers.delete(code);}};const timer=setInterval(tick,2000);ownWatchers.set(code,{timer});tick();}
+function extractRegself(text){const start=text.indexOf(REGSELF_START);if(start<0)return null;let raw=text.slice(start).trim();const newline=raw.indexOf('\n');if(newline>=0)raw=raw.slice(0,newline);const ws=raw.search(/\s/);if(ws>0)raw=raw.slice(0,ws);const parts=raw.split('|');if(parts.length!==5)return null;const code=String(parts[4]||'').toUpperCase().replace(/[^A-Z0-9]/g,'');return /^[A-Z0-9]{8}$/.test(code)?{code}:null;}
+function extractRegasserts(text){const out=[];let from=0;while(true){const start=text.indexOf(REGASSERT_START,from);if(start<0)break;let end=text.length;const next=text.indexOf('__SG_EVT__|',start+REGASSERT_START.length);if(next>=0)end=Math.min(end,next);const newline=text.indexOf('\n',start);if(newline>=0)end=Math.min(end,newline);let raw=text.slice(start,end).trim();const ws=raw.search(/\s/);if(ws>0)raw=raw.slice(0,ws);if(raw.length>=REGASSERT_START.length+10&&raw.length<=4000)out.push(raw);from=start+REGASSERT_START.length;}return out;}
+async function processText(value){const text=String(value||'');if(!text||text.length>50000)return;const self=extractRegself(text);if(self?.code)watchOwnCode(self.code);const textKey=hash(text);if(seenText.has(textKey))return;seenText.add(textKey);if(seenText.size>2400)seenText.clear();for(const raw of extractRegasserts(text)){const key=hash(raw);if(seenAssertions.has(key))continue;seenAssertions.add(key);if(seenAssertions.size>1200)seenAssertions.clear();const response=await chrome.runtime.sendMessage({type:'BLOXD_GLOBAL_REGASSERT',raw}).catch(()=>null);if(response?.notifySelf){const parts=String(raw).split('|'),code=parts.length===8?String(parts[5]||'').toUpperCase():'';await showOwnVerified(code,response.verifiedPlayerName||null);}}for(const pattern of SHORT_CODE_PATTERNS){pattern.lastIndex=0;let match;while((match=pattern.exec(text)))watchOwnCode(String(match[1]||'').toUpperCase());}}
+function inspect(node){if(!node)return;if(node.nodeType===Node.TEXT_NODE){processText(node.textContent||'');return;}if(node.nodeType!==Node.ELEMENT_NODE&&node.nodeType!==Node.DOCUMENT_FRAGMENT_NODE&&node.nodeType!==Node.DOCUMENT_NODE)return;const text=String(node.textContent||'');if(text.includes(REGASSERT_START)||text.includes(REGSELF_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);}
+function scanExisting(){try{if(!document.body)return;const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n,count=0;while((n=walker.nextNode())&&count<12000){const text=String(n.textContent||'');if(text.includes(REGASSERT_START)||text.includes(REGSELF_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);count++;}}catch(_){}}
+function attachObserver(){if(observer||!document.documentElement)return;observer=new MutationObserver(mutations=>{for(const mutation of mutations){if(mutation.type==='characterData')inspect(mutation.target);for(const node of mutation.addedNodes)inspect(node);}});observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});}
+async function boot(){await loadLanguage();attachObserver();await chrome.runtime.sendMessage({type:'BLOXD_EXTENSION_READY',url:location.href}).catch(()=>null);scanExisting();let scans=0;scanTimer=setInterval(()=>{scanExisting();scans++;if(scans>=12){clearInterval(scanTimer);scanTimer=null;}},750);}
+chrome.storage?.onChanged?.addListener((changes,area)=>{if(area==='local'&&changes.hubLanguage){const next=changes.hubLanguage.newValue;uiLanguage=['en','de','fr'].includes(next)?next:DEFAULT_LANGUAGE;}});
+if(document.documentElement)boot();else document.addEventListener('readystatechange',()=>{if(document.documentElement&&!observer)boot();});
