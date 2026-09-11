@@ -2,18 +2,35 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "0.9.3",
-  "description": "Safe early-start passive Bloxd.io verification bridge for HUB Survival Games.",
+  "version": "0.9.4",
+  "description": "Passive Bloxd.io verification bridge for HUB Survival Games.",
   "minimum_chrome_version": "120",
-  "permissions": ["storage", "tabs"],
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
   "host_permissions": [
     "https://bloxd.io/*",
     "https://nxzrgbpaxukgjyzwupjp.supabase.co/*",
     "https://bloxdio-turnier-rangliste.vercel.app/*"
   ],
-  "background": {"service_worker": "service-worker.js"},
-  "action": {"default_title": "HUB Verify · Passive Bridge", "default_popup": "popup/popup.html"},
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "HUB Verify · Passive Bridge",
+    "default_popup": "popup/popup.html"
+  },
   "content_scripts": [
-    {"matches": ["https://bloxd.io/*"], "js": ["content/bloxd-content.js"], "run_at": "document_start", "all_frames": true}
+    {
+      "matches": [
+        "https://bloxd.io/*"
+      ],
+      "js": [
+        "content/bloxd-content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
   ]
 }
