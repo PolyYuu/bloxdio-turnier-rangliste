@@ -3,12 +3,12 @@ const $=(s)=>document.querySelector(s);
 function recent(ts,maxAge=120000){return Number(ts||0)>Date.now()-maxAge;}
 function ago(ts){const s=Math.max(0,Math.round((Date.now()-Number(ts||0))/1000));if(s<60)return`vor ${s}s`;return`vor ${Math.round(s/60)}min`;}
 function render(state,version){
-  $('#version').textContent=`v${version||'0.7.0'}`;
+  $('#version').textContent=`v${version||'0.9.2'}`;
   const online=recent(state.bloxdSeenAt);
   $('#bloxdDot').classList.toggle('on',online);
   $('#bloxdStatus').textContent=online?ago(state.bloxdSeenAt):'nicht erkannt';
   $('#relayTitle').textContent=online?'PASSIVE BRIDGE AKTIV':'Wartet auf Bloxd';
-  $('#relayText').textContent=online?'Verifizierungsdaten werden automatisch im Hintergrund verarbeitet. HUB Verify schreibt nichts in den Bloxd-Chat und übernimmt niemals den Eingabefokus.':'Öffne die HUB-/Turnierlobby in Bloxd. Die Extension arbeitet danach vollständig passiv.';
+  $('#relayText').textContent=online?'Verifizierungsdaten werden automatisch im Hintergrund verarbeitet. Nach deiner einmaligen eigenen Verifizierungsbestätigung bleibt HUB Verify vollständig still.':'Öffne die HUB-/Turnierlobby in Bloxd. Die Extension arbeitet danach vollständig passiv.';
   const uploaded=Number(state.totalAssertionsUploaded||0);
   $('#assertionCount').textContent=String(uploaded);
   const latest=Array.isArray(state.recentAssertions)&&state.recentAssertions[0];
