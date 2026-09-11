@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "0.4.0",
-  "description": "Global Bloxd.io relay bridge for HUB Survival Games verification events.",
+  "version": "0.5.0",
+  "description": "Silent global Bloxd.io verification bridge for HUB Survival Games.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "tabs"],
   "host_permissions": [
