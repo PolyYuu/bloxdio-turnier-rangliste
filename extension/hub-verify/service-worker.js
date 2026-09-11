@@ -27,7 +27,15 @@ async function post(body){const response=await fetch(INGEST_URL,{method:'POST',h
 
 chrome.runtime.onInstalled.addListener(async()=>{
   const old=await chrome.storage.local.get(null);
-  await chrome.storage.local.set({...DEFAULT_STATE,totalAssertionsObserved:Number(old.totalAssertionsObserved||0),totalAssertionsUploaded:Number(old.totalAssertionsUploaded||0),recentAssertions:Array.isArray(old.recentAssertions)?old.recentAssertions.slice(0,MAX_RECENT):[],uploadedKeys:Array.isArray(old.uploadedKeys)?old.uploadedKeys.slice(-500):[]});
+  await chrome.storage.local.set({
+    ...DEFAULT_STATE,
+    totalAssertionsObserved:Number(old.totalAssertionsObserved||0),
+    totalAssertionsUploaded:Number(old.totalAssertionsUploaded||0),
+    recentAssertions:Array.isArray(old.recentAssertions)?old.recentAssertions.slice(0,MAX_RECENT):[],
+    uploadedKeys:Array.isArray(old.uploadedKeys)?old.uploadedKeys.slice(-500):[],
+    latestRegistrationCode:old.latestRegistrationCode||null,
+    latestUpload:old.latestUpload||null
+  });
   await badge();
 });
 chrome.runtime.onStartup.addListener(badge);
@@ -40,41 +48,52 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     }
     if(type==='BLOXD_GLOBAL_REGASSERT'){
       const raw=cleanRaw(message.raw);if(!raw){sendResponse({ok:false,error:'invalid_regassert'});return;}
-      const state=await getState();const key=rawKey(raw),code=rawCode(raw);const recent=Array.isArray(state.recentAssertions)?state.recentAssertions:[];const existing=recent.find((x)=>x&&x.key===key);
+      const state=await getState();
+      const key=rawKey(raw),code=rawCode(raw);
+      const recent=Array.isArray(state.recentAssertions)?state.recentAssertions:[];
+      const existing=recent.find((x)=>x&&x.key===key);
       let total=Number(state.totalAssertionsObserved||0),next=recent;
       if(!existing){total+=1;next=[{key,seenAt:Date.now(),uploadStatus:'pending'},...recent].slice(0,MAX_RECENT);}
       try{
         const uploadedKeys=Array.isArray(state.uploadedKeys)?state.uploadedKeys:[];
-        const wasUploaded=uploadedKeys.includes(key);
-        if(wasUploaded){sendResponse({ok:true,silent:true,duplicate:true,uploaded:true,totalObserved:total,totalUploaded:Number(state.totalAssertionsUploaded||0)});return;}
+        const selfCode=cleanCode(state.latestRegistrationCode?.code||'');
 
+        // Always ask the backend first. A locally seen event may need to be
+        // processed again later (for example after a test account was reset,
+        // or when the website account was created after the Bloxd assertion).
         const known=await post({mode:'status',code});
         if(known.linked===true){
           const now=Date.now();
-          const updatedKeys=[...uploadedKeys,key].slice(-500);
+          const updatedKeys=uploadedKeys.includes(key)?uploadedKeys:[...uploadedKeys,key].slice(-500);
           const updatedRecent=next.map((x)=>x?.key===key?{...x,uploadStatus:'already-linked',uploadedAt:now}:x);
+          const notifySelf=Boolean(selfCode&&code===selfCode);
           const updated=await setState({bloxdSeenAt:now,totalAssertionsObserved:total,recentAssertions:updatedRecent,uploadedKeys:updatedKeys});
           await badge();
-          sendResponse({ok:true,silent:true,duplicate:true,uploaded:false,totalObserved:updated.totalAssertionsObserved,totalUploaded:Number(updated.totalAssertionsUploaded||0)});return;
+          sendResponse({ok:true,silent:!notifySelf,notifySelf,verifiedPlayerName:notifySelf?(known.playerName||null):null,duplicate:true,uploaded:false,totalObserved:updated.totalAssertionsObserved,totalUploaded:Number(updated.totalAssertionsUploaded||0)});return;
         }
 
+        // linked=false means the assertion must be offered again even if this
+        // browser uploaded it before. The backend safely deduplicates the event
+        // and re-runs pending-account matching.
         const result=await post({raw});
         const now=Date.now();
-        const updatedKeys=[...uploadedKeys,key].slice(-500);
+        const updatedKeys=uploadedKeys.includes(key)?uploadedKeys:[...uploadedKeys,key].slice(-500);
         const updatedRecent=next.map((x)=>x?.key===key?{...x,uploadStatus:'uploaded',uploadedAt:now}:x);
         const uploadedCount=Number(state.totalAssertionsUploaded||0)+1;
-        const selfCode=cleanCode(state.latestRegistrationCode?.code||'');
-        const selfFresh=Number(state.latestRegistrationCode?.seenAt||0)>now-5*60*1000;
-        const notifySelf=Boolean(selfFresh&&selfCode&&code===selfCode&&result.playerLinked===true);
+        const notifySelf=Boolean(selfCode&&code===selfCode&&result.playerLinked===true);
         const updated=await setState({bloxdSeenAt:now,totalAssertionsObserved:total,totalAssertionsUploaded:uploadedCount,recentAssertions:updatedRecent,uploadedKeys:updatedKeys,latestUpload:{ok:true,seenAt:now}});await badge();
         sendResponse({ok:true,silent:!notifySelf,notifySelf,verifiedPlayerName:notifySelf?(result.playerName||null):null,duplicate:Boolean(existing||result.duplicate),totalObserved:updated.totalAssertionsObserved,totalUploaded:updated.totalAssertionsUploaded,uploaded:true});return;
       }catch(error){
-        const now=Date.now();const updatedRecent=next.map((x)=>x?.key===key?{...x,uploadStatus:'error',uploadedAt:now}:x);const updated=await setState({bloxdSeenAt:now,totalAssertionsObserved:total,recentAssertions:updatedRecent,latestUpload:{ok:false,error:String(error?.message||error),seenAt:now}});await badge();sendResponse({ok:false,silent:true,error:String(error?.message||error),totalObserved:updated.totalAssertionsObserved,uploaded:false});return;
+        const now=Date.now();
+        const updatedRecent=next.map((x)=>x?.key===key?{...x,uploadStatus:'error',uploadedAt:now}:x);
+        const updated=await setState({bloxdSeenAt:now,totalAssertionsObserved:total,recentAssertions:updatedRecent,latestUpload:{ok:false,error:String(error?.message||error),seenAt:now}});await badge();
+        sendResponse({ok:false,silent:true,error:String(error?.message||error),totalObserved:updated.totalAssertionsObserved,uploaded:false});return;
       }
     }
     if(type==='BLOXD_REGISTRATION_CODE'){
       const code=cleanCode(message.code);if(!code){sendResponse({ok:false,error:'invalid_code'});return;}
-      const now=Date.now();const state=await setState({bloxdSeenAt:now,latestRegistrationCode:{code,seenAt:now}});await badge();
+      const now=Date.now();
+      const state=await setState({bloxdSeenAt:now,latestRegistrationCode:{code,seenAt:now}});await badge();
       try{
         const status=await post({mode:'status',code});
         if(status.linked===true)sendResponse({ok:true,state,notifySelf:true,verifiedPlayerName:status.playerName||null});
