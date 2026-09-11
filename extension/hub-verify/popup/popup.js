@@ -3,21 +3,20 @@ const $=(s)=>document.querySelector(s);
 function recent(ts,maxAge=120000){return Number(ts||0)>Date.now()-maxAge;}
 function ago(ts){const s=Math.max(0,Math.round((Date.now()-Number(ts||0))/1000));if(s<60)return`vor ${s}s`;return`vor ${Math.round(s/60)}min`;}
 function render(state,version){
-  $('#version').textContent=`v${version||'0.4.0'}`;
+  $('#version').textContent=`v${version||'0.5.0'}`;
   const online=recent(state.bloxdSeenAt);
   $('#bloxdDot').classList.toggle('on',online);
   $('#bloxdStatus').textContent=online?ago(state.bloxdSeenAt):'nicht erkannt';
-  $('#relayTitle').textContent=online?'GLOBAL RELAY AKTIV':'Wartet auf Bloxd';
-  $('#relayText').textContent=online?'Diese Bloxd-Sitzung beobachtet lobbyweit REGASSERT-Events und lädt neue Nachweise automatisch zum HUB hoch.':'Öffne die HUB-/Turnierlobby in Bloxd. Die Extension muss nicht mit einem persönlichen HUB-Account gekoppelt werden.';
-  const observed=Number(state.totalAssertionsObserved||0),uploaded=Number(state.totalAssertionsUploaded||0);
-  $('#assertionCount').textContent=`${uploaded} / ${observed}`;
+  $('#relayTitle').textContent=online?'GLOBAL BRIDGE AKTIV':'Wartet auf Bloxd';
+  $('#relayText').textContent=online?'Verifizierungsdaten aus der Lobby werden automatisch und still zum HUB synchronisiert.':'Öffne die HUB-/Turnierlobby in Bloxd. Die Bridge ist nicht an einen einzelnen HUB-Account gekoppelt.';
+  const uploaded=Number(state.totalAssertionsUploaded||0);
+  $('#assertionCount').textContent=String(uploaded);
   const latest=Array.isArray(state.recentAssertions)&&state.recentAssertions[0];
-  $('#latestAssertion').textContent=latest?`Letztes Event ${ago(latest.seenAt)} · ${latest.uploadStatus==='uploaded'?'hochgeladen':latest.uploadStatus==='error'?'Uploadfehler':'erkannt'}`:'Noch kein REGASSERT-Event erkannt.';
+  $('#latestAssertion').textContent=latest?`Letzte Hintergrund-Verarbeitung ${ago(latest.seenAt)}.`:'Noch keine neuen Verifizierungsdaten verarbeitet.';
   const up=state.latestUpload;
-  if(up?.ok){$('#uploadStatus').textContent='ERFOLGREICH';$('#uploadText').textContent=`${up.code||'Code'}${up.playerName?` · ${up.playerName}`:''}${up.pendingVerification?` · Pending: ${up.pendingVerification}`:''}`;}
-  else if(up){$('#uploadStatus').textContent='FEHLER';$('#uploadText').textContent=String(up.error||'Unbekannter Uploadfehler');}
-  else{$('#uploadStatus').textContent='Noch keiner';$('#uploadText').textContent='Wartet auf ein neues REGASSERT-Event.';}
-  if(state.latestRegistrationCode?.code){$('#codeCard').hidden=false;$('#registrationCode').textContent=state.latestRegistrationCode.code;}else $('#codeCard').hidden=true;
+  if(up?.ok){$('#uploadStatus').textContent='VERBUNDEN';$('#uploadText').textContent='Die letzte Hintergrund-Verarbeitung wurde erfolgreich an den HUB übertragen.';}
+  else if(up){$('#uploadStatus').textContent='VERBINDUNGSFEHLER';$('#uploadText').textContent='Die Bridge versucht es bei einem späteren Event erneut.';}
+  else{$('#uploadStatus').textContent=online?'BEREIT':'OFFLINE';$('#uploadText').textContent='Andere Spieler werden still im Hintergrund verarbeitet.';}
 }
 async function refresh(){const r=await chrome.runtime.sendMessage({type:'HUB_EXTENSION_GET_STATE'});if(r?.ok)render(r.state||{},r.version);}
 $('#openHub').addEventListener('click',()=>chrome.runtime.sendMessage({type:'OPEN_HUB'}));
