@@ -6,6 +6,7 @@ const SHORT_CODE_PATTERNS=[
   /HUB\s*Code\s*:\s*([A-Z0-9]{8})/ig
 ];
 const REGASSERT_START='__SG_EVT__|REGASSERT|';
+const REGSELF_START='__SG_EVT__|REGSELF|';
 const seenText=new Set();
 const seenAssertions=new Set();
 const ownWatchers=new Map();
@@ -27,8 +28,6 @@ async function checkOwnCode(code){
     await showOwnVerified(code,response.verifiedPlayerName||null);
     const watcher=ownWatchers.get(code);if(watcher){clearInterval(watcher.timer);ownWatchers.delete(code);}return true;
   }
-  // If the code is currently not linked, allow a future verification to notify
-  // again. This also makes intentional test resets behave correctly.
   await setNotified(code,false);
   return false;
 }
@@ -44,6 +43,19 @@ function watchOwnCode(code){
   const timer=setInterval(tick,2000);
   ownWatchers.set(code,{timer});
   tick();
+}
+
+function extractRegself(text){
+  const start=text.indexOf(REGSELF_START);
+  if(start<0)return null;
+  let raw=text.slice(start).trim();
+  const newline=raw.indexOf('\n');if(newline>=0)raw=raw.slice(0,newline);
+  const ws=raw.search(/\s/);if(ws>0)raw=raw.slice(0,ws);
+  const parts=raw.split('|');
+  if(parts.length!==5)return null;
+  const code=String(parts[4]||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!/^[A-Z0-9]{8}$/.test(code))return null;
+  return {code};
 }
 
 function extractRegasserts(text){
@@ -63,6 +75,7 @@ function extractRegasserts(text){
 
 async function processText(value){
   const text=String(value||'');if(!text||text.length>50000)return;
+  const self=extractRegself(text);if(self?.code)watchOwnCode(self.code);
   const textKey=hash(text);if(seenText.has(textKey))return;seenText.add(textKey);if(seenText.size>2400)seenText.clear();
 
   const assertions=extractRegasserts(text);
@@ -90,7 +103,7 @@ function inspect(node){
   if(node.nodeType===Node.TEXT_NODE){processText(node.textContent||'');return;}
   if(node.nodeType!==Node.ELEMENT_NODE&&node.nodeType!==Node.DOCUMENT_FRAGMENT_NODE&&node.nodeType!==Node.DOCUMENT_NODE)return;
   const text=String(node.textContent||'');
-  if(text.includes(REGASSERT_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);
+  if(text.includes(REGASSERT_START)||text.includes(REGSELF_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);
 }
 
 function scanExisting(){
@@ -100,10 +113,10 @@ function scanExisting(){
     let n,count=0;
     while((n=walker.nextNode())&&count<12000){
       const text=String(n.textContent||'');
-      if(text.includes(REGASSERT_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);
+      if(text.includes(REGASSERT_START)||text.includes(REGSELF_START)||/HUB\s*(Registrierungscode|Registration\s*code|Code)\s*:/i.test(text))processText(text);
       count++;
     }
-  }catch(_){ }
+  }catch(_){}
 }
 
 function attachObserver(){
