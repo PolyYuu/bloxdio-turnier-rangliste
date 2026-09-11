@@ -44,88 +44,78 @@
     if (v.startsWith('en')) return 'en';
     return '';
   };
-  function visibleLanguage(){
-    const code = String($('#languageCode')?.textContent || '').trim().toLowerCase();
-    return ['de','en','fr'].includes(code) ? code : '';
-  }
-  function language(){
-    const stored = normalizeLang(localStorage.getItem('hub_language'));
-    const shown = visibleLanguage();
-    const chosen = shown || stored || normalizeLang(document.documentElement.lang) || 'en';
-    localStorage.setItem('hub_language', chosen);
-    localStorage.setItem('hubLang', chosen);
-    return chosen;
-  }
-  function persistLanguage(value){
+  function persistLanguage(value) {
     const lang = normalizeLang(value);
-    if (!lang) return;
+    if (!lang) return '';
+    localStorage.setItem('sg-lang', lang);
     localStorage.setItem('hub_language', lang);
     localStorage.setItem('hubLang', lang);
     document.documentElement.lang = lang;
+    if (window.state && typeof window.state === 'object') window.state.lang = lang;
+    return lang;
+  }
+  function language() {
+    return persistLanguage(
+      normalizeLang(localStorage.getItem('sg-lang')) ||
+      normalizeLang(localStorage.getItem('hub_language')) ||
+      normalizeLang(localStorage.getItem('hubLang')) ||
+      normalizeLang(document.documentElement.lang) || 'en'
+    );
   }
   const t = (key) => COPY[language()]?.[key] || COPY.en[key] || key;
-  const cleanCode = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+  const cleanCode = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
 
-  function authUserId(){
-    try{
-      for(let i=0;i<localStorage.length;i++){
-        const key=localStorage.key(i);
-        if(!key || !key.startsWith('sb-') || !key.endsWith('-auth-token')) continue;
-        const value=JSON.parse(localStorage.getItem(key)||'null');
-        const id=value?.user?.id||value?.currentSession?.user?.id||value?.session?.user?.id;
-        if(id) return String(id);
+  function authUserId() {
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith('sb-') || !key.endsWith('-auth-token')) continue;
+        const value = JSON.parse(localStorage.getItem(key) || 'null');
+        const id = value?.user?.id || value?.currentSession?.user?.id || value?.session?.user?.id;
+        if (id) return String(id);
       }
-    }catch(_){}
+    } catch (_) {}
     return '';
   }
-  function readCache(){
-    try{
-      const value=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
-      if(!value || value.status!=='pending') return null;
-      const id=authUserId();
-      if(!id || (value.auth_user_id && value.auth_user_id!==id)) return null;
+  function readCache() {
+    try {
+      const value = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (!value || value.status !== 'pending') return null;
+      const id = authUserId();
+      if (!id || (value.auth_user_id && value.auth_user_id !== id)) return null;
       return value;
-    }catch(_){return null;}
+    } catch (_) { return null; }
   }
-  function writeCache(data,userId){
-    try{
-      const id=userId||authUserId();
-      if(!id)return;
-      localStorage.setItem(CACHE_KEY,JSON.stringify({status:'pending',auth_user_id:id,code:cleanCode(data?.code),cached_at:Date.now()}));
-    }catch(_){}
+  function writeCache(data, userId) {
+    try {
+      const id = userId || authUserId();
+      if (!id) return;
+      localStorage.setItem(CACHE_KEY, JSON.stringify({status:'pending', auth_user_id:id, code:cleanCode(data?.code), cached_at:Date.now()}));
+    } catch (_) {}
   }
-  function clearCache(){try{localStorage.removeItem(CACHE_KEY);}catch(_){} }
+  function clearCache() { try { localStorage.removeItem(CACHE_KEY); } catch (_) {} }
 
-  let state=live.registrationState?.status==='pending'?live.registrationState:readCache();
-  let active=!!state;
-  let syncing=false;
-  let syncTimer=0;
-  let ownedAccountButton=null;
-  let lastLang='';
+  let pendingState = live.registrationState?.status === 'pending' ? live.registrationState : readCache();
+  let active = !!pendingState;
+  let syncing = false;
+  let lastLang = '';
 
-  function accountCode(){return cleanCode(state?.code||live.registrationState?.code||readCache()?.code)||'PENDING';}
+  function accountCode() {
+    return cleanCode(pendingState?.code || live.registrationState?.code || readCache()?.code) || 'PENDING';
+  }
 
-  function injectStyles(){
-    if($('#hubPendingStableStyles'))return;
-    const style=document.createElement('style');
-    style.id='hubPendingStableStyles';
-    style.textContent=`
-      /* Global language-arrow alignment: safe for logged-out, pending and verified. */
-      #languageButton{display:inline-flex!important;align-items:center!important;justify-content:center;gap:7px}
-      #languageButton>i{display:inline-flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;height:1em!important;transform:translateY(-1px)!important;margin:0!important}
+  function injectStyles() {
+    if ($('#hubPendingStableStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'hubPendingStableStyles';
+    style.textContent = `
+      #languageButton{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:7px!important}
+      #languageButton>i{display:inline-flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;padding-bottom:8px!important;box-sizing:border-box!important;transform:none!important;margin:0!important}
 
-      body.hub-pending-account #v3AuthModal,
-      body.hub-pending-account [data-auth-modal],
       body.hub-pending-account #communityButton,
       body.hub-pending-account #friendsButton,
       body.hub-pending-account [data-open-friends],
       body.hub-pending-account [data-friends-button],
-      body.hub-pending-account .site-header [aria-label*="friend" i],
-      body.hub-pending-account .site-header [title*="friend" i],
-      body.hub-pending-account .site-header [aria-label*="freund" i],
-      body.hub-pending-account .site-header [title*="freund" i],
-      body.hub-pending-account .site-header [aria-label*="ami" i],
-      body.hub-pending-account .site-header [title*="ami" i],
       body.hub-pending-account [data-open-register],
       body.hub-pending-account .next-cup-cta,
       body.hub-pending-account [data-register-next-cup],
@@ -156,200 +146,271 @@
       .hub-pending-profile-copy h1{margin:0;font:900 clamp(34px,5vw,58px)/.95 Montserrat,Arial;letter-spacing:.02em;overflow-wrap:anywhere}.hub-pending-profile-copy small{display:block;margin-top:8px;color:#8f88a1;font:600 10px Montserrat,Arial}.hub-pending-profile-copy small b{color:#ffc65c}
       .hub-pending-profile-card{padding:34px 32px;min-height:238px}.hub-pending-profile-card .kicker{color:#ffc65c}.hub-pending-profile-card h2{margin:0 0 14px;font:900 clamp(25px,3vw,34px)/1 Montserrat,Arial;font-style:italic}.hub-pending-profile-card p{max-width:760px;margin:0;color:#aaa2b7;font:500 15px/1.55 Montserrat,Arial}.hub-pending-profile-card button{margin-top:20px}
 
-      #hubPendingAccountModal,#hubPendingPasswordModal{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(3,1,8,.72);backdrop-filter:blur(8px)}
-      #hubPendingAccountModal[hidden],#hubPendingPasswordModal[hidden]{display:none!important}
-      .hub-pending-account-card,.hub-pending-password-card{position:relative;width:min(460px,100%);box-sizing:border-box;border:1px solid #6038a3;border-radius:16px;background:linear-gradient(180deg,#1a0c2d,#10071c);padding:26px;color:#fff;box-shadow:0 30px 80px rgba(0,0,0,.62)}
-      .hub-pending-account-card .eyebrow{color:#4de5dc;font:900 9px Montserrat;letter-spacing:.1em}.hub-pending-account-card h2{margin:7px 0 20px;font:900 28px Montserrat,Arial}.hub-pending-modal-close{position:absolute;right:14px;top:14px;width:34px;height:34px;border:1px solid #53327e;border-radius:8px;background:#170c26;color:#b9adc8;cursor:pointer}
-      .hub-pending-account-actions{display:grid;gap:10px}.hub-pending-account-actions button{min-height:44px;border:1px solid #56358b;border-radius:7px;background:#1a0d2d;color:#fff;font:900 11px Montserrat,Arial;cursor:pointer}.hub-pending-account-actions button:hover{border-color:#4de5dc}.hub-pending-account-actions .danger{color:#ff8292;border-color:#6b2442}
-      .hub-pending-password-card h2{margin:0 0 18px}.hub-pending-password-card label{display:grid;gap:7px;margin:12px 0;color:#c7bed2;font:700 12px Montserrat,Arial}.hub-pending-password-card input{width:100%;box-sizing:border-box;border:1px solid #553582;background:#09040f;color:#fff;border-radius:9px;padding:12px;font:600 14px Arial}.hub-pending-password-actions{display:flex;gap:8px;margin-top:18px}.hub-pending-password-actions button{flex:1}.hub-pending-password-message{min-height:20px;margin:10px 0 0;color:#ffb2bd;font-size:12px}.hub-pending-password-message.ok{color:#67e9b8}
+      #hubPendingPasswordModal{position:fixed;inset:0;z-index:10060;display:grid;place-items:center;padding:24px;background:rgba(5,2,18,.82);backdrop-filter:blur(10px)}
+      #hubPendingPasswordModal[hidden]{display:none!important}
+      .hub-pending-password-card{position:relative;width:min(520px,100%);box-sizing:border-box;padding:30px;border:1px solid rgba(145,86,255,.6);border-radius:22px;background:linear-gradient(180deg,rgba(27,14,58,.98),rgba(12,7,31,.98));color:#fff;box-shadow:0 28px 90px rgba(0,0,0,.6)}
+      .hub-pending-password-card h2{margin:7px 0 18px;font:800 28px/1.05 Montserrat,sans-serif}.hub-pending-password-card label{display:grid;gap:7px;margin:12px 0;color:#d7d1e8;font:700 13px Montserrat}.hub-pending-password-card input{width:100%;box-sizing:border-box;border:1px solid rgba(145,86,255,.35);background:#0d0920;color:#fff;padding:13px 14px;border-radius:10px;outline:none;font:600 15px Montserrat}.hub-pending-password-actions{display:flex;gap:10px;margin-top:18px}.hub-pending-password-actions button{flex:1}.hub-pending-password-message{min-height:20px;margin:10px 0 0;color:#ff788f;font-size:12px;font-weight:700}.hub-pending-password-message.ok{color:#67e9b8}
       @media(max-width:760px){.hub-pending-profile-hero{align-items:flex-start;padding:20px}.hub-pending-avatar{width:64px;height:64px;flex-basis:64px}.hub-pending-profile-card{padding:25px 20px}}
     `;
     document.head.appendChild(style);
   }
 
-  function overviewHost(){
-    const known=$('.my-rank-card');
-    if(known)return known;
-    const login=$('[data-v3-overview-login]');
-    return login?.closest('.panel,.card,section,article')||null;
+  function overviewHost() {
+    const known = $('.my-rank-card');
+    if (known) return known;
+    const login = $('[data-v3-overview-login]');
+    return login?.closest('.panel,.card,section,article') || null;
   }
 
-  function ownAccountButton(){
-    let button=$('#loginDemoButton');
-    if(!button)return null;
-    if(button.dataset.pendingOwned!=='1'){
-      const clone=button.cloneNode(true);
-      clone.dataset.pendingOwned='1';
-      clone.onclick=null;
-      button.replaceWith(clone);
-      button=clone;
-      button.addEventListener('click',(event)=>{
-        if(!active)return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        $('#v3AuthModal')?.setAttribute('hidden','');
-        openAccountModal();
-      },true);
-    }
-    ownedAccountButton=button;
-    return button;
-  }
-
-  function installHeader(){
-    const button=ownAccountButton();
-    if(!button)return;
+  function installHeader() {
+    const button = $('#loginDemoButton');
+    if (!button) return;
     button.removeAttribute('data-i18n');
-    button.textContent=accountCode();
-    button.disabled=false;
+    button.textContent = accountCode();
+    button.disabled = false;
     button.removeAttribute('aria-disabled');
     button.classList.add('is-account');
-    button.title=t('account');
+    button.title = t('account');
 
-    let status=$('#hubPendingHeaderStatus');
-    if(!status){
-      status=document.createElement('button');
-      status.type='button';
-      status.id='hubPendingHeaderStatus';
-      status.className='hub-pending-header-status';
-      button.insertAdjacentElement('afterend',status);
-      status.addEventListener('click',(event)=>{event.preventDefault();event.stopPropagation();location.href='pending.html';});
+    let status = $('#hubPendingHeaderStatus');
+    if (!status) {
+      status = document.createElement('button');
+      status.type = 'button';
+      status.id = 'hubPendingHeaderStatus';
+      status.className = 'hub-pending-header-status';
+      button.insertAdjacentElement('afterend', status);
+      status.addEventListener('click', (event) => { event.preventDefault(); location.href = 'pending.html'; });
     }
-    status.innerHTML=`<i>i</i>${t('pending')}`;
+    status.innerHTML = `<i>i</i>${t('pending')}`;
   }
 
-  function hideRestricted(){
-    $$('[data-open-register],.next-cup-cta,[data-register-next-cup],[data-next-cup-register]').forEach(el=>{el.hidden=true;el.style.setProperty('display','none','important');});
-    const header=$('.site-header')||document;
-    $$('#communityButton,#friendsButton,[data-open-friends],[data-friends-button],[aria-label*="friend" i],[title*="friend" i],[aria-label*="freund" i],[title*="freund" i],[aria-label*="ami" i],[title*="ami" i]',header).forEach(el=>{el.hidden=true;el.style.setProperty('display','none','important');});
+  function hideRestricted() {
+    $$('[data-open-register],.next-cup-cta,[data-register-next-cup],[data-next-cup-register]').forEach(el => { el.hidden = true; el.style.setProperty('display','none','important'); });
+    const header = $('.site-header') || document;
+    $$('#communityButton,#friendsButton,[data-open-friends],[data-friends-button]', header).forEach(el => { el.hidden = true; el.style.setProperty('display','none','important'); });
   }
 
-  function renderOverview(){
-    const host=overviewHost();if(!host)return;
+  function renderOverview() {
+    const host = overviewHost();
+    if (!host) return;
     host.classList.add('hub-pending-overview-host');
-    let surface=$('#hubPendingOverviewSurface',host);
-    if(!surface){surface=document.createElement('div');surface.id='hubPendingOverviewSurface';host.appendChild(surface);}
-    const lang=language();
-    if(surface.dataset.lang===lang&&surface.dataset.code===accountCode())return;
-    surface.dataset.lang=lang;surface.dataset.code=accountCode();
-    surface.innerHTML=`<span class="hub-pending-overview-kicker">HUB ACCOUNT</span><h2>${t('overviewTitle')}</h2><p>${t('overviewText')}</p><button type="button" class="secondary-button" data-hub-pending-profile-open>${t('viewProfile')}</button>`;
+    let surface = $('#hubPendingOverviewSurface', host);
+    if (!surface) { surface = document.createElement('div'); surface.id = 'hubPendingOverviewSurface'; host.appendChild(surface); }
+    const lang = language();
+    if (surface.dataset.lang === lang && surface.dataset.code === accountCode()) return;
+    surface.dataset.lang = lang;
+    surface.dataset.code = accountCode();
+    surface.innerHTML = `<span class="hub-pending-overview-kicker">HUB ACCOUNT</span><h2>${t('overviewTitle')}</h2><p>${t('overviewText')}</p><button type="button" class="secondary-button" data-hub-pending-profile-open>${t('viewProfile')}</button>`;
   }
 
-  function renderProfile(){
-    const page=$('[data-page="profile"]');if(!page)return;
-    let surface=$('#hubPendingProfileSurface',page);
-    if(!surface){surface=document.createElement('div');surface.id='hubPendingProfileSurface';page.prepend(surface);}
-    const lang=language();
-    if(surface.dataset.lang===lang&&surface.dataset.code===accountCode())return;
-    surface.dataset.lang=lang;surface.dataset.code=accountCode();
-    surface.innerHTML=`
-      <section class="hub-pending-profile-hero"><div class="hub-pending-avatar">•••</div><div class="hub-pending-profile-copy"><span class="kicker">${t('playerProfile')}</span><h1>${accountCode()}</h1><small>${t('bloxdName')} · <b>ⓘ ${t('pending')}</b></small></div></section>
-      <section class="hub-pending-profile-card"><span class="kicker">${t('verification')}</span><h2>${t('statsHidden')}</h2><p>${t('statsText')}</p><button type="button" class="secondary-button" data-hub-pending-status-open>${t('viewStatus')}</button></section>`;
+  function renderProfile() {
+    const page = $('[data-page="profile"]');
+    if (!page) return;
+    let surface = $('#hubPendingProfileSurface', page);
+    if (!surface) { surface = document.createElement('div'); surface.id = 'hubPendingProfileSurface'; page.prepend(surface); }
+    const lang = language();
+    if (surface.dataset.lang === lang && surface.dataset.code === accountCode()) return;
+    surface.dataset.lang = lang;
+    surface.dataset.code = accountCode();
+    surface.innerHTML = `<section class="hub-pending-profile-hero"><div class="hub-pending-avatar">•••</div><div class="hub-pending-profile-copy"><span class="kicker">${t('playerProfile')}</span><h1>${accountCode()}</h1><small>${t('bloxdName')} · <b>ⓘ ${t('pending')}</b></small></div></section><section class="hub-pending-profile-card"><span class="kicker">${t('verification')}</span><h2>${t('statsHidden')}</h2><p>${t('statsText')}</p><button type="button" class="secondary-button" data-hub-pending-status-open>${t('viewStatus')}</button></section>`;
   }
 
-  function showPage(name){
-    $$('.page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
-    $$('.primary-nav [data-route]').forEach(link=>link.classList.toggle('active',link.dataset.route===name));
-    if(location.hash!==`#${name}`)history.replaceState(null,'',`#${name}`);
-    window.scrollTo({top:0,behavior:'smooth'});
+  function showPage(name) {
+    if (typeof window.setPage === 'function') { window.setPage(name); return; }
+    $$('.page').forEach(page => page.classList.toggle('active', page.dataset.page === name));
+    $$('.primary-nav [data-route]').forEach(link => link.classList.toggle('active', link.dataset.route === name));
+    if (location.hash !== `#${name}`) history.replaceState(null, '', `#${name}`);
+    window.scrollTo({top:0, behavior:'smooth'});
   }
 
-  function openAccountModal(){
-    let modal=$('#hubPendingAccountModal');
-    if(!modal){modal=document.createElement('div');modal.id='hubPendingAccountModal';document.body.appendChild(modal);}
-    modal.innerHTML=`<section class="hub-pending-account-card"><button class="hub-pending-modal-close" type="button" data-hub-account-close>×</button><span class="eyebrow">${t('account')}</span><h2>${accountCode()}</h2><div class="hub-pending-account-actions"><button type="button" data-hub-pending-profile-open>${t('myProfile')}</button><button type="button" data-hub-password-open>${t('changePassword')}</button><button type="button" class="danger" data-hub-logout>${t('logout')}</button></div></section>`;
-    modal.hidden=false;
-  }
-  function closeAccountModal(){const modal=$('#hubPendingAccountModal');if(modal)modal.hidden=true;}
-
-  function openPasswordModal(){
+  function closeAccountModal() { $('#v3AccountModal[data-pending-account-modal="1"]')?.remove(); }
+  function openAccountModal() {
     closeAccountModal();
-    let modal=$('#hubPendingPasswordModal');
-    if(!modal){modal=document.createElement('div');modal.id='hubPendingPasswordModal';document.body.appendChild(modal);}
-    modal.innerHTML=`<section class="hub-pending-password-card"><h2>${t('passwordTitle')}</h2><label><span>${t('newPassword')}</span><input data-hub-pass-one type="password" autocomplete="new-password"></label><label><span>${t('confirmPassword')}</span><input data-hub-pass-two type="password" autocomplete="new-password"></label><p class="hub-pending-password-message" data-hub-pass-message></p><div class="hub-pending-password-actions"><button type="button" class="secondary-button" data-hub-pass-cancel>${t('cancel')}</button><button type="button" class="primary-button" data-hub-pass-save>${t('savePassword')}</button></div></section>`;
-    modal.hidden=false;setTimeout(()=>$('[data-hub-pass-one]',modal)?.focus(),30);
+    $('#v3AuthModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'v3AccountModal';
+    modal.dataset.pendingAccountModal = '1';
+    modal.className = 'v3-modal-backdrop';
+    modal.innerHTML = `<section class="v3-modal v3-account-modal"><button class="modal-close" data-v3-close type="button">×</button><span class="eyebrow">${t('account')}</span><h2>${accountCode()}</h2><div class="v3-account-actions"><button class="secondary-button wide" id="v3GoProfile" type="button">${t('myProfile')}</button><button class="ghost-button wide" id="v3ChangePassword" type="button">${t('changePassword')}</button><button class="ghost-button wide danger" id="v3Logout" type="button">${t('logout')}</button></div></section>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => { if (event.target === modal || event.target.closest('[data-v3-close]')) modal.remove(); });
+    $('#v3GoProfile', modal).onclick = () => { modal.remove(); showPage('profile'); renderProfile(); };
+    $('#v3ChangePassword', modal).onclick = () => { modal.remove(); openPasswordModal(); };
+    $('#v3Logout', modal).onclick = () => logout();
   }
-  async function savePassword(){
-    const modal=$('#hubPendingPasswordModal');if(!modal)return;
-    const one=$('[data-hub-pass-one]',modal)?.value||'',two=$('[data-hub-pass-two]',modal)?.value||'',message=$('[data-hub-pass-message]',modal);if(!message)return;
+
+  function openPasswordModal() {
+    let modal = $('#hubPendingPasswordModal');
+    if (!modal) { modal = document.createElement('div'); modal.id = 'hubPendingPasswordModal'; document.body.appendChild(modal); }
+    modal.innerHTML = `<section class="hub-pending-password-card"><span class="eyebrow">${t('account')}</span><h2>${t('passwordTitle')}</h2><label><span>${t('newPassword')}</span><input data-hub-pass-one type="password" autocomplete="new-password"></label><label><span>${t('confirmPassword')}</span><input data-hub-pass-two type="password" autocomplete="new-password"></label><p class="hub-pending-password-message" data-hub-pass-message></p><div class="hub-pending-password-actions"><button type="button" class="ghost-button" data-hub-pass-cancel>${t('cancel')}</button><button type="button" class="secondary-button" data-hub-pass-save>${t('savePassword')}</button></div></section>`;
+    modal.hidden = false;
+    modal.onclick = event => { if (event.target === modal || event.target.closest('[data-hub-pass-cancel]')) modal.hidden = true; };
+    $('[data-hub-pass-save]', modal).onclick = savePassword;
+    setTimeout(() => $('[data-hub-pass-one]', modal)?.focus(), 30);
+  }
+
+  async function savePassword() {
+    const modal = $('#hubPendingPasswordModal');
+    if (!modal) return;
+    const one = $('[data-hub-pass-one]', modal)?.value || '';
+    const two = $('[data-hub-pass-two]', modal)?.value || '';
+    const message = $('[data-hub-pass-message]', modal);
+    if (!message) return;
     message.classList.remove('ok');
-    if(one.length<8){message.textContent=t('passwordShort');return;}
-    if(one!==two){message.textContent=t('passwordMismatch');return;}
-    try{const{error}=await api.client.auth.updateUser({password:one});if(error)throw error;message.textContent=t('passwordSaved');message.classList.add('ok');setTimeout(()=>modal.hidden=true,800);}catch(error){console.error(error);message.textContent=t('passwordError');}
-  }
-  async function logout(){
-    try{await api.client.auth.signOut();}catch(error){console.warn(error);}
-    clearCache();state=null;active=false;live.registrationState=null;location.href='index.html#overview';location.reload();
-  }
-
-  function sync(){
-    if(!active||syncing)return;
-    syncing=true;
-    try{
-      document.body.classList.add('hub-pending-account');
-      document.body.dataset.hubAccountState='pending';
-      $('#v3AuthModal')?.setAttribute('hidden','');
-      installHeader();hideRestricted();renderOverview();renderProfile();lastLang=language();
-    }finally{syncing=false;}
-  }
-  function queueSync(force=false){
-    if(!active||syncTimer)return;
-    if(!force){
-      const headerOk=$('#loginDemoButton')?.dataset.pendingOwned==='1'&&$('#loginDemoButton')?.textContent.trim()===accountCode();
-      const overviewOk=!overviewHost()||!!$('#hubPendingOverviewSurface',overviewHost());
-      const profileOk=!!$('#hubPendingProfileSurface');
-      const langOk=language()===lastLang;
-      const authClosed=!$('#v3AuthModal')||$('#v3AuthModal').hidden;
-      if(headerOk&&overviewOk&&profileOk&&langOk&&authClosed)return;
+    if (one.length < 8) { message.textContent = t('passwordShort'); return; }
+    if (one !== two) { message.textContent = t('passwordMismatch'); return; }
+    try {
+      const {error} = await api.client.auth.updateUser({password:one});
+      if (error) throw error;
+      message.textContent = t('passwordSaved');
+      message.classList.add('ok');
+      setTimeout(() => { modal.hidden = true; }, 800);
+    } catch (error) {
+      console.error(error);
+      message.textContent = t('passwordError');
     }
-    syncTimer=setTimeout(()=>{syncTimer=0;sync();},25);
   }
 
-  function clearPendingUi(){
-    active=false;state=null;live.registrationState=null;document.body.classList.remove('hub-pending-account');if(document.body.dataset.hubAccountState==='pending')delete document.body.dataset.hubAccountState;
-    $('#hubPendingHeaderStatus')?.remove();$('#hubPendingAccountModal')?.remove();$('#hubPendingPasswordModal')?.remove();$('#hubPendingProfileSurface')?.remove();$('#hubPendingOverviewSurface')?.remove();$$('.hub-pending-overview-host').forEach(host=>host.classList.remove('hub-pending-overview-host'));
+  async function logout() {
+    try { if (window.HubPresenceClear) await window.HubPresenceClear(); } catch (_) {}
+    try { if (typeof api.logout === 'function') await api.logout(); else await api.client.auth.signOut(); } catch (error) { console.warn(error); }
+    clearCache();
+    pendingState = null;
+    active = false;
+    live.registrationState = null;
+    location.href = 'index.html#overview';
+    location.reload();
   }
 
-  async function currentSession(){if(typeof api.currentSession==='function')return await api.currentSession();const{data}=await api.client.auth.getSession();return data?.session||null;}
-  async function refresh(){
-    try{
-      const session=await currentSession();
-      if(!session){clearCache();clearPendingUi();return;}
-      const{data,error}=await api.client.rpc('get_my_registration_status');if(error)throw error;
-      if(data?.status==='pending'){state=data;live.registrationState=data;active=true;writeCache(data,session.user?.id);sync();return;}
-      clearCache();const was=active;clearPendingUi();if(was)location.reload();
-    }catch(error){console.warn('Pending state refresh failed',error);const cached=readCache();if(cached){state=cached;active=true;sync();}}
+  function sync() {
+    if (!active || syncing) return;
+    syncing = true;
+    try {
+      document.body.classList.add('hub-pending-account');
+      document.body.dataset.hubAccountState = 'pending';
+      installHeader();
+      hideRestricted();
+      renderOverview();
+      renderProfile();
+      lastLang = language();
+    } finally { syncing = false; }
   }
 
-  function handlePendingClick(event){
-    if(!active)return;
-    const target=event.target;
-    if(target.closest?.('[data-hub-account-close]')){event.preventDefault();event.stopPropagation();closeAccountModal();return;}
-    if(target===$('#hubPendingAccountModal')){closeAccountModal();return;}
-    if(target.closest?.('[data-hub-pending-profile-open]')){event.preventDefault();event.stopPropagation();closeAccountModal();showPage('profile');renderProfile();return;}
-    if(target.closest?.('.primary-nav [data-route="profile"]')){event.preventDefault();event.stopImmediatePropagation();showPage('profile');renderProfile();return;}
-    if(target.closest?.('[data-hub-pending-status-open]')){event.preventDefault();event.stopPropagation();location.href='pending.html';return;}
-    if(target.closest?.('[data-hub-password-open]')){event.preventDefault();event.stopPropagation();openPasswordModal();return;}
-    if(target.closest?.('[data-hub-pass-cancel]')){event.preventDefault();$('#hubPendingPasswordModal').hidden=true;return;}
-    if(target.closest?.('[data-hub-pass-save]')){event.preventDefault();savePassword();return;}
-    if(target===$('#hubPendingPasswordModal')){$('#hubPendingPasswordModal').hidden=true;return;}
-    if(target.closest?.('[data-hub-logout]')){event.preventDefault();event.stopPropagation();logout();return;}
-    if(target.closest?.('#communityButton,#friendsButton,[data-open-friends],[data-friends-button],[data-open-register],.next-cup-cta,[data-register-next-cup],[data-next-cup-register],[data-v3-friend-add],[data-friend-add]')){event.preventDefault();event.stopImmediatePropagation();core.toast?.(t('blocked'),true);}
+  function clearPendingUi() {
+    active = false;
+    pendingState = null;
+    live.registrationState = null;
+    document.body.classList.remove('hub-pending-account');
+    if (document.body.dataset.hubAccountState === 'pending') delete document.body.dataset.hubAccountState;
+    $('#hubPendingHeaderStatus')?.remove();
+    $('#v3AccountModal[data-pending-account-modal="1"]')?.remove();
+    $('#hubPendingPasswordModal')?.remove();
+    $('#hubPendingProfileSurface')?.remove();
+    $('#hubPendingOverviewSurface')?.remove();
+    $$('.hub-pending-overview-host').forEach(host => host.classList.remove('hub-pending-overview-host'));
+  }
+
+  async function currentSession() {
+    if (typeof api.currentSession === 'function') return await api.currentSession();
+    const {data} = await api.client.auth.getSession();
+    return data?.session || null;
+  }
+  async function refresh() {
+    try {
+      const session = await currentSession();
+      if (!session) { clearCache(); clearPendingUi(); return; }
+      const {data, error} = await api.client.rpc('get_my_registration_status');
+      if (error) throw error;
+      if (data?.status === 'pending') {
+        pendingState = data;
+        live.registrationState = data;
+        active = true;
+        writeCache(data, session.user?.id);
+        sync();
+        return;
+      }
+      clearCache();
+      const was = active;
+      clearPendingUi();
+      if (was) location.reload();
+    } catch (error) {
+      console.warn('Pending state refresh failed', error);
+      const cached = readCache();
+      if (cached) { pendingState = cached; active = true; sync(); }
+    }
+  }
+
+  function handlePendingActions(event) {
+    if (!active) return;
+    const target = event.target;
+    if (target.closest?.('[data-hub-pending-profile-open]')) { event.preventDefault(); event.stopImmediatePropagation(); showPage('profile'); renderProfile(); return; }
+    if (target.closest?.('.primary-nav [data-route="profile"]')) { event.preventDefault(); event.stopImmediatePropagation(); showPage('profile'); renderProfile(); return; }
+    if (target.closest?.('[data-hub-pending-status-open]')) { event.preventDefault(); event.stopImmediatePropagation(); location.href = 'pending.html'; return; }
+    if (target.closest?.('#communityButton,#friendsButton,[data-open-friends],[data-friends-button],[data-open-register],.next-cup-cta,[data-register-next-cup],[data-next-cup-register]')) { event.preventDefault(); event.stopImmediatePropagation(); core.toast?.(t('blocked'), true); }
   }
 
   injectStyles();
-  document.addEventListener('click',handlePendingClick,true);
-  document.addEventListener('click',(event)=>{
-    const langButton=event.target.closest?.('[data-lang]');
-    if(langButton?.dataset.lang){persistLanguage(langButton.dataset.lang);setTimeout(()=>queueSync(true),0);setTimeout(()=>queueSync(true),120);}
-  },true);
-  window.addEventListener('hashchange',()=>queueSync(true));
-  document.addEventListener('hub:auth-restored',(event)=>{
-    const detail=event.detail||{};
-    if(detail.loggedIn===false){clearCache();clearPendingUi();return;}
-    if(detail.registrationState?.status==='pending'){state=detail.registrationState;live.registrationState=state;active=true;writeCache(state,detail.session?.user?.id||detail.user?.id);sync();return;}
-    if(detail.registrationState?.status==='verified'){const was=active;clearCache();clearPendingUi();if(was)location.reload();return;}
-    setTimeout(refresh,20);
+  language();
+
+  // Important: the verified V3 app intercepts this button on document capture.
+  // Window capture runs first, so Pending can claim the click before V3 falls back to the login modal.
+  window.addEventListener('click', event => {
+    if (!active) return;
+    const account = event.target.closest?.('#loginDemoButton');
+    if (!account) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    openAccountModal();
+  }, true);
+
+  document.addEventListener('click', handlePendingActions, true);
+  document.addEventListener('click', event => {
+    const langButton = event.target.closest?.('[data-lang]');
+    if (!langButton?.dataset.lang) return;
+    const lang = persistLanguage(langButton.dataset.lang);
+    if (typeof window.applyLanguage === 'function') window.applyLanguage(lang);
+    setTimeout(() => { if (active) sync(); }, 0);
+    setTimeout(() => { if (active) sync(); }, 120);
+  }, true);
+
+  window.addEventListener('hashchange', () => { if (active) sync(); });
+  window.addEventListener('storage', event => {
+    if (!['sg-lang','hub_language','hubLang'].includes(event.key)) return;
+    const lang = language();
+    if (typeof window.applyLanguage === 'function') window.applyLanguage(lang);
+    if (active) sync();
   });
-  new MutationObserver(()=>queueSync(false)).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['hidden','class']});
-  setTimeout(refresh,20);setInterval(refresh,10000);
+  document.addEventListener('hub:auth-restored', event => {
+    const detail = event.detail || {};
+    if (detail.loggedIn === false) { clearCache(); clearPendingUi(); return; }
+    if (detail.registrationState?.status === 'pending') {
+      pendingState = detail.registrationState;
+      live.registrationState = pendingState;
+      active = true;
+      writeCache(pendingState, detail.session?.user?.id || detail.user?.id);
+      sync();
+      return;
+    }
+    if (detail.registrationState?.status === 'verified') {
+      const was = active;
+      clearCache();
+      clearPendingUi();
+      if (was) location.reload();
+      return;
+    }
+    setTimeout(refresh, 20);
+  });
+
+  new MutationObserver(() => {
+    if (!active) return;
+    const lang = language();
+    if (lang !== lastLang) {
+      if (typeof window.applyLanguage === 'function' && window.state?.lang !== lang) window.applyLanguage(lang);
+      sync();
+    }
+  }).observe(document.documentElement, {childList:true, subtree:true, characterData:true});
+
+  setTimeout(refresh, 20);
+  setInterval(refresh, 10000);
 })();
