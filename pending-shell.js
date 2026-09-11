@@ -25,6 +25,10 @@
     $$('#languageMenu [data-lang]').forEach(b=>b.classList.toggle('active',b.dataset.lang===l));
     const status=$('#accountStatusText');if(status)status.textContent=t.pending;
     const community=$('#communityButton');if(community)community.setAttribute('aria-label',t.friends);
+    // Pending is already an authenticated HUB account. Never let the account
+    // button fall back into the login modal while verification is pending.
+    const account=$('#loginDemoButton');
+    if(account){account.textContent='PENDING';account.disabled=true;account.setAttribute('aria-disabled','true');account.title=t.pending;account.classList.add('is-account');}
   }
 
   const button=$('#languageButton'),menu=$('#languageMenu');
@@ -34,7 +38,6 @@
   }
   $$('#languageMenu [data-lang]').forEach(b=>b.addEventListener('click',()=>{setTimeout(()=>{if(menu)menu.hidden=true;if(button)button.setAttribute('aria-expanded','false');sync();},0);}));
   $('#communityButton')?.addEventListener('click',()=>{location.href='index.html#overview';});
-  $('#loginDemoButton')?.addEventListener('click',()=>{location.href='index.html#profile';});
   $('#hubPendingHeaderStatus')?.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
   window.addEventListener('storage',sync);
   sync();
