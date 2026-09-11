@@ -8,13 +8,43 @@ const SHORT_CODE_PATTERNS=[
 const REGASSERT_START='__SG_EVT__|REGASSERT|';
 const seenText=new Set();
 const seenAssertions=new Set();
+const ownWatchers=new Map();
 let statusBox=null;
 let observer=null;
 let scanTimer=null;
 
 function hash(text){let h=2166136261;for(let i=0;i<text.length;i+=1)h=Math.imul(h^text.charCodeAt(i),16777619);return String(h>>>0);}
-function ensureStatus(){if(statusBox||window.top!==window||!document.documentElement)return;statusBox=document.createElement('div');statusBox.id='hub-verify-extension-status';Object.assign(statusBox.style,{position:'fixed',right:'14px',bottom:'14px',zIndex:'2147483647',padding:'11px 14px',border:'1px solid rgba(85,230,177,.62)',borderRadius:'10px',background:'rgba(7,4,13,.94)',color:'#f7ffff',font:'700 11px/1.4 Arial,sans-serif',boxShadow:'0 10px 32px rgba(0,0,0,.35)',pointerEvents:'none',opacity:'0',transform:'translateY(6px)',transition:'opacity .18s ease, transform .18s ease',whiteSpace:'pre-line',maxWidth:'330px'});document.documentElement.appendChild(statusBox);}
-function toast(text,accent='#55e6b1',timeout=6500){ensureStatus();if(!statusBox)return;statusBox.textContent=text;statusBox.style.borderColor=accent;statusBox.style.opacity='1';statusBox.style.transform='translateY(0)';if(timeout)setTimeout(()=>{if(statusBox){statusBox.style.opacity='0';statusBox.style.transform='translateY(6px)';}},timeout);}
+function ensureStatus(){if(statusBox||window.top!==window||!document.documentElement)return;statusBox=document.createElement('div');statusBox.id='hub-verify-extension-status';Object.assign(statusBox.style,{position:'fixed',right:'14px',bottom:'14px',zIndex:'2147483647',padding:'13px 15px',border:'1px solid rgba(85,230,177,.68)',borderRadius:'11px',background:'rgba(7,4,13,.95)',color:'#f7ffff',font:'700 12px/1.45 Arial,sans-serif',boxShadow:'0 12px 34px rgba(0,0,0,.38)',pointerEvents:'none',opacity:'0',transform:'translateY(8px)',transition:'opacity .2s ease, transform .2s ease',whiteSpace:'pre-line',maxWidth:'340px'});document.documentElement.appendChild(statusBox);}
+function toast(text,accent='#55e6b1',timeout=15000){ensureStatus();if(!statusBox)return;statusBox.textContent=text;statusBox.style.borderColor=accent;statusBox.style.opacity='1';statusBox.style.transform='translateY(0)';if(statusBox._hubTimer)clearTimeout(statusBox._hubTimer);if(timeout)statusBox._hubTimer=setTimeout(()=>{if(statusBox){statusBox.style.opacity='0';statusBox.style.transform='translateY(8px)';}},timeout);}
+
+async function getNotifiedCodes(){try{const data=await chrome.storage.local.get({ownVerifiedNotifications:[]});return Array.isArray(data.ownVerifiedNotifications)?data.ownVerifiedNotifications:[];}catch(_){return[];}}
+async function setNotified(code,value){try{const list=await getNotifiedCodes();const next=value?[...new Set([...list,code])]:list.filter((x)=>x!==code);await chrome.storage.local.set({ownVerifiedNotifications:next.slice(-30)});}catch(_){}}
+async function showOwnVerified(code,name){const notified=await getNotifiedCodes();if(notified.includes(code))return;await setNotified(code,true);toast(`Spieler ${String(name||'Dein Spieler')} ist nun verifiziert\nKehre zurück zur Website, um dein Profil zu sehen.`,'#55e6b1',15000);}
+
+async function checkOwnCode(code){
+  const response=await chrome.runtime.sendMessage({type:'BLOXD_REGISTRATION_CODE',code}).catch(()=>null);
+  if(response?.notifySelf){
+    await showOwnVerified(code,response.verifiedPlayerName||null);
+    const watcher=ownWatchers.get(code);if(watcher){clearInterval(watcher.timer);ownWatchers.delete(code);}return true;
+  }
+  // If the code is currently not linked, allow a future verification to notify
+  // again. This also makes intentional test resets behave correctly.
+  await setNotified(code,false);
+  return false;
+}
+
+function watchOwnCode(code){
+  if(!code||ownWatchers.has(code))return;
+  let attempts=0;
+  const tick=async()=>{
+    attempts+=1;
+    const done=await checkOwnCode(code);
+    if(done||attempts>=180){const watcher=ownWatchers.get(code);if(watcher)clearInterval(watcher.timer);ownWatchers.delete(code);}
+  };
+  const timer=setInterval(tick,2000);
+  ownWatchers.set(code,{timer});
+  tick();
+}
 
 function extractRegasserts(text){
   const out=[];let from=0;
@@ -40,8 +70,9 @@ async function processText(value){
     const key=hash(raw);if(seenAssertions.has(key))continue;seenAssertions.add(key);if(seenAssertions.size>1200)seenAssertions.clear();
     const response=await chrome.runtime.sendMessage({type:'BLOXD_GLOBAL_REGASSERT',raw}).catch(()=>null);
     if(response?.notifySelf){
-      const name=String(response.verifiedPlayerName||'Dein Spieler');
-      toast(`Spieler ${name} ist nun verifiziert\nKehre zurück zur Website, um dein Profil zu sehen.`,'#55e6b1',7000);
+      const parts=String(raw).split('|');
+      const code=parts.length===8?String(parts[5]||'').toUpperCase():'';
+      await showOwnVerified(code,response.verifiedPlayerName||null);
     }
   }
 
@@ -49,11 +80,7 @@ async function processText(value){
     pattern.lastIndex=0;let match;
     while((match=pattern.exec(text))){
       const code=String(match[1]||'').toUpperCase();
-      const response=await chrome.runtime.sendMessage({type:'BLOXD_REGISTRATION_CODE',code}).catch(()=>null);
-      if(response?.notifySelf){
-        const name=String(response.verifiedPlayerName||'Dein Spieler');
-        toast(`Spieler ${name} ist nun verifiziert\nKehre zurück zur Website, um dein Profil zu sehen.`,'#55e6b1',7000);
-      }
+      watchOwnCode(code);
     }
   }
 }
