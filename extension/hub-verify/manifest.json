@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "0.6.0",
-  "description": "Silent global Bloxd.io verification bridge for HUB Survival Games.",
+  "version": "0.7.0",
+  "description": "Passive global Bloxd.io verification bridge for HUB Survival Games.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "tabs"],
   "host_permissions": [
@@ -12,7 +12,7 @@
     "https://bloxdio-turnier-rangliste.vercel.app/*"
   ],
   "background": {"service_worker": "service-worker.js"},
-  "action": {"default_title": "HUB Verify · Global Bridge", "default_popup": "popup/popup.html"},
+  "action": {"default_title": "HUB Verify · Passive Bridge", "default_popup": "popup/popup.html"},
   "content_scripts": [
     {"matches": ["https://bloxd.io/*"], "js": ["content/bloxd-content.js"], "run_at": "document_idle", "all_frames": true}
   ]
