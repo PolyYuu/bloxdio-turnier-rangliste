@@ -1,1 +1,26 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HUB Verify</title><link rel="stylesheet" href="popup.css"></head><body><main><header><div class="logo">HUB</div><div><strong>HUB Verify</strong><span id="version">v0.9.2</span></div></header><section class="status-grid"><div class="status-row"><span class="dot" id="bloxdDot"></span><b>Bloxd</b><em id="bloxdStatus">nicht erkannt</em></div><div class="status-row"><span class="dot on"></span><b>Modus</b><em>Passiv</em></div></section><section class="card"><small>HUB VERIFY</small><strong id="relayTitle">Wartet auf Bloxd</strong><p id="relayText">Die Bridge verifiziert Registrierungen der Lobby automatisch im Hintergrund.</p></section><section class="card"><small>HINTERGRUND-SYNC</small><strong class="counter" id="assertionCount">0</strong><p id="latestAssertion">Noch keine neuen Verifizierungsdaten verarbeitet.</p></section><section class="card" id="uploadCard"><small>VERBINDUNG ZUM HUB</small><strong id="uploadStatus">Bereit</strong><p id="uploadText">Bereits verifizierte Spieler werden automatisch übersprungen.</p></section><div class="actions"><button id="openHub">HUB ÖFFNEN</button><button id="openBloxd" class="accent">BLOXD ÖFFNEN</button></div><button id="clear" class="link-button">Diagnose-Zähler zurücksetzen</button><p class="privacy">HUB Verify arbeitet nach der einmaligen eigenen Verifizierungsbestätigung vollständig im Hintergrund und greift nicht in deine Steuerung oder Eingabe ein.</p></main><script src="popup.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HUB Verify</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="logo">HUB</div>
+      <div class="header-copy"><strong>HUB Verify</strong><span id="version">v0.9.4</span></div>
+      <label class="language-picker" aria-label="Language"><select id="language"><option value="en">EN</option><option value="de">DE</option><option value="fr">FR</option></select></label>
+    </header>
+    <section class="status-grid"><div class="status-row"><span class="dot" id="bloxdDot"></span><b id="bloxdLabel">Bloxd</b><em id="bloxdStatus">not detected</em></div><div class="status-row"><span class="dot on"></span><b id="modeLabel">Mode</b><em id="modeValue">Passive</em></div></section>
+    <section class="card"><small id="verifyKicker">HUB VERIFY</small><strong id="relayTitle">Waiting for Bloxd</strong><p id="relayText">The bridge verifies lobby registrations automatically in the background.</p></section>
+    <section class="card"><small id="syncKicker">BACKGROUND SYNC</small><strong class="counter" id="assertionCount">0</strong><p id="latestAssertion">No new verification data processed yet.</p></section>
+    <section class="card" id="uploadCard"><small id="hubKicker">HUB CONNECTION</small><strong id="uploadStatus">Ready</strong><p id="uploadText">Other players are processed silently in the background.</p></section>
+    <div class="actions"><button id="openHub">OPEN HUB</button><button id="openBloxd" class="accent">OPEN BLOXD</button></div>
+    <button id="clear" class="link-button">Reset diagnostic counters</button>
+    <p class="privacy" id="privacy">The extension never displays other players' names or registration codes. Your own successful verification appears directly in game.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
