@@ -2296,9 +2296,9 @@ window.HubAPI = (() => {
       <button class="modal-close" data-v3-close type="button">×</button>
       <span class="eyebrow">HUB ACCOUNT</span>
       <h2>${isLogin?copy('Log in','Anmelden','Se connecter'):copy('Create account','Account erstellen','Créer un compte')}</h2>
-      <p>${copy('Use your current Bloxd.io ingame name. No email address is required.','Nutze deinen aktuellen Bloxd.io Ingame-Namen. Eine E-Mail-Adresse ist nicht erforderlich.','Utilise ton pseudo Bloxd.io actuel. Aucune adresse e-mail n’est requise.')}</p>
+      <p>${isLogin?copy('Use your current Bloxd.io ingame name or your 8-digit HUB code. No email address is required.','Nutze deinen aktuellen Bloxd.io Ingame-Namen oder deinen 8-stelligen HUB-Code. Eine E-Mail-Adresse ist nicht erforderlich.','Utilise ton pseudo Bloxd.io actuel ou ton code HUB à 8 caractères. Aucune adresse e-mail n’est requise.'):copy('Use your current Bloxd.io ingame name. No email address is required.','Nutze deinen aktuellen Bloxd.io Ingame-Namen. Eine E-Mail-Adresse ist nicht erforderlich.','Utilise ton pseudo Bloxd.io actuel. Aucune adresse e-mail n’est requise.')}</p>
       <form id="v3AuthForm">
-        <label><span>${copy('Ingame name','Ingame-Name','Pseudo en jeu')}</span><input id="v3Username" autocomplete="username" maxlength="32" required></label>
+        <label><span>${isLogin?copy('Ingame name or 8-digit HUB code','Ingame-Name oder 8-stelliger HUB-Code','Pseudo en jeu ou code HUB à 8 caractères'):copy('Ingame name','Ingame-Name','Pseudo en jeu')}</span><input id="v3Username" autocomplete="username" maxlength="32" required></label>
         <label><span>${copy('Password','Passwort','Mot de passe')}</span><input id="v3Password" type="password" autocomplete="${isLogin?'current-password':'new-password'}" minlength="8" required></label>
         ${isLogin?'':`<label><span>${copy('Repeat password','Passwort wiederholen','Répéter le mot de passe')}</span><input id="v3PasswordRepeat" type="password" autocomplete="new-password" minlength="8" required></label>`}
         <div class="v3-form-error" id="v3AuthError"></div>
