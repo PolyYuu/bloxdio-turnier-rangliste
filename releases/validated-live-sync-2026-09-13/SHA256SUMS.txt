@@ -1,0 +1,4 @@
+a055828fa1620101846cbb57db3012095679e32b6fe4fa565c83a9b60f2540b1  HUB-Verify-v1.0.1.zip
+de51304f8cba858c0f76e4a14ffaeafe94cda2662d399f05bb4e540e6709d706  HUB-Verify-v1.0.2.zip
+54c95cce2ecbca498c13ed509dc3d24f8cc1b81115fd695ddd32b74ed749f2e7  HUB-Verify-v1.0.3.zip
+e72977ecdeca6daad791dd77cd79985f285d2ee7169afd3d06dcbf59aca1f6d8  SG_WorldCode_HUB_LiveSync_v3_2.zip

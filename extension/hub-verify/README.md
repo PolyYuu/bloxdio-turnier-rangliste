@@ -1,30 +1,30 @@
-# HUB Verify – Chrome Extension v0.1.0
+# HUB Verify — validated v1.0.1
 
-HUB Verify is the first Manifest V3 bridge between the HUB Survival Games website and Bloxd.io.
+HUB Verify is the Manifest V3 bridge between HUB Survival Games and Bloxd.io.
 
-## What v0.1.0 does
+## Validated capabilities
 
-- Detects when the HUB verification page is open.
-- Detects when Bloxd.io is open, including Bloxd embedded in an iframe.
-- Keeps a short-lived pairing state in `chrome.storage.local`.
-- Detects the normal 8-character HUB registration code when it appears in Bloxd chat.
-- Detects a future World Code identity marker in this format:
+- Passive account verification through Bloxd registration markers
+- Tournament LiveSync relay for `BEGIN`, `PLAYER`, `KILL`, `DM`, `WIN`, snapshot, `END` and `CANCEL` markers
+- Snapshot buffering and reconciliation upload
+- 30-second Bloxd heartbeat
+- Silent removal of technical `HUBSYNC` carrier lines
+- DE/EN/FR popup UI and local diagnostic counters
+- No Tampermonkey dependency
 
-  `__HUB_VERIFY__|db=PLAYER_DB_ID|name=PLAYER_NAME|code=ABCDEFGH|ts=TIMESTAMP`
-
-- Sends detected verification data back to the HUB tab through extension messaging.
-- Shows connection state in the extension popup.
-- Never reads or stores Bloxd passwords or cookies.
+The end-to-end-tested pair is HUB Verify `v1.0.1` plus Bloxd World Code LiveSync `v3.2`. The World Code is not published here because it contains the private tournament-event signing key.
 
 ## Install for development
 
-1. Extract the ZIP.
+1. Extract `HUB-Verify-v1.0.1.zip` or use this folder.
 2. Open `chrome://extensions` in Chrome.
 3. Enable **Developer mode**.
 4. Click **Load unpacked**.
-5. Select the extracted `hub-verify-extension` folder.
-6. Open the HUB pending page and Bloxd.io.
+5. Select the extracted extension folder.
+6. Reload any already-open Bloxd tab so Chrome injects the current content script.
 
-## Important
+## Security model
 
-v0.1.0 is deliberately a bridge/diagnostic build. It does not yet claim a player profile by itself. The final claim is only enabled after the permanent Bloxd `PlayerDbId` can be proven through the World Code/relay path rather than trusted from arbitrary page text.
+The extension can be installed by any player for account verification. Tournament events are only sent to the Bloxd account that an in-game admin selected as the active relay. Repeated delivery of the same event ID is deduplicated by the backend.
+
+Do not add the World Code signing key or an unredacted World Code package to this public repository.
