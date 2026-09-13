@@ -27,7 +27,7 @@
       bridgeEyebrow:'INSTANT VERIFICATION', bridgeTitle:'Verify your account right now?', bridgeBadge:'GOOGLE CHROME',
       bridgeText:'If you do not want to wait for an admin to unlock your account, you can verify it yourself immediately. Install HUB Verify and open Bloxd.io once in Google Chrome. After a few seconds, the extension detects your verification data and confirms your account automatically. HUB Verify acts as a secure bridge between Bloxd.io and the HUB so we can confirm that the Bloxd account really belongs to you.',
       bridgeBrowser:'Google Chrome is currently recommended. Microsoft Edge and Brave are also Chromium-based and can generally use Chrome extensions, but HUB Verify has not yet been officially tested there.',
-      bridgeTutorial:'VIEW TUTORIAL', bridgeDownload:'DOWNLOAD EXTENSION', bridgeOpenBloxd:'OPEN BLOXD.IO',
+      bridgeTutorial:'TUTORIAL', bridgeDownload:'DOWNLOAD EXTENSION', bridgeOpenBloxd:'OPEN BLOXD.IO',
       bridgeNote:'After successful verification, your Pending account is unlocked automatically.',
       untilThen:'Until then', untilText:'You can already use the HUB. Your player name, stats and account-bound features unlock automatically once verification is complete.', backHub:'TO OVERVIEW'
     },
@@ -47,7 +47,7 @@
       bridgeEyebrow:'SOFORT VERIFIZIEREN', bridgeTitle:'Jetzt sofort verifizieren?', bridgeBadge:'GOOGLE CHROME',
       bridgeText:'Wenn du nicht auf die Freigabe durch einen Admin warten möchtest, kannst du deinen Account sofort selbst verifizieren. Installiere dafür HUB Verify und öffne Bloxd.io einmal in Google Chrome. Nach wenigen Sekunden erkennt die Extension deine Verifizierungsdaten und bestätigt deinen Account automatisch. HUB Verify dient dabei als sichere Brücke zwischen Bloxd.io und dem HUB, damit wir bestätigen können, dass der Bloxd-Account wirklich zu dir gehört.',
       bridgeBrowser:'Aktuell empfehlen wir Google Chrome. Microsoft Edge und Brave basieren ebenfalls auf Chromium und können Chrome-Erweiterungen grundsätzlich verwenden. HUB Verify wurde dort bisher allerdings noch nicht offiziell getestet.',
-      bridgeTutorial:'TUTORIAL ANSEHEN', bridgeDownload:'EXTENSION HERUNTERLADEN', bridgeOpenBloxd:'BLOXD.IO ÖFFNEN',
+      bridgeTutorial:'TUTORIAL', bridgeDownload:'EXTENSION HERUNTERLADEN', bridgeOpenBloxd:'BLOXD.IO ÖFFNEN',
       bridgeNote:'Nach erfolgreicher Verifizierung wird dein Pending-Account automatisch freigeschaltet.',
       untilThen:'Bis dahin', untilText:'Du kannst den HUB bereits nutzen. Dein Spielername, deine Stats und accountgebundene Funktionen werden automatisch freigeschaltet, sobald die Verifizierung abgeschlossen ist.', backHub:'ZUR OVERVIEW'
     },
@@ -67,7 +67,7 @@
       bridgeEyebrow:'VÉRIFICATION IMMÉDIATE', bridgeTitle:'Te vérifier maintenant ?', bridgeBadge:'GOOGLE CHROME',
       bridgeText:'Si tu ne veux pas attendre la validation par un administrateur, tu peux vérifier ton compte immédiatement. Installe HUB Verify puis ouvre Bloxd.io une fois dans Google Chrome. Après quelques secondes, l’extension détecte les données de vérification et confirme automatiquement ton compte. HUB Verify sert de pont sécurisé entre Bloxd.io et le HUB afin de confirmer que le compte Bloxd t’appartient vraiment.',
       bridgeBrowser:'Google Chrome est actuellement recommandé. Microsoft Edge et Brave utilisent aussi Chromium et peuvent généralement utiliser les extensions Chrome, mais HUB Verify n’y a pas encore été testé officiellement.',
-      bridgeTutorial:'VOIR LE TUTORIEL', bridgeDownload:'TÉLÉCHARGER L’EXTENSION', bridgeOpenBloxd:'OUVRIR BLOXD.IO',
+      bridgeTutorial:'TUTORIEL', bridgeDownload:'TÉLÉCHARGER L’EXTENSION', bridgeOpenBloxd:'OUVRIR BLOXD.IO',
       bridgeNote:'Après la vérification, ton compte Pending est débloqué automatiquement.',
       untilThen:'En attendant', untilText:'Tu peux déjà utiliser le HUB. Ton nom de joueur, tes statistiques et les fonctions liées au compte seront débloqués automatiquement après la vérification.', backHub:'VERS L’APERÇU'
     }
@@ -264,7 +264,12 @@
       .hub-pending-route-note{margin-top:15px!important;padding-top:15px;border-top:1px solid rgba(255,255,255,.06)}
       .hub-pending-bridge-badge{display:inline-flex;width:max-content;margin:4px 0 12px;padding:7px 10px;border:1px solid rgba(56,240,219,.28);border-radius:999px;background:rgba(56,240,219,.08);color:#59ead9;font-size:8px;font-weight:900;letter-spacing:.08em}
       .hub-pending-browser-note{margin:15px 0 0!important;padding:11px 13px;border:1px solid rgba(255,255,255,.055);border-radius:11px;background:rgba(255,255,255,.025);color:#9087a5!important;font-size:10.5px!important;line-height:1.55!important}
-      .hub-pending-verify-actions{display:grid;grid-template-columns:.9fr 1.3fr 1fr;gap:9px;margin:19px 0 2px}
+      .hub-pending-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 12px}
+      .hub-pending-title-row h2{margin:0!important}
+      .hub-pending-tutorial-pill{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;padding:7px 11px;border:1px solid rgba(244,189,79,.48);border-radius:999px;background:rgba(244,189,79,.11);color:#f4bd4f;font:900 8px/1 Montserrat,Arial;letter-spacing:.07em;cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease}
+      .hub-pending-tutorial-pill:hover{transform:translateY(-1px);border-color:rgba(244,189,79,.8);background:rgba(244,189,79,.17)}
+      .hub-pending-tutorial-pill i{display:grid;place-items:center;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;font:900 9px/1 Montserrat,Arial;font-style:normal}
+      .hub-pending-verify-actions{display:grid;grid-template-columns:1fr 1.15fr;gap:9px;margin:19px 0 2px}
       .hub-pending-verify-button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:45px;padding:0 13px;border:1px solid rgba(126,79,241,.48);border-radius:10px;background:rgba(126,79,241,.08);color:#f7f4ff!important;font:900 9px/1.18 Montserrat,Arial;letter-spacing:.045em;text-align:center;text-decoration:none!important;cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
       .hub-pending-verify-button:hover{transform:translateY(-1px);border-color:rgba(151,108,255,.9);background:rgba(126,79,241,.15)}
       .hub-pending-verify-button.primary{border-color:rgba(56,240,219,.48);background:linear-gradient(135deg,rgba(56,240,219,.20),rgba(71,186,255,.15));color:#e6fffc!important;box-shadow:0 10px 28px rgba(20,207,190,.08)}
@@ -277,9 +282,9 @@
       .hub-pending-modal-message{min-height:19px;margin:7px 0 0;color:#ff788f;font-size:12px;font-weight:700}
       .hub-pending-modal-message.ok{color:#67e9b8}
 
-      @media(max-width:900px){.hub-pending-route-grid{grid-template-columns:1fr}.hub-pending-verify-actions{grid-template-columns:1fr 1fr}.hub-pending-verify-button.bloxd{grid-column:1/-1}}
+      @media(max-width:900px){.hub-pending-route-grid{grid-template-columns:1fr}.hub-pending-verify-actions{grid-template-columns:1fr 1fr}}
       @media(max-width:760px){.hub-pending-profile-hero,.hub-pending-route-hero{align-items:flex-start;padding:20px}.hub-pending-avatar,.hub-pending-route-avatar{width:64px;height:64px;flex-basis:64px}.hub-pending-profile-card{padding:25px 20px}.hub-pending-route-card{padding:20px}.hub-pending-route-strip{align-items:stretch;flex-direction:column}}
-      @media(max-width:480px){.hub-pending-route-actions{display:grid}.hub-pending-route-actions button{width:100%}.hub-pending-route-code>strong{font-size:22px;letter-spacing:.14em}.hub-pending-verify-actions{grid-template-columns:1fr}.hub-pending-verify-button.bloxd{grid-column:auto}}
+      @media(max-width:480px){.hub-pending-route-actions{display:grid}.hub-pending-route-actions button{width:100%}.hub-pending-route-code>strong{font-size:22px;letter-spacing:.14em}.hub-pending-title-row{align-items:flex-start;flex-direction:column}.hub-pending-verify-actions{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
   }
@@ -425,14 +430,16 @@
 
         <article class="hub-pending-route-card">
           <span class="eyebrow teal">${t('bridgeEyebrow')}</span>
-          <h2>${t('bridgeTitle')}</h2>
+          <div class="hub-pending-title-row">
+            <h2>${t('bridgeTitle')}</h2>
+            <button type="button" class="hub-pending-tutorial-pill"><i>?</i>${t('bridgeTutorial')}</button>
+          </div>
           <span class="hub-pending-bridge-badge">${t('bridgeBadge')}</span>
           <p>${t('bridgeText')}</p>
           <p class="hub-pending-browser-note">${t('bridgeBrowser')}</p>
           <div class="hub-pending-verify-actions">
-            <button type="button" class="hub-pending-verify-button muted">${t('bridgeTutorial')}</button>
-            <button type="button" class="hub-pending-verify-button primary">${t('bridgeDownload')}</button>
-            <a class="hub-pending-verify-button bloxd" href="https://bloxd.io/" target="_blank" rel="noopener noreferrer">${t('bridgeOpenBloxd')}</a>
+            <button type="button" class="hub-pending-verify-button muted">${t('bridgeDownload')}</button>
+            <a class="hub-pending-verify-button primary" href="https://bloxd.io/play/classic_playerSchematic%7CtAblSWG4Pqc09SRAM8PS6/1" target="_blank" rel="noopener noreferrer">${t('bridgeOpenBloxd')}</a>
           </div>
           <p class="hub-pending-route-note">${t('bridgeNote')}</p>
         </article>
