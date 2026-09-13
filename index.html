@@ -3243,12 +3243,14 @@ function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const 
     for(const raw of String(text).replace(/\r/g,'').split('\n')){
       const line=raw.trim();
       if(!line)continue;
-      if(line.endsWith(':')){
-        const label=line.slice(0,-1).trim();
-        const color=COLOR_MAP.get(label.toLowerCase());
+      const teamLine=line.match(/^([^:]+)\s*:\s*(.*)$/);
+      if(teamLine){
+        const color=COLOR_MAP.get(teamLine[1].trim().toLowerCase());
         if(color){
           flush();
           current={name:color[0],hex:color[1],lines:[]};
+          const inlineBody=teamLine[2].trim();
+          if(inlineBody)current.lines.push(inlineBody);
           continue;
         }
       }
