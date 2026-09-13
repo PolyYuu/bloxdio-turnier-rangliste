@@ -24,10 +24,11 @@
       registration:'YOUR REGISTRATION', pendingTitle:'Verification pending', pendingText:'Your account was created successfully. This registration code belongs to your Pending account and stays visible until verification has been completed.',
       yourCode:'YOUR REGISTRATION CODE', copyCode:'COPY CODE', checkStatus:'CHECK STATUS', pendingNote:'Your verification is still pending. Once your permanent Bloxd ID has been confirmed, your profile is unlocked automatically.',
       copied:'Code copied.', copyFail:'Could not copy the code.', noCode:'No registration code is available for this account.', statusError:'Could not load verification status.',
-      bridgeEyebrow:'AUTOMATIC VERIFICATION', bridgeTitle:'HUB Verify Extension', bridgeBadge:'TESTING',
-      bridgeText:'HUB Verify detects the verification data directly in Bloxd and sends it automatically to the HUB. You do not need to copy or enter a code manually.',
-      bridgeStep1:'Install the HUB Verify Extension', bridgeStep2:'Open the HUB / tournament lobby in Bloxd', bridgeStep3:'Verification runs automatically in the background',
-      bridgeButton:'EXTENSION NOT PUBLIC YET', bridgeNote:'The technical connection already works. Before public release, the complete verification flow is being tested once more with a fresh Pending account.',
+      bridgeEyebrow:'INSTANT VERIFICATION', bridgeTitle:'Verify your account right now?', bridgeBadge:'GOOGLE CHROME',
+      bridgeText:'If you do not want to wait for an admin to unlock your account, you can verify it yourself immediately. Install HUB Verify and open Bloxd.io once in Google Chrome. After a few seconds, the extension detects your verification data and confirms your account automatically. HUB Verify acts as a secure bridge between Bloxd.io and the HUB so we can confirm that the Bloxd account really belongs to you.',
+      bridgeBrowser:'Google Chrome is currently recommended. Microsoft Edge and Brave are also Chromium-based and can generally use Chrome extensions, but HUB Verify has not yet been officially tested there.',
+      bridgeTutorial:'VIEW TUTORIAL', bridgeDownload:'DOWNLOAD EXTENSION', bridgeOpenBloxd:'OPEN BLOXD.IO',
+      bridgeNote:'After successful verification, your Pending account is unlocked automatically.',
       untilThen:'Until then', untilText:'You can already use the HUB. Your player name, stats and account-bound features unlock automatically once verification is complete.', backHub:'TO OVERVIEW'
     },
     de: {
@@ -43,10 +44,11 @@
       registration:'DEINE REGISTRIERUNG', pendingTitle:'Verifizierung ausstehend', pendingText:'Dein Account wurde erfolgreich erstellt. Dieser Registrierungscode gehört zu deinem Pending-Account und bleibt sichtbar, solange die Verifizierung noch nicht abgeschlossen ist.',
       yourCode:'DEIN REGISTRIERUNGSCODE', copyCode:'CODE KOPIEREN', checkStatus:'STATUS PRÜFEN', pendingNote:'Deine Verifizierung steht noch aus. Sobald deine permanente Bloxd-ID bestätigt wurde, wird dein Profil automatisch freigeschaltet.',
       copied:'Code kopiert.', copyFail:'Kopieren war nicht möglich.', noCode:'Für diesen Account ist kein Registrierungscode verfügbar.', statusError:'Status konnte nicht geladen werden.',
-      bridgeEyebrow:'AUTOMATISCHE VERIFIZIERUNG', bridgeTitle:'HUB Verify Extension', bridgeBadge:'TESTPHASE',
-      bridgeText:'HUB Verify erkennt die Verifizierungsdaten direkt in Bloxd und überträgt sie automatisch an den HUB. Du musst keinen Code manuell kopieren oder eingeben.',
-      bridgeStep1:'HUB Verify Extension installieren', bridgeStep2:'HUB-/Turnierlobby in Bloxd öffnen', bridgeStep3:'Verifizierung läuft automatisch im Hintergrund',
-      bridgeButton:'EXTENSION NOCH NICHT FREIGEGEBEN', bridgeNote:'Die technische Verbindung funktioniert bereits. Vor der öffentlichen Freigabe testen wir den kompletten Ablauf noch einmal mit einem frischen Pending-Account.',
+      bridgeEyebrow:'SOFORT VERIFIZIEREN', bridgeTitle:'Jetzt sofort verifizieren?', bridgeBadge:'GOOGLE CHROME',
+      bridgeText:'Wenn du nicht auf die Freigabe durch einen Admin warten möchtest, kannst du deinen Account sofort selbst verifizieren. Installiere dafür HUB Verify und öffne Bloxd.io einmal in Google Chrome. Nach wenigen Sekunden erkennt die Extension deine Verifizierungsdaten und bestätigt deinen Account automatisch. HUB Verify dient dabei als sichere Brücke zwischen Bloxd.io und dem HUB, damit wir bestätigen können, dass der Bloxd-Account wirklich zu dir gehört.',
+      bridgeBrowser:'Aktuell empfehlen wir Google Chrome. Microsoft Edge und Brave basieren ebenfalls auf Chromium und können Chrome-Erweiterungen grundsätzlich verwenden. HUB Verify wurde dort bisher allerdings noch nicht offiziell getestet.',
+      bridgeTutorial:'TUTORIAL ANSEHEN', bridgeDownload:'EXTENSION HERUNTERLADEN', bridgeOpenBloxd:'BLOXD.IO ÖFFNEN',
+      bridgeNote:'Nach erfolgreicher Verifizierung wird dein Pending-Account automatisch freigeschaltet.',
       untilThen:'Bis dahin', untilText:'Du kannst den HUB bereits nutzen. Dein Spielername, deine Stats und accountgebundene Funktionen werden automatisch freigeschaltet, sobald die Verifizierung abgeschlossen ist.', backHub:'ZUR OVERVIEW'
     },
     fr: {
@@ -62,10 +64,11 @@
       registration:'TON INSCRIPTION', pendingTitle:'Vérification en attente', pendingText:'Ton compte a bien été créé. Ce code d’inscription appartient à ton compte en attente et reste visible jusqu’à la fin de la vérification.',
       yourCode:'TON CODE D’INSCRIPTION', copyCode:'COPIER LE CODE', checkStatus:'VÉRIFIER LE STATUT', pendingNote:'Ta vérification est toujours en attente. Dès que ton identifiant Bloxd permanent est confirmé, ton profil est débloqué automatiquement.',
       copied:'Code copié.', copyFail:'Impossible de copier le code.', noCode:'Aucun code d’inscription n’est disponible pour ce compte.', statusError:'Impossible de charger le statut de vérification.',
-      bridgeEyebrow:'VÉRIFICATION AUTOMATIQUE', bridgeTitle:'HUB Verify Extension', bridgeBadge:'PHASE DE TEST',
-      bridgeText:'HUB Verify détecte les données de vérification directement dans Bloxd et les transmet automatiquement au HUB. Aucun code ne doit être copié ou saisi manuellement.',
-      bridgeStep1:'Installer HUB Verify Extension', bridgeStep2:'Ouvrir le lobby HUB / tournoi dans Bloxd', bridgeStep3:'La vérification se fait automatiquement en arrière-plan',
-      bridgeButton:'EXTENSION PAS ENCORE PUBLIQUE', bridgeNote:'La connexion technique fonctionne déjà. Avant la publication, nous testons encore une fois le processus complet avec un nouveau compte en attente.',
+      bridgeEyebrow:'VÉRIFICATION IMMÉDIATE', bridgeTitle:'Te vérifier maintenant ?', bridgeBadge:'GOOGLE CHROME',
+      bridgeText:'Si tu ne veux pas attendre la validation par un administrateur, tu peux vérifier ton compte immédiatement. Installe HUB Verify puis ouvre Bloxd.io une fois dans Google Chrome. Après quelques secondes, l’extension détecte les données de vérification et confirme automatiquement ton compte. HUB Verify sert de pont sécurisé entre Bloxd.io et le HUB afin de confirmer que le compte Bloxd t’appartient vraiment.',
+      bridgeBrowser:'Google Chrome est actuellement recommandé. Microsoft Edge et Brave utilisent aussi Chromium et peuvent généralement utiliser les extensions Chrome, mais HUB Verify n’y a pas encore été testé officiellement.',
+      bridgeTutorial:'VOIR LE TUTORIEL', bridgeDownload:'TÉLÉCHARGER L’EXTENSION', bridgeOpenBloxd:'OUVRIR BLOXD.IO',
+      bridgeNote:'Après la vérification, ton compte Pending est débloqué automatiquement.',
       untilThen:'En attendant', untilText:'Tu peux déjà utiliser le HUB. Ton nom de joueur, tes statistiques et les fonctions liées au compte seront débloqués automatiquement après la vérification.', backHub:'VERS L’APERÇU'
     }
   };
@@ -259,21 +262,24 @@
       .hub-pending-route-status.success{color:#54edbb!important}
       .hub-pending-route-status.error{color:#ff8194!important}
       .hub-pending-route-note{margin-top:15px!important;padding-top:15px;border-top:1px solid rgba(255,255,255,.06)}
-      .hub-pending-bridge-badge{display:inline-flex;width:max-content;margin:4px 0 12px;padding:7px 10px;border:1px solid rgba(244,189,79,.3);border-radius:999px;background:rgba(244,189,79,.1);color:#f4bd4f;font-size:8px;font-weight:900;letter-spacing:.08em}
-      .hub-pending-route-steps{display:grid;gap:8px;margin:18px 0}
-      .hub-pending-route-steps>div{display:grid;grid-template-columns:27px 1fr;align-items:center;gap:9px}
-      .hub-pending-route-steps b{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:rgba(56,240,219,.09);color:#38f0db;font-size:11px}
-      .hub-pending-route-steps span{color:#aaa1b6;font-size:12px}
-      .hub-pending-route-card button[disabled]{opacity:.48;cursor:not-allowed}
+      .hub-pending-bridge-badge{display:inline-flex;width:max-content;margin:4px 0 12px;padding:7px 10px;border:1px solid rgba(56,240,219,.28);border-radius:999px;background:rgba(56,240,219,.08);color:#59ead9;font-size:8px;font-weight:900;letter-spacing:.08em}
+      .hub-pending-browser-note{margin:15px 0 0!important;padding:11px 13px;border:1px solid rgba(255,255,255,.055);border-radius:11px;background:rgba(255,255,255,.025);color:#9087a5!important;font-size:10.5px!important;line-height:1.55!important}
+      .hub-pending-verify-actions{display:grid;grid-template-columns:.9fr 1.3fr 1fr;gap:9px;margin:19px 0 2px}
+      .hub-pending-verify-button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:45px;padding:0 13px;border:1px solid rgba(126,79,241,.48);border-radius:10px;background:rgba(126,79,241,.08);color:#f7f4ff!important;font:900 9px/1.18 Montserrat,Arial;letter-spacing:.045em;text-align:center;text-decoration:none!important;cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
+      .hub-pending-verify-button:hover{transform:translateY(-1px);border-color:rgba(151,108,255,.9);background:rgba(126,79,241,.15)}
+      .hub-pending-verify-button.primary{border-color:rgba(56,240,219,.48);background:linear-gradient(135deg,rgba(56,240,219,.20),rgba(71,186,255,.15));color:#e6fffc!important;box-shadow:0 10px 28px rgba(20,207,190,.08)}
+      .hub-pending-verify-button.primary:hover{border-color:rgba(56,240,219,.82);background:linear-gradient(135deg,rgba(56,240,219,.28),rgba(71,186,255,.20));box-shadow:0 12px 32px rgba(20,207,190,.13)}
+      .hub-pending-verify-button.bloxd{border-color:rgba(255,255,255,.11);background:rgba(255,255,255,.045)}
+      .hub-pending-verify-button.muted{border-color:rgba(126,79,241,.35);background:rgba(126,79,241,.07)}
       .hub-pending-route-strip{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:21px 24px}
       .hub-pending-route-strip strong{font-size:16px}
       .hub-pending-route-strip p{max-width:900px;margin:4px 0 0;color:#a79bc8;font-size:13px;line-height:1.55}
       .hub-pending-modal-message{min-height:19px;margin:7px 0 0;color:#ff788f;font-size:12px;font-weight:700}
       .hub-pending-modal-message.ok{color:#67e9b8}
 
-      @media(max-width:900px){.hub-pending-route-grid{grid-template-columns:1fr}}
+      @media(max-width:900px){.hub-pending-route-grid{grid-template-columns:1fr}.hub-pending-verify-actions{grid-template-columns:1fr 1fr}.hub-pending-verify-button.bloxd{grid-column:1/-1}}
       @media(max-width:760px){.hub-pending-profile-hero,.hub-pending-route-hero{align-items:flex-start;padding:20px}.hub-pending-avatar,.hub-pending-route-avatar{width:64px;height:64px;flex-basis:64px}.hub-pending-profile-card{padding:25px 20px}.hub-pending-route-card{padding:20px}.hub-pending-route-strip{align-items:stretch;flex-direction:column}}
-      @media(max-width:480px){.hub-pending-route-actions{display:grid}.hub-pending-route-actions button{width:100%}.hub-pending-route-code>strong{font-size:22px;letter-spacing:.14em}}
+      @media(max-width:480px){.hub-pending-route-actions{display:grid}.hub-pending-route-actions button{width:100%}.hub-pending-route-code>strong{font-size:22px;letter-spacing:.14em}.hub-pending-verify-actions{grid-template-columns:1fr}.hub-pending-verify-button.bloxd{grid-column:auto}}
     `;
     document.head.appendChild(style);
   }
@@ -422,13 +428,13 @@
           <h2>${t('bridgeTitle')}</h2>
           <span class="hub-pending-bridge-badge">${t('bridgeBadge')}</span>
           <p>${t('bridgeText')}</p>
-          <div class="hub-pending-route-steps">
-            <div><b>1</b><span>${t('bridgeStep1')}</span></div>
-            <div><b>2</b><span>${t('bridgeStep2')}</span></div>
-            <div><b>3</b><span>${t('bridgeStep3')}</span></div>
+          <p class="hub-pending-browser-note">${t('bridgeBrowser')}</p>
+          <div class="hub-pending-verify-actions">
+            <button type="button" class="hub-pending-verify-button muted">${t('bridgeTutorial')}</button>
+            <button type="button" class="hub-pending-verify-button primary">${t('bridgeDownload')}</button>
+            <a class="hub-pending-verify-button bloxd" href="https://bloxd.io/" target="_blank" rel="noopener noreferrer">${t('bridgeOpenBloxd')}</a>
           </div>
-          <button type="button" class="secondary-button" disabled>${t('bridgeButton')}</button>
-          <p>${t('bridgeNote')}</p>
+          <p class="hub-pending-route-note">${t('bridgeNote')}</p>
         </article>
       </div>
 
