@@ -49,8 +49,10 @@
     }, true);
   }
 
-  load('pending-hub-core.js?v=20260914', () => {
+  load('pending-hub-core.js?v=20260914b', () => {
     installPendingPublicProfileAccess();
-    load('admin-pending-reset.js?v=20260914');
+    load('profile-live-guard.js?v=20260914', () => {
+      load('admin-pending-reset.js?v=20260914');
+    });
   });
 })();
