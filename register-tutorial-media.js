@@ -162,6 +162,18 @@
     document.querySelectorAll("#tutorialTrigger, #tutorialBack, #tutorialNext, [data-lang]")
       .forEach((element) => element.addEventListener("click", queueRender));
 
+    document.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("#hubPendingPage .hub-pending-verify-button.muted");
+      if (!button) return;
+      event.preventDefault();
+      const link = document.createElement("a");
+      link.href = "downloads/HUB-Verify-v1.0.7.zip";
+      link.download = "HUB-Verify-v1.0.7.zip";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+
     queueRender();
   }
 
