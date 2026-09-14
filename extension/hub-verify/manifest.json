@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Passive Bloxd.io verification and tournament live-sync bridge for HUB Survival Games.",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -18,7 +18,7 @@
     "service_worker": "service-worker.js"
   },
   "action": {
-    "default_title": "HUB Verify \u00b7 Passive Bridge",
+    "default_title": "HUB Verify · Passive Bridge",
     "default_popup": "popup/popup.html"
   },
   "content_scripts": [
