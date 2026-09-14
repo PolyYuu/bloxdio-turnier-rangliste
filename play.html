@@ -3,46 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HUB · Survival Games</title>
-  <link rel="stylesheet" href="play.css">
+  <title>PLAY · HUB Survival Games</title>
+  <link rel="stylesheet" href="play.css?v=20260915">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <main id="playShell" class="play-shell">
-    <iframe
-      id="bloxdFrame"
-      class="bloxd-frame"
-      title="Bloxd Survival Games"
-      src="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1"
-      allow="autoplay; clipboard-read; clipboard-write; pointer-lock"
-      referrerpolicy="strict-origin-when-cross-origin">
-    </iframe>
-
-    <header class="hud-top">
+    <header class="play-topbar">
       <a class="hub-button" href="index.html#overview">← HUB</a>
+      <div class="play-heading">
+        <span>HUB · PLAY</span>
+        <strong>BLOXD.IO SURVIVAL GAMES</strong>
+      </div>
       <div class="match-chip">
         <span id="modeLabel">SURVIVAL GAMES</span>
-        <strong id="roundLabel">RUNDE 1</strong>
+        <strong id="roundLabel">KEIN CUP LIVE</strong>
       </div>
-      <button id="fullscreenButton" class="hub-button" type="button">⛶ VOLLBILD</button>
     </header>
 
-    <div id="liveStatus" class="live-status">VERBINDE MIT HUB…</div>
+    <section class="play-layout">
+      <div id="gameStage" class="game-stage">
+        <iframe
+          id="bloxdFrame"
+          class="bloxd-frame"
+          title="Bloxd Survival Games"
+          src="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1"
+          allow="autoplay; clipboard-read; clipboard-write; pointer-lock; fullscreen"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin">
+        </iframe>
 
-    <section id="roundOverlay" class="round-overlay" hidden>
-      <div class="round-card">
-        <p class="eyebrow">HUB · LIVE RESULT</p>
-        <h1 id="overlayTitle">RUNDE BEENDET</h1>
-        <div id="overlayRanking" class="overlay-ranking"></div>
-        <div id="myRatingBlock" class="my-rating" hidden>
-          <span>DEIN RATING</span>
-          <strong id="myRatingValue"></strong>
+        <div class="game-hud">
+          <div id="liveStatus" class="live-status">VERBINDE MIT HUB…</div>
+          <button id="fullscreenButton" class="fullscreen-button" type="button">⛶ VOLLBILD</button>
         </div>
-        <button id="closeOverlayButton" class="continue-button" type="button">WEITER</button>
+
+        <section id="roundOverlay" class="round-overlay" hidden>
+          <div class="round-card">
+            <div class="round-card-head">
+              <div>
+                <p class="eyebrow">HUB · LIVE CUP</p>
+                <h1 id="overlayTitle">RUNDE BEENDET</h1>
+                <p id="overlaySubtitle" class="overlay-subtitle">So hat sich der Cup nach dieser Runde verändert.</p>
+              </div>
+              <span id="overlayRoundChip" class="overlay-round-chip">RUNDE 1</span>
+            </div>
+            <div id="overlayRanking" class="overlay-ranking"></div>
+            <div id="myRatingBlock" class="my-rating" hidden>
+              <span>DEIN COMPETITIVE RATING</span>
+              <strong id="myRatingValue"></strong>
+            </div>
+            <button id="closeOverlayButton" class="continue-button" type="button">WEITERSPIELEN</button>
+          </div>
+        </section>
       </div>
+
+      <aside id="playSidePanel" class="side-panel">
+        <div class="side-panel-head">
+          <span id="sideEyebrow" class="eyebrow">HUB · LIVE</span>
+          <h2 id="sideTitle">DEIN RANG</h2>
+          <p id="sideMeta">Live-Daten werden geladen…</p>
+        </div>
+        <div id="sidePanelContent" class="side-panel-content">
+          <div class="side-loading">VERBINDE MIT HUB…</div>
+        </div>
+      </aside>
     </section>
   </main>
 
-  <script src="play.js"></script>
+  <script src="play.js?v=20260915"></script>
 </body>
 </html>
