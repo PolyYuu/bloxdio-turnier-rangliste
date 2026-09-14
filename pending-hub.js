@@ -10,6 +10,25 @@
     (document.head || document.documentElement).appendChild(script);
   };
 
+  function installPlayNavigation() {
+    const nav = document.querySelector('.primary-nav');
+    if (!nav || nav.querySelector('[data-hub-play-link]')) return;
+
+    const profile = nav.querySelector('[data-route="profile"]');
+    const cup = nav.querySelector('[data-route="cup"]');
+    const reference = cup || profile || nav.querySelector('a,button');
+    const link = document.createElement('a');
+    link.href = 'play.html';
+    link.dataset.hubPlayLink = '1';
+    link.textContent = 'PLAY';
+    link.className = reference?.className || '';
+    link.removeAttribute('data-route');
+    link.setAttribute('aria-label', 'Play Bloxd.io');
+
+    if (profile) nav.insertBefore(link, profile);
+    else nav.appendChild(link);
+  }
+
   function installPendingPublicProfileAccess() {
     const pendingStyles = document.getElementById('hubPendingStableStyles');
     if (pendingStyles && pendingStyles.dataset.publicProfilesUnlocked !== '1') {
@@ -49,10 +68,17 @@
     }, true);
   }
 
-  load('pending-hub-core.js?v=20260914b', () => {
+  installPlayNavigation();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installPlayNavigation, {once:true});
+  }
+  new MutationObserver(installPlayNavigation).observe(document.documentElement, {childList:true, subtree:true});
+
+  load('pending-hub-core.js?v=20260915', () => {
     installPendingPublicProfileAccess();
-    load('profile-live-guard.js?v=20260914', () => {
-      load('admin-pending-reset.js?v=20260914');
+    installPlayNavigation();
+    load('profile-live-guard.js?v=20260915', () => {
+      load('admin-pending-reset.js?v=20260915');
     });
   });
 })();
