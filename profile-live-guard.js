@@ -17,6 +17,48 @@
     return String(value || '').trim().toLowerCase();
   }
 
+  function closeProfileSourceOverlay(profileTarget) {
+    if (!profileTarget) return;
+
+    const explicitOverlay = profileTarget.closest([
+      '.v3-modal-backdrop',
+      '.modal-backdrop',
+      '.modal-overlay',
+      '.cup-modal-backdrop',
+      '.cup-detail-overlay',
+      '.v3-cup-detail-overlay',
+      '[class*="modal-backdrop"]',
+      '[class*="detail-overlay"]',
+      '[class*="cup-overlay"]',
+      '[role="dialog"]'
+    ].join(','));
+
+    if (explicitOverlay) {
+      const closeButton = explicitOverlay.querySelector('[data-v3-close],[data-close],.modal-close,.close-button,[aria-label="Close"],[aria-label="Schließen"]');
+      if (closeButton) {
+        try { closeButton.click(); } catch (_) {}
+      }
+      if (explicitOverlay.isConnected) explicitOverlay.remove();
+    }
+
+    // Cup/team detail cards have existed under a few different ids/classes over time.
+    // Only run this when a player profile link was clicked, so stale detail overlays can never sit above PROFILE.
+    document.querySelectorAll([
+      '#v3CupDetailModal',
+      '#cupDetailModal',
+      '#teamDetailModal',
+      '#v3TeamDetailModal',
+      '[data-cup-detail-modal]',
+      '[data-team-detail-modal]'
+    ].join(',')).forEach(node => node.remove());
+
+    const visibleModal = document.querySelector('.v3-modal-backdrop,.modal-backdrop,.modal-overlay,[class*="modal-backdrop"]');
+    if (!visibleModal) {
+      document.body.classList.remove('modal-open', 'no-scroll', 'overflow-hidden');
+      if (document.body.style.overflow === 'hidden') document.body.style.removeProperty('overflow');
+    }
+  }
+
   function injectGuardStyles() {
     if (document.getElementById('hubProfileLiveGuardStyles')) return;
     const style = document.createElement('style');
@@ -98,9 +140,7 @@
 
     const hadPlayer = !!live.player;
     const previousPlayer = live.player;
-    if (!hadPlayer) {
-      live.player = {id:'__public_viewer__', current_name:'', avatar_pixels:null};
-    }
+    if (!hadPlayer) live.player = {id:'__public_viewer__', current_name:'', avatar_pixels:null};
 
     try {
       await originalRenderProfileLive(gp.current_name);
@@ -109,9 +149,7 @@
     }
 
     const shownName = normalize(profileName()?.textContent);
-    if (shownName !== normalize(gp.current_name)) {
-      throw new Error('Das Live-Profil konnte nicht bestätigt werden.');
-    }
+    if (shownName !== normalize(gp.current_name)) throw new Error('Das Live-Profil konnte nicht bestätigt werden.');
 
     clearGate();
     document.dispatchEvent(new CustomEvent('hub:live-profile-rendered', {detail:{player:gp}}));
@@ -145,6 +183,8 @@
     event.preventDefault();
     event.stopImmediatePropagation();
 
+    closeProfileSourceOverlay(profileTarget);
+
     renderPublicLiveProfile(name).catch(error => {
       console.error('[The HUB] Live profile failed', error);
       setGate('error', 'Profil konnte nicht geladen werden', error?.message || 'Die Live-Daten sind gerade nicht verfügbar.');
@@ -153,7 +193,6 @@
   }, true);
 
   // A static/demo profile must never be shown as a fallback.
-  // If PROFILE is opened without a confirmed live render, keep its old markup hidden.
   window.addEventListener('hashchange', () => {
     if (location.hash !== '#profile') return;
     const page = profilePage();
