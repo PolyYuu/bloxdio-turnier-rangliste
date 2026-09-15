@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>PLAY · HUB Survival Games</title>
-  <link rel="stylesheet" href="play.css?v=20260915b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Pixelify+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="play.css?v=20260915d">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -28,8 +31,7 @@
           class="bloxd-frame"
           title="Bloxd Survival Games"
           src="https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLbTc24H7?lobby=1"
-          allow="autoplay; clipboard-read; clipboard-write; pointer-lock; fullscreen"
-          allowfullscreen
+          allow="autoplay; clipboard-read; clipboard-write; pointer-lock"
           referrerpolicy="strict-origin-when-cross-origin">
         </iframe>
 
@@ -59,7 +61,7 @@
 
       <aside id="playSidePanel" class="side-panel">
         <div class="side-panel-head">
-          <span id="sideEyebrow" class="eyebrow">HUB · LIVE</span>
+          <span id="sideEyebrow" class="eyebrow">COMPETITIVE</span>
           <h2 id="sideTitle">DEIN RANG</h2>
           <p id="sideMeta">Live-Daten werden geladen…</p>
         </div>
@@ -70,6 +72,20 @@
     </section>
   </main>
 
-  <script src="play.js?v=20260915b"></script>
+  <div class="modal-backdrop" id="teamDetailModal" hidden>
+    <section class="team-detail-modal" role="dialog" aria-modal="true" aria-labelledby="teamDetailTitle">
+      <button class="modal-close" type="button" data-close-modal="teamDetailModal" aria-label="Close">×</button>
+      <span class="eyebrow">CUP DUO PROFILE</span>
+      <h2 id="teamDetailTitle"></h2>
+      <div class="team-detail-summary" id="teamDetailSummary"></div>
+      <div class="team-player-cards" id="teamPlayerCards"></div>
+      <div class="team-round-table-wrap">
+        <h3>ROUND BY ROUND</h3>
+        <div id="teamRoundTable"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="play.js?v=20260915d"></script>
 </body>
 </html>
