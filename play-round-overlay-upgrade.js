@@ -22,7 +22,6 @@
 
   let pausedForOverlay = false;
   let previousFrameTabIndex = null;
-  let previousFrameAllow = null;
   let liveTournamentId = '';
   let roundOneFallbackBusy = false;
   let renderToken = 0;
@@ -165,26 +164,48 @@
     return `<span class="round-cup-player">${avatar}<strong>${esc(player.name)}</strong></span>`;
   }
 
-  function rowMarkup(row, ownTeamId, phase) {
+  function movementInfo(teamId, beforeMap, finalRank, round) {
+    if (round <= 1) return {text:'',className:'same'};
+    const previous = beforeMap.get(String(teamId));
+    if (!previous) return {text:'',className:'same'};
+    if (previous.rank > finalRank) return {text:`${previous.rank} → ${finalRank}`,className:'up'};
+    if (previous.rank < finalRank) return {text:`${previous.rank} → ${finalRank}`,className:'down'};
+    return {text:`${previous.rank} → ${finalRank}`,className:'same'};
+  }
+
+  function rowMarkup(row, ownTeamId, phase, beforeMap, round) {
     const mine = String(row.team.id) === String(ownTeamId);
     const duo = row.members.map((player,index) => `${index ? '<span class="round-cup-plus">+</span>' : ''}${playerMarkup(player)}`).join('');
+    const move = movementInfo(row.team.id,beforeMap,row.rank,round);
+    const showMove = phase === 'after' && move.text;
     return `<div class="round-cup-row hub-managed-round-row ${mine ? 'is-mine' : ''} ${row.rank===1 ? 'top' : ''}" data-team-id="${esc(row.team.id)}" data-phase="${phase}">
       <span class="round-cup-rank">#${row.rank}</span>
       <div class="round-cup-team"><div class="round-cup-players">${duo || `<strong>${esc(row.label)}</strong>`}</div></div>
-      <div class="round-cup-points"><strong>${row.points}</strong><span>PTS</span></div>
+      <div class="round-cup-points">
+        <span class="round-cup-change ${move.className} ${showMove ? 'visible' : ''}">${esc(move.text)}</span>
+        <span class="round-cup-score"><strong>${row.points}</strong><span>PTS</span></span>
+      </div>
     </div>`;
   }
 
-  function buildBoard(rows, ownTeamId, phase) {
+  function buildBoard(rows, ownTeamId, phase, beforeMap, round) {
     overlayRanking.innerHTML = '<div id="roundCupTableHead" class="round-cup-table-head"><span>#</span><span>TEAM</span><span>PTS</span></div>' +
-      `<div class="hub-managed-round-board">${rows.map(row => rowMarkup(row,ownTeamId,phase)).join('')}</div>`;
+      `<div class="hub-managed-round-board">${rows.map(row => rowMarkup(row,ownTeamId,phase,beforeMap,round)).join('')}</div>`;
   }
 
-  function updateRowToFinal(rowElement, finalRow) {
+  function updateRowToFinal(rowElement, finalRow, beforeMap, round) {
     const rank = $('.round-cup-rank',rowElement);
-    const points = $('.round-cup-points strong',rowElement);
+    const points = $('.round-cup-score strong',rowElement);
+    const change = $('.round-cup-change',rowElement);
     if (rank) rank.textContent = `#${finalRow.rank}`;
     if (points) points.textContent = String(finalRow.points);
+    if (change) {
+      const move = movementInfo(finalRow.team.id,beforeMap,finalRow.rank,round);
+      change.textContent = move.text;
+      change.classList.remove('up','down','same','visible');
+      change.classList.add(move.className);
+      if (move.text) change.classList.add('visible');
+    }
     rowElement.classList.toggle('top',finalRow.rank===1);
     rowElement.dataset.phase = 'after';
   }
@@ -194,15 +215,16 @@
     const windowRows = focusWindow(snapshot.after,snapshot.before,ownTeamId);
     const before = windowRows.before;
     const after = windowRows.after;
+    const beforeMap = new Map(snapshot.before.map(row => [String(row.team.id),row]));
 
     if (round <= 1) {
-      buildBoard(after,ownTeamId,'after');
+      buildBoard(after,ownTeamId,'after',beforeMap,round);
       overlay.classList.remove('hub-managed-preparing');
       overlay.classList.add('hub-managed-ready');
       return;
     }
 
-    buildBoard(before,ownTeamId,'before');
+    buildBoard(before,ownTeamId,'before',beforeMap,round);
     overlay.classList.remove('hub-managed-preparing');
     overlay.classList.add('hub-managed-ready');
 
@@ -218,7 +240,7 @@
     for (const finalRow of after) {
       const element = $(`.hub-managed-round-row[data-team-id="${CSS.escape(String(finalRow.team.id))}"]`,board);
       if (!element) continue;
-      updateRowToFinal(element,finalRow);
+      updateRowToFinal(element,finalRow,beforeMap,round);
       board.appendChild(element);
     }
 
@@ -271,30 +293,15 @@
     }
   }
 
-  function revokePointerLockPermission() {
-    if (!bloxdFrame) return;
-    previousFrameAllow = bloxdFrame.getAttribute('allow');
-    if (!previousFrameAllow) return;
-    const next = previousFrameAllow
-      .split(';')
-      .map(value => value.trim())
-      .filter(Boolean)
-      .filter(value => !/^pointer-lock(?:\s|$)/i.test(value))
-      .join('; ');
-    bloxdFrame.setAttribute('allow',next);
-  }
-
-  function restorePointerLockPermission() {
-    if (!bloxdFrame) return;
-    if (previousFrameAllow == null) return;
-    bloxdFrame.setAttribute('allow',previousFrameAllow);
-    previousFrameAllow = null;
+  function notifyBloxd(type) {
+    try {
+      bloxdFrame?.contentWindow?.postMessage?.({source:'SG_WEBSITE',type},'https://bloxd.io');
+    } catch (_) {}
   }
 
   function forceOverlayFocus() {
     try { window.focus(); } catch (_) {}
     try { document.exitPointerLock?.(); } catch (_) {}
-    try { bloxdFrame?.contentWindow?.blur?.(); } catch (_) {}
     try { overlay.focus({preventScroll:true}); } catch (_) {}
     try { closeButton.focus({preventScroll:true}); }
     catch (_) { try { closeButton.focus(); } catch (_) {} }
@@ -306,20 +313,24 @@
     document.body.classList.add('hub-round-overlay-open');
     overlay.tabIndex = -1;
 
-    revokePointerLockPermission();
+    // This is the mechanism that made the old index test work: ask the code
+    // running inside the Bloxd iframe to release its own pointer lock.
+    notifyBloxd('OVERLAY_OPEN');
 
     if (bloxdFrame) {
       previousFrameTabIndex = bloxdFrame.getAttribute('tabindex');
       bloxdFrame.setAttribute('tabindex','-1');
       bloxdFrame.setAttribute('aria-hidden','true');
-      bloxdFrame.inert = true;
       bloxdFrame.style.pointerEvents = 'none';
       try { bloxdFrame.blur(); } catch (_) {}
     }
 
     forceOverlayFocus();
-    [20,60,120,240,480].forEach(delay => setTimeout(() => {
-      if (!overlay.hidden) forceOverlayFocus();
+    [20,60,120,240,480,900].forEach(delay => setTimeout(() => {
+      if (!overlay.hidden) {
+        notifyBloxd('OVERLAY_OPEN');
+        forceOverlayFocus();
+      }
     },delay));
   }
 
@@ -329,15 +340,15 @@
     document.body.classList.remove('hub-round-overlay-open');
     ++renderToken;
 
+    notifyBloxd('OVERLAY_CLOSE');
+
     if (bloxdFrame) {
       if (previousFrameTabIndex == null) bloxdFrame.removeAttribute('tabindex');
       else bloxdFrame.setAttribute('tabindex',previousFrameTabIndex);
       bloxdFrame.removeAttribute('aria-hidden');
-      bloxdFrame.inert = false;
       bloxdFrame.style.removeProperty('pointer-events');
       previousFrameTabIndex = null;
     }
-    restorePointerLockPermission();
     setTimeout(() => {
       try { bloxdFrame?.focus(); } catch (_) {}
     },0);
@@ -404,6 +415,13 @@
       roundOneFallbackBusy = false;
     }
   }
+
+  window.addEventListener('message', event => {
+    if (event.source !== bloxdFrame?.contentWindow || !event.data) return;
+    if (event.data.source === 'HUB_VERIFY' && event.data.type === 'OVERLAY_POINTER_RELEASED') {
+      forceOverlayFocus();
+    }
+  });
 
   document.addEventListener('focusin', event => {
     if (overlay.hidden) return;
