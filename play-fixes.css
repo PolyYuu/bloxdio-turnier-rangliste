@@ -72,12 +72,22 @@ body.hub-round-overlay-open #roundOverlay *{pointer-events:auto}
 }
 #roundOverlay .round-cup-team{min-width:0;padding:0 12px}
 #roundOverlay .round-cup-players{display:flex;align-items:center;min-width:0;gap:0}
+#roundOverlay .round-cup-players:has(.round-cup-plus){
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  justify-content:stretch;
+  gap:0;
+  width:100%
+}
+#roundOverlay .round-cup-players:has(.round-cup-plus) .round-cup-player:first-child{justify-content:flex-end}
+#roundOverlay .round-cup-players:has(.round-cup-plus) .round-cup-player:last-child{justify-content:flex-start}
 #roundOverlay .round-cup-player{display:flex;align-items:center;gap:7px;min-width:0;flex:0 1 auto}
 #roundOverlay .round-cup-player strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px!important;font-weight:900}
 #roundOverlay .round-cup-avatar{display:block;width:30px;height:30px;flex:0 0 30px;border:1px solid rgba(56,240,219,.28);border-radius:6px;background:#fff;image-rendering:pixelated;object-fit:cover}
 #roundOverlay .round-cup-row.is-mine .round-cup-avatar{border-color:rgba(244,201,75,.72)}
 #roundOverlay .round-cup-avatar-fallback{display:grid;place-items:center;color:#160d26;font-size:11px;font-weight:900}
-#roundOverlay .round-cup-plus{flex:0 0 auto;margin:0 12px;color:#746a86;font-size:10px;font-weight:900}
+#roundOverlay .round-cup-plus{flex:0 0 auto;margin:0 clamp(14px,2.2vw,34px);color:#746a86;font-size:10px;font-weight:900;text-align:center}
 #roundOverlay .round-cup-points{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:0 12px;text-align:right}
 #roundOverlay .round-cup-score{display:grid;justify-items:end;min-width:45px}
 #roundOverlay .round-cup-score strong{display:block;font-size:15px!important;font-weight:900}
@@ -104,7 +114,7 @@ body.hub-round-overlay-open #roundOverlay *{pointer-events:auto}
   #roundOverlay .round-cup-table-head,#roundOverlay .round-cup-row{grid-template-columns:48px minmax(0,1fr) 126px!important}
   #roundOverlay .round-card{padding:16px}
   #roundOverlay .round-cup-avatar{width:26px;height:26px;flex-basis:26px}
-  #roundOverlay .round-cup-plus{margin:0 6px}
+  #roundOverlay .round-cup-plus{margin:0 10px}
   #roundOverlay .round-cup-player strong{font-size:9px!important}
   #roundOverlay .round-cup-points{gap:7px;padding:0 8px}
   #roundOverlay .round-cup-change{min-width:38px;font-size:8px!important}
