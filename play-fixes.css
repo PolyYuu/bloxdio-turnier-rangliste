@@ -88,7 +88,8 @@ body.hub-round-overlay-open #roundOverlay *{pointer-events:auto}
 #roundOverlay .round-cup-change.down{color:#ff718d!important}
 #roundOverlay .round-cup-change.same{color:#7d748a!important}
 #roundOverlay .static-round-one{transition:none!important}
-#roundOverlay .continue-button{margin-top:10px}
+#roundOverlay .continue-button{position:relative;margin-top:10px;color:transparent!important;font-size:0!important}
+#roundOverlay .continue-button::after{content:attr(data-space-label);color:#0b0715;font-size:9px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
 
 /* Keep the responsive stacked layout usable on small screens, but the iframe itself remains non-scrollable. */
 @media(max-width:820px){
