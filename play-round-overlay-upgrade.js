@@ -27,6 +27,7 @@
   let renderToken = 0;
   let fallbackTimer = 0;
   let activeAnimation = null;
+  let pendingSkip = false;
 
   function currentOverlayRound() {
     const text = $('#overlayRoundChip')?.textContent || $('#overlayTitle')?.textContent || '';
@@ -217,7 +218,11 @@
 
   function finishAnimationImmediately() {
     const active = activeAnimation;
-    if (!active || active.stage === 'done') return false;
+    if (!active) {
+      if (overlay.dataset.animationState === 'loading') { pendingSkip = true; return true; }
+      return false;
+    }
+    if (active.stage === 'done') return false;
     active.stage = 'done';
     active.skipped = true;
     buildBoard(active.after,active.ownTeamId,'after',active.beforeMap,active.round);
@@ -236,6 +241,17 @@
     const beforeMap = new Map(snapshot.before.map(row => [String(row.team.id),row]));
 
     activeAnimation = {token,round,ownTeamId,beforeMap,after,stage:'done',skipped:false};
+
+    if (pendingSkip && round > 1) {
+      pendingSkip = false;
+      activeAnimation.stage = 'hold';
+      buildBoard(after,ownTeamId,'after',beforeMap,round);
+      activeAnimation.stage = 'done';
+      setAnimationState('done');
+      overlay.classList.remove('hub-managed-preparing');
+      overlay.classList.add('hub-managed-ready');
+      return;
+    }
 
     if (round <= 1) {
       buildBoard(after,ownTeamId,'after',beforeMap,round);
@@ -305,6 +321,7 @@
     if (!round || overlay.hidden) return;
     const token = ++renderToken;
     activeAnimation = null;
+    pendingSkip = false;
     setAnimationState('loading');
     overlay.classList.add('hub-managed-preparing');
     overlay.classList.remove('hub-managed-ready');
@@ -331,8 +348,10 @@
   }
 
   function syncContinueButtonA11y() {
-    closeButton.setAttribute('aria-label',localizedContinueLabel());
-    closeButton.setAttribute('title',localizedContinueLabel());
+    const label = localizedContinueLabel();
+    closeButton.dataset.spaceLabel = label;
+    closeButton.setAttribute('aria-label',label);
+    closeButton.setAttribute('title',label);
   }
 
   function forceOverlayFocus() {
@@ -370,6 +389,7 @@
     document.body.classList.remove('hub-round-overlay-open');
     ++renderToken;
     activeAnimation = null;
+    pendingSkip = false;
     setAnimationState('idle');
 
     if (bloxdFrame) {
