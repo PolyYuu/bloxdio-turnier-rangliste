@@ -7,6 +7,93 @@ body{min-height:0}
 .side-panel{min-height:0;max-height:100%;overflow:hidden}
 .side-panel-content{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
 
+/* While the round-result overlay is visible, keep every pointer event on HUB UI instead of Bloxd. */
+body.hub-round-overlay-open .bloxd-frame{pointer-events:none!important}
+body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important}
+
+/* Round-end board mirrors the Cup > Team standings visual language. */
+#roundOverlay .round-card{
+  width:min(760px,calc(100% - 34px));
+  padding:24px;
+  border-radius:14px;
+  border:1px solid rgba(126,79,241,.46);
+  background:linear-gradient(180deg,rgba(23,10,57,.97),rgba(12,8,36,.97));
+  box-shadow:0 28px 90px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.035)
+}
+#roundOverlay .overlay-ranking{display:block;position:relative}
+#roundOverlay .round-cup-table-head{
+  display:grid;
+  grid-template-columns:72px 1fr 120px;
+  align-items:center;
+  padding:8px 12px;
+  color:#8d80a6;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.06em;
+  text-transform:uppercase
+}
+#roundOverlay .round-cup-row{
+  min-height:60px;
+  margin-bottom:6px;
+  display:grid!important;
+  grid-template-columns:72px 1fr 120px!important;
+  align-items:center;
+  gap:0!important;
+  padding:0!important;
+  border:1px solid rgba(126,86,225,.2)!important;
+  border-radius:7px!important;
+  background:rgba(16,9,41,.62)!important;
+  transition:transform 3.75s cubic-bezier(.2,.8,.2,1),opacity .55s ease,background .55s ease,border-color .55s ease!important
+}
+#roundOverlay .round-cup-row.top{
+  border-color:rgba(244,201,75,.42)!important;
+  background:linear-gradient(90deg,rgba(82,60,16,.43),rgba(24,12,55,.76))!important
+}
+#roundOverlay .round-cup-row.is-mine{
+  border:2px solid var(--gold)!important;
+  box-shadow:0 0 0 1px rgba(244,201,75,.12)
+}
+#roundOverlay .round-cup-rank{
+  padding:0 12px;
+  font-size:20px!important;
+  font-style:normal!important;
+  font-weight:900!important;
+  text-align:center
+}
+#roundOverlay .round-cup-team{
+  min-width:0;
+  padding:0 12px
+}
+#roundOverlay .round-cup-team strong{
+  font-size:11px!important;
+  font-weight:900
+}
+#roundOverlay .round-cup-team small{
+  margin-top:3px;
+  color:#8d80a6!important;
+  font-size:8px!important
+}
+#roundOverlay .round-cup-team .overlay-move{
+  display:block;
+  margin-top:5px;
+  text-align:left!important;
+  font-size:8px!important
+}
+#roundOverlay .round-cup-points{
+  padding:0 12px;
+  text-align:right
+}
+#roundOverlay .round-cup-points strong{
+  font-size:15px!important;
+  font-weight:900
+}
+#roundOverlay .round-cup-points small{
+  display:block;
+  margin-top:3px;
+  font-size:7px!important
+}
+#roundOverlay .static-round-one{transition:none!important}
+
 /* Keep the responsive stacked layout usable on small screens, but the iframe itself remains non-scrollable. */
 @media(max-width:820px){
   html,body{height:100%;overflow:hidden}
@@ -15,4 +102,8 @@ body{min-height:0}
   .game-stage{min-height:0;height:60vh}
   .side-panel{min-height:0}
   .side-panel-content{overflow-y:auto}
+}
+@media(max-width:620px){
+  #roundOverlay .round-cup-table-head,#roundOverlay .round-cup-row{grid-template-columns:52px 1fr 82px!important}
+  #roundOverlay .round-card{padding:18px}
 }
