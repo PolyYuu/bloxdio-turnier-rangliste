@@ -17,10 +17,12 @@
 
   const START_HOLD_MS = 750;
   const MOVE_MS = 3750;
+  const WINDOW_SIZE = 7;
   const POINTS = {kill:1, deathmatch:3, win:2};
 
   let pausedForOverlay = false;
   let previousFrameTabIndex = null;
+  let previousFrameAllow = null;
   let liveTournamentId = '';
   let roundOneFallbackBusy = false;
   let renderToken = 0;
@@ -52,32 +54,21 @@
     })[char]);
   }
 
-  function installCupHeader() {
-    let head = $('#roundCupTableHead', overlayRanking);
-    if (!head) {
-      head = document.createElement('div');
-      head.id = 'roundCupTableHead';
-      head.className = 'round-cup-table-head';
-      head.innerHTML = '<span>#</span><span>TEAM</span><span>PTS</span>';
-      overlayRanking.prepend(head);
-    }
-    return head;
-  }
-
   function ownTeamIdFromPage() {
     return $('#sidePanelContent .cup-row.is-mine')?.dataset?.cupTeam || '';
   }
 
+  function teamMembers(teamId, players) {
+    return players.filter(player => String(player.team_id) === String(teamId));
+  }
+
   function teamLabel(teamId, players) {
-    const names = players
-      .filter(player => String(player.team_id) === String(teamId))
-      .map(player => player.name)
-      .filter(Boolean);
+    const names = teamMembers(teamId,players).map(player => player.name).filter(Boolean);
     return names.length ? names.join(' + ') : 'TEAM';
   }
 
   function pointsThrough(teamId, round, players, events) {
-    const playerIds = new Set(players.filter(player => String(player.team_id) === String(teamId)).map(player => String(player.id)));
+    const playerIds = new Set(teamMembers(teamId,players).map(player => String(player.id)));
     return events.reduce((total,event) => {
       if (!playerIds.has(String(event.player_id)) || Number(event.round) > Number(round)) return total;
       return total + (POINTS[event.type] || 0);
@@ -87,6 +78,7 @@
   function standingsFor(round, teams, players, events) {
     const ordered = teams.map(team => ({
       team,
+      members:teamMembers(team.id,players),
       label:teamLabel(team.id,players),
       points:pointsThrough(team.id,round,players,events)
     })).sort((a,b) => b.points-a.points || a.label.localeCompare(b.label,'de'));
@@ -143,11 +135,42 @@
     };
   }
 
+  function focusWindow(after, before, ownTeamId) {
+    if (!after.length) return {before:[],after:[]};
+    const ownIndex = after.findIndex(row => String(row.team.id) === String(ownTeamId));
+    const size = Math.min(WINDOW_SIZE,after.length);
+    const safeIndex = ownIndex >= 0 ? ownIndex : 0;
+    const start = Math.max(0,Math.min(safeIndex-3,after.length-size));
+    const afterRows = after.slice(start,start+size);
+    const ids = new Set(afterRows.map(row => String(row.team.id)));
+    const beforeRows = before.filter(row => ids.has(String(row.team.id)));
+    return {before:beforeRows,after:afterRows};
+  }
+
+  function avatarSrcFromSide(playerName) {
+    const wanted = String(playerName || '').trim().toLowerCase();
+    for (const chip of $$('#sidePanelContent .cup-player')) {
+      const label = $('.cup-player-name',chip)?.textContent?.trim().toLowerCase();
+      if (label !== wanted) continue;
+      return $('img.pixel-avatar',chip)?.src || '';
+    }
+    return '';
+  }
+
+  function playerMarkup(player) {
+    const src = avatarSrcFromSide(player.name);
+    const avatar = src
+      ? `<img class="round-cup-avatar" src="${esc(src)}" alt="${esc(player.name)}">`
+      : `<span class="round-cup-avatar round-cup-avatar-fallback">${esc(String(player.name || '?').charAt(0).toUpperCase())}</span>`;
+    return `<span class="round-cup-player">${avatar}<strong>${esc(player.name)}</strong></span>`;
+  }
+
   function rowMarkup(row, ownTeamId, phase) {
     const mine = String(row.team.id) === String(ownTeamId);
+    const duo = row.members.map((player,index) => `${index ? '<span class="round-cup-plus">+</span>' : ''}${playerMarkup(player)}`).join('');
     return `<div class="round-cup-row hub-managed-round-row ${mine ? 'is-mine' : ''} ${row.rank===1 ? 'top' : ''}" data-team-id="${esc(row.team.id)}" data-phase="${phase}">
       <span class="round-cup-rank">#${row.rank}</span>
-      <div class="round-cup-team"><strong>${esc(row.label)}</strong></div>
+      <div class="round-cup-team"><div class="round-cup-players">${duo || `<strong>${esc(row.label)}</strong>`}</div></div>
       <div class="round-cup-points"><strong>${row.points}</strong><span>PTS</span></div>
     </div>`;
   }
@@ -168,8 +191,9 @@
 
   async function animateBoardFromPrevious(snapshot, round, token) {
     const ownTeamId = ownTeamIdFromPage();
-    const before = snapshot.before;
-    const after = snapshot.after;
+    const windowRows = focusWindow(snapshot.after,snapshot.before,ownTeamId);
+    const before = windowRows.before;
+    const after = windowRows.after;
 
     if (round <= 1) {
       buildBoard(after,ownTeamId,'after');
@@ -189,11 +213,8 @@
     if (!board) return;
 
     const firstRects = new Map();
-    $$('.hub-managed-round-row',board).forEach(row => {
-      firstRects.set(row.dataset.teamId,row.getBoundingClientRect());
-    });
+    $$('.hub-managed-round-row',board).forEach(row => firstRects.set(row.dataset.teamId,row.getBoundingClientRect()));
 
-    const afterMap = new Map(after.map(row => [String(row.team.id),row]));
     for (const finalRow of after) {
       const element = $(`.hub-managed-round-row[data-team-id="${CSS.escape(String(finalRow.team.id))}"]`,board);
       if (!element) continue;
@@ -205,15 +226,13 @@
     $$('.hub-managed-round-row',board).forEach(row => {
       lastRects.set(row.dataset.teamId,row.getBoundingClientRect());
       row.classList.remove('is-animating');
-      row.style.transitionDelay = '0ms';
     });
 
     $$('.hub-managed-round-row',board).forEach(row => {
       const first = firstRects.get(row.dataset.teamId);
       const last = lastRects.get(row.dataset.teamId);
       if (!first || !last) return;
-      const deltaY = first.top-last.top;
-      row.style.transform = `translateY(${deltaY}px)`;
+      row.style.transform = `translateY(${first.top-last.top}px)`;
     });
 
     void board.offsetHeight;
@@ -230,9 +249,8 @@
       $$('.hub-managed-round-row',board).forEach(row => {
         row.classList.remove('is-animating');
         row.style.removeProperty('transform');
-        row.style.removeProperty('transition-delay');
       });
-    },MOVE_MS+80);
+    },MOVE_MS+100);
   }
 
   async function renderManagedRound(round) {
@@ -250,13 +268,33 @@
       console.warn('[The HUB] Managed round overlay failed',error);
       overlay.classList.remove('hub-managed-preparing');
       overlay.classList.add('hub-managed-ready');
-      installCupHeader();
     }
+  }
+
+  function revokePointerLockPermission() {
+    if (!bloxdFrame) return;
+    previousFrameAllow = bloxdFrame.getAttribute('allow');
+    if (!previousFrameAllow) return;
+    const next = previousFrameAllow
+      .split(';')
+      .map(value => value.trim())
+      .filter(Boolean)
+      .filter(value => !/^pointer-lock(?:\s|$)/i.test(value))
+      .join('; ');
+    bloxdFrame.setAttribute('allow',next);
+  }
+
+  function restorePointerLockPermission() {
+    if (!bloxdFrame) return;
+    if (previousFrameAllow == null) return;
+    bloxdFrame.setAttribute('allow',previousFrameAllow);
+    previousFrameAllow = null;
   }
 
   function forceOverlayFocus() {
     try { window.focus(); } catch (_) {}
     try { document.exitPointerLock?.(); } catch (_) {}
+    try { bloxdFrame?.contentWindow?.blur?.(); } catch (_) {}
     try { overlay.focus({preventScroll:true}); } catch (_) {}
     try { closeButton.focus({preventScroll:true}); }
     catch (_) { try { closeButton.focus(); } catch (_) {} }
@@ -268,6 +306,8 @@
     document.body.classList.add('hub-round-overlay-open');
     overlay.tabIndex = -1;
 
+    revokePointerLockPermission();
+
     if (bloxdFrame) {
       previousFrameTabIndex = bloxdFrame.getAttribute('tabindex');
       bloxdFrame.setAttribute('tabindex','-1');
@@ -278,7 +318,7 @@
     }
 
     forceOverlayFocus();
-    [30,90,180,350].forEach(delay => setTimeout(() => {
+    [20,60,120,240,480].forEach(delay => setTimeout(() => {
       if (!overlay.hidden) forceOverlayFocus();
     },delay));
   }
@@ -296,10 +336,11 @@
       bloxdFrame.inert = false;
       bloxdFrame.style.removeProperty('pointer-events');
       previousFrameTabIndex = null;
-      setTimeout(() => {
-        try { bloxdFrame.focus(); } catch (_) {}
-      },0);
     }
+    restorePointerLockPermission();
+    setTimeout(() => {
+      try { bloxdFrame?.focus(); } catch (_) {}
+    },0);
   }
 
   function syncOverlayState() {
