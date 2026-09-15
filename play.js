@@ -186,15 +186,6 @@
     });
   }
 
-  function nearestFive(rows, teamId) {
-    if (!rows.length) return [];
-    const index = rows.findIndex(row => row.team.id === teamId);
-    if (index < 0) return rows.slice(0,5);
-    const size = Math.min(5, rows.length);
-    const start = Math.max(0, Math.min(index - 2, rows.length - size));
-    return rows.slice(start, start + size);
-  }
-
   function playerChip(player) {
     return `<div class="cup-player">${avatarMarkup(player)}<span class="cup-player-name">${esc(player.name)}</span></div>`;
   }
@@ -473,40 +464,15 @@
     }
   }
 
-  function overlayRowsForRound(round) {
-    const before = standings(Math.max(0,Number(round)-1));
-    const after = standings(Number(round));
-    const visible = nearestFive(after,myTeamId);
-    const beforeMap = new Map(before.map(row => [row.team.id,row]));
-    return visible.map(row => ({
-      after:row,
-      before:beforeMap.get(row.team.id) || row,
-      delta:teamPoints(row.team.id,round)-teamPoints(row.team.id,Math.max(0,Number(round)-1))
-    }));
-  }
-
   async function showRoundOverlay(round) {
-    const rows = overlayRowsForRound(round);
     overlayTitle.textContent = `RUNDE ${round} BEENDET`;
     overlayRoundChip.textContent = `RUNDE ${round}`;
     overlaySubtitle.textContent = "So hat sich der Cup nach dieser Runde verändert.";
 
-    overlayRanking.innerHTML = rows.map(({after,before,delta}) => {
-      const movement = before.rank-after.rank;
-      const cls = movement > 0 ? "up" : movement < 0 ? "down" : "same";
-      const text = movement > 0
-        ? `▲ ${before.rank} → ${after.rank}`
-        : movement < 0
-          ? `▼ ${before.rank} → ${after.rank}`
-          : `• #${after.rank}`;
-      const translate = (after.rank-before.rank)*66;
-      return `<div class="overlay-row ${after.team.id===myTeamId ? "is-mine" : ""}" style="transform:translateY(${translate}px);opacity:.72">
-        <span class="place">#${after.rank}</span>
-        <div class="overlay-team"><strong>${esc(teamName(after.team))}</strong><small>${teamMembers(after.team.id).map(player => esc(player.name)).join(" + ")}</small></div>
-        <span class="overlay-move ${cls}">${text}</span>
-        <div class="overlay-points"><strong>${after.points} PTS</strong><small>${delta>=0 ? "+" : ""}${delta} DIESE RUNDE</small></div>
-      </div>`;
-    }).join("") || `<div class="side-empty">Ergebnis wird geladen…</div>`;
+    // There is intentionally no ranking renderer or animation here.
+    // play-round-overlay-upgrade.js is the single owner of the Cup-style
+    // seven-team ranking, avatars and 0.75s + 3.75s movement animation.
+    overlayRanking.innerHTML = "";
 
     ratingBlock.hidden = true;
     const roundResult = await loadMyRoundResult(round);
@@ -524,13 +490,7 @@
     }
 
     overlay.hidden = false;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      overlayRanking.querySelectorAll(".overlay-row").forEach((row,index) => {
-        row.style.transitionDelay = `${index*55}ms`;
-        row.style.transform = "translateY(0)";
-        row.style.opacity = "1";
-      });
-    }));
+    window.dispatchEvent(new CustomEvent("hub:round-overlay-open", {detail:{round}}));
   }
 
   async function refresh() {
