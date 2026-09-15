@@ -8,8 +8,9 @@ body{min-height:0}
 .side-panel-content{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
 
 /* While the round-result overlay is visible, keep every pointer event on HUB UI instead of Bloxd. */
-body.hub-round-overlay-open .bloxd-frame{pointer-events:none!important}
-body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important}
+body.hub-round-overlay-open .bloxd-frame{pointer-events:none!important;user-select:none!important}
+body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important;cursor:default}
+body.hub-round-overlay-open #roundOverlay *{pointer-events:auto}
 
 /* Round-end board mirrors the Cup > Team standings visual language. */
 #roundOverlay .round-card{
@@ -21,6 +22,8 @@ body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important}
   box-shadow:0 28px 90px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.035)
 }
 #roundOverlay .overlay-ranking{display:block;position:relative}
+#roundOverlay.hub-managed-preparing .overlay-ranking{visibility:hidden}
+#roundOverlay.hub-managed-ready .overlay-ranking{visibility:visible}
 #roundOverlay .round-cup-table-head{
   display:grid;
   grid-template-columns:72px 1fr 120px;
@@ -32,6 +35,7 @@ body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important}
   letter-spacing:.06em;
   text-transform:uppercase
 }
+#roundOverlay .hub-managed-round-board{position:relative}
 #roundOverlay .round-cup-row{
   min-height:60px;
   margin-bottom:6px;
@@ -42,8 +46,11 @@ body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important}
   padding:0!important;
   border:1px solid rgba(126,86,225,.2)!important;
   border-radius:7px!important;
-  background:rgba(16,9,41,.62)!important;
-  transition:transform 3.75s cubic-bezier(.2,.8,.2,1),opacity .55s ease,background .55s ease,border-color .55s ease!important
+  background:rgba(16,9,41,.62)!important
+}
+#roundOverlay .round-cup-row.is-animating{
+  transition:transform 3.75s cubic-bezier(.2,.8,.2,1),background .55s ease,border-color .55s ease!important;
+  will-change:transform
 }
 #roundOverlay .round-cup-row.top{
   border-color:rgba(244,201,75,.42)!important;
@@ -87,6 +94,7 @@ body.hub-round-overlay-open #roundOverlay{pointer-events:auto!important}
   font-size:15px!important;
   font-weight:900
 }
+#roundOverlay .round-cup-points span,
 #roundOverlay .round-cup-points small{
   display:block;
   margin-top:3px;
