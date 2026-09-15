@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "1.0.8",
+  "version": "1.0.7",
   "description": "Passive Bloxd.io verification and tournament live-sync bridge for HUB Survival Games.",
   "minimum_chrome_version": "120",
   "permissions": [
