@@ -26,6 +26,7 @@
   let roundOneFallbackBusy = false;
   let renderToken = 0;
   let fallbackTimer = 0;
+  let activeAnimation = null;
 
   function currentOverlayRound() {
     const text = $('#overlayRoundChip')?.textContent || $('#overlayTitle')?.textContent || '';
@@ -210,6 +211,23 @@
     rowElement.dataset.phase = 'after';
   }
 
+  function setAnimationState(state) {
+    overlay.dataset.animationState = state;
+  }
+
+  function finishAnimationImmediately() {
+    const active = activeAnimation;
+    if (!active || active.stage === 'done') return false;
+    active.stage = 'done';
+    active.skipped = true;
+    buildBoard(active.after,active.ownTeamId,'after',active.beforeMap,active.round);
+    setAnimationState('done');
+    overlay.classList.remove('hub-managed-preparing');
+    overlay.classList.add('hub-managed-ready');
+    forceOverlayFocus();
+    return true;
+  }
+
   async function animateBoardFromPrevious(snapshot, round, token) {
     const ownTeamId = ownTeamIdFromPage();
     const windowRows = focusWindow(snapshot.after,snapshot.before,ownTeamId);
@@ -217,23 +235,29 @@
     const after = windowRows.after;
     const beforeMap = new Map(snapshot.before.map(row => [String(row.team.id),row]));
 
+    activeAnimation = {token,round,ownTeamId,beforeMap,after,stage:'done',skipped:false};
+
     if (round <= 1) {
       buildBoard(after,ownTeamId,'after',beforeMap,round);
+      setAnimationState('done');
       overlay.classList.remove('hub-managed-preparing');
       overlay.classList.add('hub-managed-ready');
       return;
     }
 
+    activeAnimation.stage = 'hold';
+    setAnimationState('active');
     buildBoard(before,ownTeamId,'before',beforeMap,round);
     overlay.classList.remove('hub-managed-preparing');
     overlay.classList.add('hub-managed-ready');
 
     await new Promise(resolve => setTimeout(resolve,START_HOLD_MS));
-    if (token !== renderToken || overlay.hidden) return;
+    if (token !== renderToken || overlay.hidden || activeAnimation?.token !== token || activeAnimation.stage === 'done') return;
 
     const board = $('.hub-managed-round-board',overlayRanking);
     if (!board) return;
 
+    activeAnimation.stage = 'moving';
     const firstRects = new Map();
     $$('.hub-managed-round-row',board).forEach(row => firstRects.set(row.dataset.teamId,row.getBoundingClientRect()));
 
@@ -259,7 +283,7 @@
 
     void board.offsetHeight;
     requestAnimationFrame(() => {
-      if (token !== renderToken || overlay.hidden) return;
+      if (token !== renderToken || overlay.hidden || activeAnimation?.token !== token || activeAnimation.stage === 'done') return;
       $$('.hub-managed-round-row',board).forEach(row => {
         row.classList.add('is-animating');
         row.style.transform = 'translateY(0)';
@@ -267,17 +291,21 @@
     });
 
     setTimeout(() => {
-      if (token !== renderToken) return;
+      if (token !== renderToken || activeAnimation?.token !== token || activeAnimation.stage === 'done') return;
       $$('.hub-managed-round-row',board).forEach(row => {
         row.classList.remove('is-animating');
         row.style.removeProperty('transform');
       });
+      activeAnimation.stage = 'done';
+      setAnimationState('done');
     },MOVE_MS+100);
   }
 
   async function renderManagedRound(round) {
     if (!round || overlay.hidden) return;
     const token = ++renderToken;
+    activeAnimation = null;
+    setAnimationState('loading');
     overlay.classList.add('hub-managed-preparing');
     overlay.classList.remove('hub-managed-ready');
 
@@ -288,15 +316,23 @@
       await animateBoardFromPrevious(snapshot,round,token);
     } catch (error) {
       console.warn('[The HUB] Managed round overlay failed',error);
+      activeAnimation = null;
+      setAnimationState('done');
       overlay.classList.remove('hub-managed-preparing');
       overlay.classList.add('hub-managed-ready');
     }
   }
 
-  function notifyBloxd(type) {
-    try {
-      bloxdFrame?.contentWindow?.postMessage?.({source:'SG_WEBSITE',type},'https://bloxd.io');
-    } catch (_) {}
+  function localizedContinueLabel() {
+    const lang = String(document.documentElement.lang || '').toLowerCase();
+    if (lang.startsWith('de')) return 'Leertaste drücken, um fortzufahren';
+    if (lang.startsWith('fr')) return 'Appuyez sur Espace pour continuer';
+    return 'Press Space to continue';
+  }
+
+  function syncContinueButtonA11y() {
+    closeButton.setAttribute('aria-label',localizedContinueLabel());
+    closeButton.setAttribute('title',localizedContinueLabel());
   }
 
   function forceOverlayFocus() {
@@ -313,10 +349,6 @@
     document.body.classList.add('hub-round-overlay-open');
     overlay.tabIndex = -1;
 
-    // This is the mechanism that made the old index test work: ask the code
-    // running inside the Bloxd iframe to release its own pointer lock.
-    notifyBloxd('OVERLAY_OPEN');
-
     if (bloxdFrame) {
       previousFrameTabIndex = bloxdFrame.getAttribute('tabindex');
       bloxdFrame.setAttribute('tabindex','-1');
@@ -325,12 +357,10 @@
       try { bloxdFrame.blur(); } catch (_) {}
     }
 
+    syncContinueButtonA11y();
     forceOverlayFocus();
     [20,60,120,240,480,900].forEach(delay => setTimeout(() => {
-      if (!overlay.hidden) {
-        notifyBloxd('OVERLAY_OPEN');
-        forceOverlayFocus();
-      }
+      if (!overlay.hidden) forceOverlayFocus();
     },delay));
   }
 
@@ -339,8 +369,8 @@
     pausedForOverlay = false;
     document.body.classList.remove('hub-round-overlay-open');
     ++renderToken;
-
-    notifyBloxd('OVERLAY_CLOSE');
+    activeAnimation = null;
+    setAnimationState('idle');
 
     if (bloxdFrame) {
       if (previousFrameTabIndex == null) bloxdFrame.removeAttribute('tabindex');
@@ -416,12 +446,14 @@
     }
   }
 
-  window.addEventListener('message', event => {
-    if (event.source !== bloxdFrame?.contentWindow || !event.data) return;
-    if (event.data.source === 'HUB_VERIFY' && event.data.type === 'OVERLAY_POINTER_RELEASED') {
-      forceOverlayFocus();
+  function handleContinueClick(event) {
+    if (overlay.hidden) return;
+    if (finishAnimationImmediately()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
     }
-  });
+  }
 
   document.addEventListener('focusin', event => {
     if (overlay.hidden) return;
@@ -442,17 +474,27 @@
 
   document.addEventListener('keydown', event => {
     if (overlay.hidden) return;
+
+    if (event.code === 'Space' || event.key === ' ') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!finishAnimationImmediately()) closeButton.click();
+      return;
+    }
+
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopImmediatePropagation();
       closeButton.click();
       return;
     }
-    if (['Tab','Shift','Enter',' '].includes(event.key)) return;
+
+    if (['Tab','Shift','Enter'].includes(event.key)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   },true);
 
+  closeButton.addEventListener('click',handleContinueClick,true);
   closeButton.addEventListener('pointerdown', event => {
     if (overlay.hidden) return;
     event.stopPropagation();
@@ -464,8 +506,12 @@
   });
   overlayObserver.observe(overlay,{attributes:true,attributeFilter:['hidden']});
 
+  const langObserver = new MutationObserver(() => syncContinueButtonA11y());
+  langObserver.observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+
   fallbackTimer = window.setInterval(checkRoundOneFallback,1400);
   setTimeout(checkRoundOneFallback,700);
   window.addEventListener('pagehide',() => clearInterval(fallbackTimer),{once:true});
+  syncContinueButtonA11y();
   syncOverlayState();
 })();
