@@ -8,6 +8,8 @@
   let channelReady = false;
   let mapsMode = false;
   let liveCup = null;
+  let assetsReady = false;
+  let refreshTimer = 0;
   let applyQueued = false;
 
   function injectStyles() {
@@ -112,10 +114,24 @@
       chip.textContent = liveCup ? `LIVE · ${liveCup.name || "Cup"}` : "Kein Live-Cup";
       chip.classList.toggle("is-offline", !liveCup);
     }
-    if (trigger && !trigger.dataset.cooldown) trigger.disabled = !(liveCup && channelReady);
-    if (!channelReady) setStatus("Realtime-Verbindung wird vorbereitet …");
+    if (trigger && !trigger.dataset.cooldown) trigger.disabled = !(liveCup && channelReady && assetsReady);
+    if (!assetsReady) setStatus("SG7-Medien werden vorbereitet …");
+    else if (!channelReady) setStatus("Realtime-Verbindung wird vorbereitet …");
     else if (!liveCup) setStatus("Es läuft aktuell kein Cup. Der SG7-Trigger bleibt deaktiviert.");
     else setStatus(`Bereit für ${liveCup.name || "den Live-Cup"}.`);
+  }
+
+  async function refreshAssetState() {
+    try {
+      const [image, audio] = await Promise.all([
+        fetch("map-intros/assets/sg7.webp?v=20260916a", { method: "GET", cache: "no-store" }),
+        fetch("map-intros/assets/sg7-intro.mp3?v=20260916a", { method: "GET", cache: "no-store" })
+      ]);
+      assetsReady = image.ok && audio.ok;
+    } catch (_) {
+      assetsReady = false;
+    }
+    updateControls();
   }
 
   async function refreshLiveCup() {
@@ -141,11 +157,9 @@
     const panel = document.getElementById("hubAdminMapsPanel");
     const mapsButton = document.querySelector("[data-hub-admin-maps]");
     if (!panel || !mapsButton) return;
-
     panel.hidden = !mapsMode;
     mapsButton.classList.toggle("active", mapsMode);
     if (!mapsMode) return;
-
     document.querySelectorAll("#v3AdminPrimaryNav [data-v3-admin-section]").forEach(button => button.classList.remove("active"));
     document.querySelector(".admin-overview-v2")?.setAttribute("hidden", "");
     document.querySelector(".admin-workbench")?.setAttribute("hidden", "");
@@ -163,6 +177,7 @@
     mapsMode = true;
     applyMapsVisibility();
     refreshLiveCup();
+    refreshAssetState();
   }
 
   function leaveMaps() {
@@ -175,10 +190,9 @@
   }
 
   async function triggerSG7() {
-    if (!liveCup || !channelReady || !channel) return;
+    if (!liveCup || !channelReady || !channel || !assetsReady) return;
     const button = document.getElementById("hubTriggerMapSG7");
     if (!button || button.dataset.cooldown) return;
-
     button.dataset.cooldown = "1";
     button.disabled = true;
     const nonce = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -190,7 +204,6 @@
       sentAt: new Date().toISOString(),
       nonce
     };
-
     try {
       const result = await channel.send({ type: "broadcast", event: EVENT_NAME, payload });
       if (result !== "ok") throw new Error(String(result || "broadcast failed"));
@@ -199,7 +212,6 @@
       console.error("[HUB Map Intros] Broadcast failed", error);
       setStatus("SG7 konnte nicht gesendet werden. Bitte erneut versuchen.", "error");
     }
-
     window.setTimeout(() => {
       delete button.dataset.cooldown;
       updateControls();
@@ -237,14 +249,16 @@
     if (ensureUi()) {
       ensureChannel();
       refreshLiveCup();
+      refreshAssetState();
     }
   };
   bootstrap();
-  window.setInterval(() => {
+  refreshTimer = window.setInterval(() => {
     if (document.getElementById("v3AdminPrimaryNav")) {
       ensureUi();
       ensureChannel();
       refreshLiveCup();
+      refreshAssetState();
       if (mapsMode) queueApplyVisibility();
     }
   }, 3500);
