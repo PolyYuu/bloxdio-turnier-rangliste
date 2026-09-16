@@ -23,9 +23,9 @@
   ];
 
   const COPY = {
-    de:{kicker:'COMPETITIVE UPDATE',title:'Dein Rang wurde aktualisiert',placementTitle:'Einrangspiel abgeschlossen',placementCopy:'Dein Competitive-Fortschritt wurde aktualisiert.',rankCopy:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',progress:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',continue:'WEITERSPIELEN',placement:'EINRANGSPIELE',unranked:'UNRANKED'},
-    en:{kicker:'COMPETITIVE UPDATE',title:'Your rank was updated',placementTitle:'Placement game complete',placementCopy:'Your competitive progress has been updated.',rankCopy:'This is how your competitive rating changed after this round.',rating:'RATING',progress:'PROGRESS TO NEXT RANK',top:'TOP RANK',left:'left',continue:'CONTINUE PLAYING',placement:'PLACEMENTS',unranked:'UNRANKED'},
-    fr:{kicker:'MISE À JOUR COMPÉTITIVE',title:'Ton rang a été mis à jour',placementTitle:'Match de placement terminé',placementCopy:'Ta progression compétitive a été mise à jour.',rankCopy:'Voici comment ton rating compétitif a changé après cette manche.',rating:'RATING',progress:'PROGRESSION VERS LE RANG SUIVANT',top:'RANG MAXIMAL',left:'restants',continue:'CONTINUER',placement:'PLACEMENTS',unranked:'UNRANKED'}
+    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANKUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrankung nicht angezeigt.',unranked:'UNRANKED',continue:'WEITER',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rankSubtitle:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',toNext:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG'},
+    en:{placementKicker:'PLACEMENT UPDATE',placements:'YOUR PLACEMENTS',placementSubtitle:'Complete 15 ranked rounds to reveal your first rank.',currentStatus:'CURRENT STATUS',progress:'PLACEMENT PROGRESS',help:'Only completed matches are marked. Your hidden rating is not shown during placements.',unranked:'UNRANKED',continue:'CONTINUE',rankKicker:'RANKED UPDATE',rankTitle:'YOUR PROGRESS',rankSubtitle:'This is how your competitive rating changed after this round.',rating:'RATING',toNext:'PROGRESS TO NEXT RANK',top:'TOP RANK',left:'left',currentRank:'CURRENT RANK'},
+    fr:{placementKicker:'MISE À JOUR PLACEMENT',placements:'TES PLACEMENTS',placementSubtitle:'Termine 15 manches classées pour révéler ton premier rang.',currentStatus:'STATUT ACTUEL',progress:'PROGRESSION PLACEMENT',help:'Seuls les matchs terminés sont marqués. Ton rating caché reste invisible pendant les placements.',unranked:'UNRANKED',continue:'CONTINUER',rankKicker:'MISE À JOUR RANKED',rankTitle:'TA PROGRESSION',rankSubtitle:'Voici comment ton rating compétitif a changé après cette manche.',rating:'RATING',toNext:'PROGRESSION VERS LE RANG SUIVANT',top:'RANG MAXIMAL',left:'restants',currentRank:'RANG ACTUEL'}
   };
 
   let overlay = null;
@@ -33,6 +33,8 @@
   let activeState = null;
   let closeTimer = 0;
   let hadRoundOverlayOpen = !roundOverlay.hidden;
+  let iconPromise = null;
+  const iconCache = {unranked:'',ranks:{}};
 
   function lang(){
     const raw = String(document.documentElement.lang || localStorage.getItem('sg-lang') || 'en').toLowerCase();
@@ -45,9 +47,34 @@
     const n = Number(value || 0);
     return RANKS.slice().reverse().find(r => n >= r.min) || RANKS[0];
   }
-  function pct(value, rank){
+  function pct(value,rank){
     if (!rank || rank.key === 'grandmaster') return 100;
     return Math.max(0,Math.min(100,(Number(value)-rank.min)/(rank.high-rank.min)*100));
+  }
+
+  async function loadCanonicalIcons(){
+    if (iconPromise) return iconPromise;
+    iconPromise = (async()=>{
+      try{
+        const html = await fetch('index.html',{cache:'force-cache'}).then(r=>r.text());
+        const unranked = html.match(/(?:const|let|var)\s+UNRANKED_ICON\s*=\s*['\"]([^'\"]+)['\"]/);
+        if (unranked) iconCache.unranked = unranked[1];
+        for (const rank of RANKS) {
+          const rx = new RegExp(rank.key+"\\s*:\\s*['\\\"]([^'\\\"]+)['\\\"]",'i');
+          const hit = html.match(rx);
+          if (hit) iconCache.ranks[rank.key] = hit[1];
+        }
+      } catch (_) {}
+      return iconCache;
+    })();
+    return iconPromise;
+  }
+
+  function rankGraphic(rank,cls=''){
+    const src = iconCache.ranks[rank.key];
+    return src
+      ? `<img class="${cls}" src="${src}" alt="${rank.label}">`
+      : `<div class="rank-icon-fallback ${cls}" aria-hidden="true">${rank.symbol}</div>`;
   }
 
   function build(){
@@ -55,40 +82,11 @@
     overlay = document.createElement('section');
     overlay.id = 'playRankUpdateOverlay';
     overlay.hidden = true;
-    overlay.innerHTML = `
-      <article class="play-rank-update-card" role="dialog" aria-modal="true" aria-labelledby="playRankUpdateTitle">
-        <button type="button" class="play-rank-update-close" aria-label="Close">×</button>
-        <div class="play-rank-update-grid">
-          <div class="play-rank-update-visual">
-            <div class="play-rank-update-orbit"><div class="play-rank-update-symbol">◇</div></div>
-            <strong class="play-rank-update-rank">UNRANKED</strong>
-            <span class="play-rank-update-rating"></span>
-          </div>
-          <div class="play-rank-update-data">
-            <span class="play-rank-update-kicker"></span>
-            <h2 id="playRankUpdateTitle"></h2>
-            <p class="play-rank-update-copy"></p>
-            <div class="play-rank-rated-view">
-              <div class="play-rank-rating-change"><span></span><i>→</i><strong></strong></div>
-              <div class="play-rank-delta"></div>
-              <div class="play-rank-progress-meta"><span></span><b></b></div>
-              <div class="play-rank-progress"><i></i></div>
-              <div class="play-rank-progress-scale"><span></span><span></span><span></span></div>
-            </div>
-            <div class="play-rank-placement-view" hidden>
-              <div class="play-placement-count"><strong></strong><small>/ 15</small></div>
-              <div class="play-rank-progress-meta"><span></span><b></b></div>
-              <div class="play-placement-dots"></div>
-            </div>
-            <button type="button" class="play-rank-update-button"></button>
-          </div>
-        </div>
-      </article>`;
     gameStage.appendChild(overlay);
-
-    overlay.querySelector('.play-rank-update-close').addEventListener('click', () => handleClose(false));
-    overlay.querySelector('.play-rank-update-button').addEventListener('click', () => handleClose(false));
-    overlay.addEventListener('click', event => { if (event.target === overlay) handleClose(false); });
+    overlay.addEventListener('click',event=>{
+      if (event.target === overlay) handleClose(false);
+      if (event.target.closest('[data-play-rank-close]')) handleClose(false);
+    });
   }
 
   async function animationState(){
@@ -100,161 +98,143 @@
     const {error} = await db.rpc('ack_my_animation_state');
     if (error) throw error;
   }
-
   function hasUnseen(st){
-    if (!st) return false;
-    return Number(st.current_finalized_games || 0) > Number(st.seen_finalized_games || 0);
+    return !!st && Number(st.current_finalized_games||0) > Number(st.seen_finalized_games||0);
   }
 
-  function fillRated(st){
-    const c = t();
-    const before = Number(st.seen_rating || st.current_rating || 0);
-    const after = Number(st.current_rating || before);
-    const beforeRank = rankFor(before);
-    const afterRank = rankFor(after);
-    const delta = after-before;
-    const afterPct = pct(after,afterRank);
-    const beforePct = beforeRank.key === afterRank.key ? pct(before,beforeRank) : 0;
-
-    overlay.classList.remove('is-placement');
-    overlay.querySelector('.play-rank-rated-view').hidden = false;
-    overlay.querySelector('.play-rank-placement-view').hidden = true;
-    overlay.querySelector('.play-rank-update-kicker').textContent = c.kicker;
-    overlay.querySelector('#playRankUpdateTitle').textContent = c.title;
-    overlay.querySelector('.play-rank-update-copy').textContent = c.rankCopy;
-    overlay.querySelector('.play-rank-update-symbol').textContent = afterRank.symbol;
-    overlay.querySelector('.play-rank-update-rank').textContent = afterRank.label;
-    overlay.querySelector('.play-rank-update-rating').textContent = `${Math.round(after)} RP`;
-    const change = overlay.querySelector('.play-rank-rating-change');
-    change.querySelector('span').textContent = Math.round(before);
-    change.querySelector('strong').textContent = Math.round(after);
-    const deltaEl = overlay.querySelector('.play-rank-delta');
-    deltaEl.textContent = `${delta>=0?'+':''}${Math.round(delta)} ${c.rating}`;
-    deltaEl.className = `play-rank-delta ${delta>0?'positive':delta<0?'negative':'neutral'}`;
-    const meta = overlay.querySelector('.play-rank-progress-meta');
-    meta.querySelector('span').textContent = afterRank.key === 'grandmaster' ? c.top : c.progress;
-    meta.querySelector('b').textContent = `${Math.round(afterPct)}%`;
-    const scale = overlay.querySelector('.play-rank-progress-scale');
-    scale.children[0].textContent = Math.round(afterRank.min);
-    scale.children[1].textContent = afterRank.key === 'grandmaster' ? c.top : `${Math.max(0,Math.round(afterRank.high-after))} ${c.left}`;
-    scale.children[2].textContent = afterRank.key === 'grandmaster' ? '3000+' : Math.round(afterRank.high);
-    overlay.style.setProperty('--rank-before-pct',`${beforePct}%`);
-    overlay.style.setProperty('--rank-after-pct',`${afterPct}%`);
+  function placementMarkup(st){
+    const c=t();
+    const done=Math.max(0,Math.min(15,Number(st.current_placement_games||0)));
+    const completed=!!st.current_is_ranked;
+    const rank=completed?rankFor(Number(st.current_rating||0)):null;
+    const pctDone=Math.round(done/15*100);
+    const emblem=completed
+      ? rankGraphic(rank)
+      : iconCache.unranked
+        ? `<img src="${iconCache.unranked}" alt="Unranked">`
+        : `<div class="placement-fallback-emblem" aria-hidden="true">◇</div>`;
+    const nodes=Array.from({length:15},(_,i)=>`<span class="placement-node ${i<done?'done':''} ${i===done-1?'latest':''}"></span>`).join('');
+    return `
+      <section class="placement-modal ${completed?'placement-ranked-complete':''}" role="dialog" aria-modal="true" aria-labelledby="playPlacementTitle">
+        <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
+        <span class="placement-kicker">${completed?'PLACEMENTS COMPLETE':`${c.placementKicker} · ROUND ${done}`}</span>
+        <h2 id="playPlacementTitle">${completed?c.currentRank:c.placements}</h2>
+        <p class="placement-subtitle">${completed?(lang()==='de'?'Deine 15 Einrankungsmatches sind abgeschlossen.':lang()==='fr'?'Tes 15 matchs de placement sont terminés.':'Your 15 placement games are complete.'):c.placementSubtitle}</p>
+        <div class="unranked-badge-wrap">${emblem}</div>
+        <span class="placement-rank-label">${completed?c.currentRank:c.currentStatus}</span>
+        <strong class="placement-rank-name">${completed?rank.label:c.unranked}</strong>
+        <div class="placement-progress-copy">${completed?`<b>${Math.round(Number(st.current_rating||0))}</b> RATING`:`${c.progress}: <b>${done}/15</b>`}</div>
+        ${completed?'':`<div class="placement-track" style="--placement-fill:${done<=1?0:((done-1)/14*93.8)}%"><i class="placement-progress-fill"></i>${nodes}</div>`}
+        <p class="placement-help">${completed?(lang()==='de'?'Ab jetzt zählt jedes weitere Game als normales Ranked-Game.':lang()==='fr'?'Les prochaines parties utilisent maintenant le système Ranked normal.':'Future games now use the normal Ranked system.'):c.help}</p>
+        <button class="cta-button" type="button" data-play-rank-close>${c.continue}</button>
+      </section>`;
   }
 
-  function fillPlacement(st){
-    const c = t();
-    const done = Math.max(0,Math.min(15,Number(st.current_placement_games || 0)));
-    const completed = !!st.current_is_ranked;
-    const rank = completed ? rankFor(Number(st.current_rating || 0)) : null;
-
-    overlay.classList.add('is-placement');
-    overlay.querySelector('.play-rank-rated-view').hidden = true;
-    overlay.querySelector('.play-rank-placement-view').hidden = false;
-    overlay.querySelector('.play-rank-update-kicker').textContent = c.kicker;
-    overlay.querySelector('#playRankUpdateTitle').textContent = completed ? c.title : c.placementTitle;
-    overlay.querySelector('.play-rank-update-copy').textContent = c.placementCopy;
-    overlay.querySelector('.play-rank-update-symbol').textContent = completed ? rank.symbol : '○';
-    overlay.querySelector('.play-rank-update-rank').textContent = completed ? rank.label : c.unranked;
-    overlay.querySelector('.play-rank-update-rating').textContent = completed ? `${Math.round(Number(st.current_rating||0))} RP` : `${done} / 15`;
-    overlay.querySelector('.play-placement-count strong').textContent = done;
-    const meta = overlay.querySelector('.play-rank-placement-view .play-rank-progress-meta');
-    meta.querySelector('span').textContent = c.placement;
-    meta.querySelector('b').textContent = `${Math.round(done/15*100)}%`;
-    const dots = overlay.querySelector('.play-placement-dots');
-    dots.innerHTML = Array.from({length:15},(_,i)=>`<i class="${i<done?'done':''} ${i===done-1?'latest':''}"></i>`).join('');
+  function ratedMarkup(st){
+    const c=t();
+    const before=Number(st.seen_rating||st.current_rating||0);
+    const after=Number(st.current_rating||before);
+    const oldRank=rankFor(before),newRank=rankFor(after);
+    const delta=after-before;
+    const beforePct=oldRank.key===newRank.key?pct(before,oldRank):0;
+    const afterPct=pct(after,newRank);
+    const rankChanged=oldRank.key!==newRank.key;
+    const gameNo=Number(st.current_finalized_games||0);
+    return `
+      <section class="rank-update-modal" role="dialog" aria-modal="true" aria-labelledby="playRankTitle">
+        <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
+        <div class="rank-update-header">
+          <span class="update-kicker">${c.rankKicker}${gameNo?` · GAME ${gameNo}`:''}</span>
+          <h2 id="playRankTitle">${c.rankTitle}</h2>
+          <p class="rank-update-subtitle">${c.rankSubtitle}</p>
+        </div>
+        <div class="rank-transition-wrap">
+          <div class="rank-transition-rank old-rank">${rankGraphic(oldRank)}<strong>${oldRank.label}</strong></div>
+          <i class="rank-transition-arrow">→</i>
+          <div class="rank-transition-rank new-rank">${rankGraphic(newRank)}<strong>${newRank.label}</strong></div>
+        </div>
+        <div class="rank-rating-change"><span>${Math.round(before)}</span><i>→</i><strong>${Math.round(after)}</strong></div>
+        <div class="rank-delta ${delta>0?'positive':delta<0?'negative':'neutral'}">${delta>=0?'+':''}${Math.round(delta)} ${c.rating}</div>
+        <div class="progress-wrap">
+          <div class="progress-meta"><span>${newRank.key==='grandmaster'?c.top:c.toNext}</span><b>${Math.round(afterPct)}%</b></div>
+          <div class="rank-progress"><i></i></div>
+          <div class="progress-scale"><span>${Math.round(newRank.min)}</span><span>${newRank.key==='grandmaster'?c.top:`${Math.max(0,Math.round(newRank.high-after))} ${c.left}`}</span><span>${newRank.key==='grandmaster'?'3000+':Math.round(newRank.high)}</span></div>
+        </div>
+        <button class="cta-button" type="button" data-play-rank-close>${c.continue}</button>
+      </section>`;
   }
 
-  function open(st){
+  async function open(st){
     build();
-    activeState = st;
+    await loadCanonicalIcons();
+    activeState=st;
     clearTimeout(closeTimer);
-
-    if (!st.seen_is_ranked) fillPlacement(st);
-    else fillRated(st);
-
-    overlay.querySelector('.play-rank-update-button').textContent = t().continue;
-    overlay.hidden = false;
-    overlay.classList.remove('is-closing','is-instant','is-animating');
+    overlay.innerHTML = !st.seen_is_ranked ? placementMarkup(st) : ratedMarkup(st);
+    overlay.style.setProperty('--rank-before-pct',`${!st.seen_is_ranked?0:(rankFor(Number(st.seen_rating||0)).key===rankFor(Number(st.current_rating||0)).key?pct(Number(st.seen_rating||0),rankFor(Number(st.seen_rating||0))):0)}%`);
+    overlay.style.setProperty('--rank-after-pct',`${!st.seen_is_ranked?0:pct(Number(st.current_rating||0),rankFor(Number(st.current_rating||0)))}%`);
+    overlay.hidden=false;
+    overlay.classList.remove('is-closing','is-instant','is-animating','rank-transition-arrived');
     document.body.classList.add('hub-play-rank-update-open');
     void overlay.offsetWidth;
     overlay.classList.add('is-open');
-    requestAnimationFrame(()=>requestAnimationFrame(()=>overlay.classList.add('is-animating')));
-    try { window.postMessage({type:'OVERLAY_OPEN'},'*'); } catch (_) {}
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      overlay.classList.add('is-animating');
+      if (st.seen_is_ranked) setTimeout(()=>overlay?.classList.add('rank-transition-arrived'),500);
+    }));
+    overlay.dataset.openedAt=String(performance.now());
+    try{window.postMessage({type:'OVERLAY_OPEN'},'*');}catch(_){}
   }
 
   async function handleClose(instant){
     if (!overlay || overlay.hidden) return;
     if (!instant && !overlay.classList.contains('is-instant')) {
-      // First Continue while the visual is still animating finishes it immediately,
-      // matching the Cup overlay skip/continue interaction.
-      const started = overlay.classList.contains('is-animating');
-      if (started && performance.now() - Number(overlay.dataset.openedAt || 0) < 3300) {
-        overlay.classList.add('is-instant');
+      const started=overlay.classList.contains('is-animating');
+      if (started && performance.now()-Number(overlay.dataset.openedAt||0)<3300) {
+        overlay.classList.add('is-instant','rank-transition-arrived');
         return;
       }
     }
-    try { await acknowledge(); } catch (error) { console.warn('[The HUB] Could not acknowledge PLAY rank update',error); }
+    try{await acknowledge();}catch(error){console.warn('[The HUB] Could not acknowledge PLAY rank update',error);}
     overlay.classList.add('is-closing');
     overlay.classList.remove('is-open');
-    closeTimer = setTimeout(()=>{
-      overlay.hidden = true;
-      overlay.classList.remove('is-closing','is-animating','is-instant');
+    closeTimer=setTimeout(()=>{
+      overlay.hidden=true;
+      overlay.innerHTML='';
+      overlay.classList.remove('is-closing','is-animating','is-instant','rank-transition-arrived');
       document.body.classList.remove('hub-play-rank-update-open');
-      activeState = null;
-      try { window.postMessage({type:'OVERLAY_CLOSE'},'*'); } catch (_) {}
-      try { bloxdFrame?.focus(); } catch (_) {}
+      activeState=null;
+      try{window.postMessage({type:'OVERLAY_CLOSE'},'*');}catch(_){}
+      try{bloxdFrame?.focus();}catch(_){}
     },220);
   }
 
   async function showPendingAfterCup(){
     if (busy || !roundOverlay.hidden || document.hidden) return;
-    busy = true;
-    try {
-      const {data:{session}} = await db.auth.getSession();
+    busy=true;
+    try{
+      const {data:{session}}=await db.auth.getSession();
       if (!session) return;
-      const st = await animationState();
+      const st=await animationState();
       if (!hasUnseen(st)) return;
-      // Ranking experience disabled means the user opted out of rank animations;
-      // acknowledge silently just like the normal HUB does.
-      const {data:profile,error:profileError} = await db.rpc('get_my_profile');
+      const {data:profile,error:profileError}=await db.rpc('get_my_profile');
       if (profileError) throw profileError;
-      if (profile?.ranking_experience_enabled === false) {
-        await acknowledge();
-        return;
-      }
-      open(st);
-      overlay.dataset.openedAt = String(performance.now());
-    } catch (error) {
-      console.warn('[The HUB] PLAY competitive update unavailable',error);
-    } finally {
-      busy = false;
-    }
+      if (profile?.ranking_experience_enabled===false){await acknowledge();return;}
+      await open(st);
+    }catch(error){console.warn('[The HUB] PLAY competitive update unavailable',error);}
+    finally{busy=false;}
   }
 
-  const observer = new MutationObserver(mutations => {
-    if (!mutations.some(m => m.type === 'attributes' && m.attributeName === 'hidden')) return;
-    if (!roundOverlay.hidden) {
-      hadRoundOverlayOpen = true;
-      return;
-    }
-    if (hadRoundOverlayOpen) {
-      hadRoundOverlayOpen = false;
-      // Give the round close/focus handlers a moment to finish before taking over.
-      setTimeout(showPendingAfterCup,180);
-    }
+  const observer=new MutationObserver(mutations=>{
+    if (!mutations.some(m=>m.type==='attributes'&&m.attributeName==='hidden')) return;
+    if (!roundOverlay.hidden){hadRoundOverlayOpen=true;return;}
+    if (hadRoundOverlayOpen){hadRoundOverlayOpen=false;setTimeout(showPendingAfterCup,180);}
   });
   observer.observe(roundOverlay,{attributes:true,attributeFilter:['hidden']});
 
-  // Space/click behavior: while the rank update is visible, first input skips animation,
-  // second input closes and acknowledges it.
   document.addEventListener('keydown',event=>{
-    if (!overlay || overlay.hidden || event.code !== 'Space') return;
+    if (!overlay || overlay.hidden || event.code!=='Space') return;
     event.preventDefault();
     event.stopImmediatePropagation();
     handleClose(false);
   },true);
-
-  // Do not auto-show on page load. PLAY rank updates are deliberately chained only
-  // after a Cup standings overlay was actually seen/closed on this page.
 })();
