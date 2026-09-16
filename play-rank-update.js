@@ -13,7 +13,7 @@
   if (!roundOverlay || !gameStage) return;
 
   const PRE_ANIMATION_HOLD_MS = 650;
-  const RANK_ANIMATION_MS = 3500;
+  const RANK_SEGMENT_MS = 3500;
   const PLACEMENT_LINE_MS = 2080;
   const PLACEMENT_ANIMATION_MS = 2900;
 
@@ -28,9 +28,9 @@
   ];
 
   const COPY = {
-    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANGUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrangung nicht angezeigt.',unranked:'UNRANKED',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rankSubtitle:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',toNext:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG',skip:'LEERTASTE DRÜCKEN ZUM ÜBERSPRINGEN',close:'LEERTASTE DRÜCKEN ZUM SCHLIESSEN'},
-    en:{placementKicker:'PLACEMENT UPDATE',placements:'YOUR PLACEMENTS',placementSubtitle:'Complete 15 ranked rounds to reveal your first rank.',currentStatus:'CURRENT STATUS',progress:'PLACEMENT PROGRESS',help:'Only completed matches are marked. Your hidden rating is not shown during placements.',unranked:'UNRANKED',rankKicker:'RANKED UPDATE',rankTitle:'YOUR PROGRESS',rankSubtitle:'This is how your competitive rating changed after this round.',rating:'RATING',toNext:'PROGRESS TO NEXT RANK',top:'TOP RANK',left:'left',currentRank:'CURRENT RANK',skip:'PRESS SPACE TO SKIP',close:'PRESS SPACE TO CLOSE'},
-    fr:{placementKicker:'MISE À JOUR PLACEMENT',placements:'TES PLACEMENTS',placementSubtitle:'Termine 15 manches classées pour révéler ton premier rang.',currentStatus:'STATUT ACTUEL',progress:'PROGRESSION PLACEMENT',help:'Seuls les matchs terminés sont marqués. Ton rating caché reste invisible pendant les placements.',unranked:'UNRANKED',rankKicker:'MISE À JOUR RANKED',rankTitle:'TA PROGRESSION',rankSubtitle:'Voici comment ton rating compétitif a changé après cette manche.',rating:'RATING',toNext:'PROGRESSION VERS LE RANG SUIVANT',top:'RANG MAXIMAL',left:'restants',currentRank:'RANG ACTUEL',skip:'APPUYEZ SUR ESPACE POUR PASSER',close:'APPUYEZ SUR ESPACE POUR FERMER'}
+    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANGUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrangung nicht angezeigt.',unranked:'UNRANKED',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rating:'RATING',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG',rankUp:'RANGAUFSTIEG',skip:'LEERTASTE DRÜCKEN ZUM ÜBERSPRINGEN',close:'LEERTASTE DRÜCKEN ZUM SCHLIESSEN'},
+    en:{placementKicker:'PLACEMENT UPDATE',placements:'YOUR PLACEMENTS',placementSubtitle:'Complete 15 ranked rounds to reveal your first rank.',currentStatus:'CURRENT STATUS',progress:'PLACEMENT PROGRESS',help:'Only completed matches are marked. Your hidden rating is not shown during placements.',unranked:'UNRANKED',rankKicker:'RANKED UPDATE',rankTitle:'YOUR PROGRESS',rating:'RATING',top:'TOP RANK',left:'left',currentRank:'CURRENT RANK',rankUp:'RANK UP',skip:'PRESS SPACE TO SKIP',close:'PRESS SPACE TO CLOSE'},
+    fr:{placementKicker:'MISE À JOUR PLACEMENT',placements:'TES PLACEMENTS',placementSubtitle:'Termine 15 manches classées pour révéler ton premier rang.',currentStatus:'STATUT ACTUEL',progress:'PROGRESSION PLACEMENT',help:'Seuls les matchs terminés sont marqués. Ton rating caché reste invisible pendant les placements.',unranked:'UNRANKED',rankKicker:'MISE À JOUR RANKED',rankTitle:'TA PROGRESSION',rating:'RATING',top:'RANG MAXIMAL',left:'restants',currentRank:'RANG ACTUEL',rankUp:'RANG SUPÉRIEUR',skip:'APPUYEZ SUR ESPACE POUR PASSER',close:'APPUYEZ SUR ESPACE POUR FERMER'}
   };
 
   let overlay = null;
@@ -40,7 +40,8 @@
   let startTimer = 0;
   let animationTimer = 0;
   let nodeTimer = 0;
-  let ratingFrame = 0;
+  let switchTimer = 0;
+  let progressFrame = 0;
   let hadRoundOverlayOpen = !roundOverlay.hidden;
   let iconPromise = null;
   let previousFrameTabIndex = null;
@@ -62,6 +63,22 @@
   function pct(value,rank){
     if (!rank || rank.key === 'grandmaster') return 100;
     return Math.max(0,Math.min(100,(Number(value)-rank.min)/(rank.high-rank.min)*100));
+  }
+  function nextRank(rank){
+    const index=RANKS.findIndex(item=>item.key===rank?.key);
+    return index>=0 && index<RANKS.length-1 ? RANKS[index+1] : null;
+  }
+  function progressTitle(rank){
+    const next=nextRank(rank);
+    if (!next) return t().top;
+    if (lang()==='de') return `FORTSCHRITT ZU ${next.label}`;
+    if (lang()==='fr') return `PROGRESSION VERS ${next.label}`;
+    return `PROGRESS TO ${next.label}`;
+  }
+  function remainingText(value,rank){
+    if (!nextRank(rank)) return t().top;
+    const amount=Math.max(0,Math.round(rank.high-Number(value||0)));
+    return `${amount} ${t().left}`;
   }
 
   async function loadCanonicalIcons(){
@@ -115,9 +132,7 @@
     return !!st && Number(st.current_finalized_games||0) > Number(st.seen_finalized_games||0);
   }
 
-  function actionButtonLabel(mode){
-    return mode === 'close' ? t().close : t().skip;
-  }
+  function actionButtonLabel(mode){ return mode === 'close' ? t().close : t().skip; }
   function updateActionButton(mode){
     const button = overlay?.querySelector('.cta-button');
     if (!button) return;
@@ -167,31 +182,36 @@
     const before=Number(st.seen_rating||st.current_rating||0);
     const after=Number(st.current_rating||before);
     const oldRank=rankFor(before),newRank=rankFor(after);
+    const beforePct=pct(before,oldRank),afterPct=pct(after,newRank);
     const delta=after-before;
-    const beforePct=oldRank.key===newRank.key?pct(before,oldRank):0;
-    const afterPct=pct(after,newRank);
     const gameNo=Number(st.current_finalized_games||0);
+    const rankChanged=oldRank.key!==newRank.key;
+    const rankUp=rankChanged&&after>before;
     return `
-      <section class="rank-update-modal" role="dialog" aria-modal="true" aria-labelledby="playRankTitle" data-rating-before="${before}" data-rating-after="${after}" data-before-pct="${beforePct}" data-after-pct="${afterPct}">
+      <section class="rank-update-modal" id="rankUpdateCard" role="dialog" aria-modal="true" aria-labelledby="rankUpdateTitle"
+        data-rating-before="${before}" data-rating-after="${after}" data-before-pct="${beforePct}" data-after-pct="${afterPct}"
+        data-old-rank="${oldRank.key}" data-new-rank="${newRank.key}" data-rank-changed="${rankChanged?'1':'0'}" data-rank-up="${rankUp?'1':'0'}">
         <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
-        <div class="rank-update-header">
-          <span class="update-kicker">${c.rankKicker}${gameNo?` · GAME ${gameNo}`:''}</span>
-          <h2 id="playRankTitle">${c.rankTitle}</h2>
-          <p class="rank-update-subtitle">${c.rankSubtitle}</p>
+        <div class="rankup-flare" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="rank-update-grid">
+          <div class="rank-update-visual">
+            <span class="update-kicker" id="updateKicker">${c.rankKicker}${gameNo?` · GAME ${gameNo}`:''}</span>
+            <h2 id="rankUpdateTitle">${c.rankTitle}</h2>
+            <div class="update-rank-icon" id="updateRankIconWrap">${rankGraphic(oldRank)}</div>
+            <span class="update-rank-name" id="updateRankName">${oldRank.label}</span>
+            <div class="rankup-message" id="rankUpMessage" hidden><small>${c.rankUp}</small><strong id="newRankName">${newRank.label}</strong></div>
+          </div>
+          <div class="rank-update-data">
+            <div class="rating-change"><span id="ratingBefore">${Math.round(before)}</span><i>→</i><strong id="ratingAfter">${Math.round(after)}</strong></div>
+            <div class="delta ${delta>0?'positive':delta<0?'negative':'neutral'}" id="ratingDelta">${delta>=0?'+':''}${Math.round(delta)} ${c.rating}</div>
+            <div class="progress-wrap update-progress">
+              <div class="progress-meta"><span id="updateProgressTitle">${progressTitle(oldRank)}</span><b id="updateProgressPct">${Math.round(beforePct)}%</b></div>
+              <div class="rank-progress thick-progress"><i id="animatedUpdateBar" style="width:${beforePct}%;transition:none"></i></div>
+              <div class="progress-scale"><span id="updateLow">${Math.round(oldRank.min)}</span><span id="updateRemaining">${remainingText(before,oldRank)}</span><span id="updateHigh">${oldRank.key==='grandmaster'?'3000+':Math.round(oldRank.high)}</span></div>
+            </div>
+            <button class="cta-button wide" type="button" data-play-rank-close>${c.skip}</button>
+          </div>
         </div>
-        <div class="rank-transition-wrap">
-          <div class="rank-transition-rank old-rank">${rankGraphic(oldRank)}<strong>${oldRank.label}</strong></div>
-          <i class="rank-transition-arrow">→</i>
-          <div class="rank-transition-rank new-rank">${rankGraphic(newRank)}<strong>${newRank.label}</strong></div>
-        </div>
-        <div class="rank-rating-change"><span>${Math.round(before)}</span><i>→</i><strong class="play-rating-live">${Math.round(before)}</strong></div>
-        <div class="rank-delta ${delta>0?'positive':delta<0?'negative':'neutral'}">${delta>=0?'+':''}${Math.round(delta)} ${c.rating}</div>
-        <div class="progress-wrap">
-          <div class="progress-meta"><span>${newRank.key==='grandmaster'?c.top:c.toNext}</span><b class="play-rank-pct-live">${Math.round(beforePct)}%</b></div>
-          <div class="rank-progress"><i style="width:${beforePct}%;transition:none"></i></div>
-          <div class="progress-scale"><span>${Math.round(newRank.min)}</span><span>${newRank.key==='grandmaster'?c.top:`${Math.max(0,Math.round(newRank.high-after))} ${c.left}`}</span><span>${newRank.key==='grandmaster'?'3000+':Math.round(newRank.high)}</span></div>
-        </div>
-        <button class="cta-button" type="button" data-play-rank-close>${c.skip}</button>
       </section>`;
   }
 
@@ -224,8 +244,9 @@
     clearTimeout(startTimer); startTimer=0;
     clearTimeout(animationTimer); animationTimer=0;
     clearTimeout(nodeTimer); nodeTimer=0;
-    if (ratingFrame) cancelAnimationFrame(ratingFrame);
-    ratingFrame=0;
+    clearTimeout(switchTimer); switchTimer=0;
+    if (progressFrame) cancelAnimationFrame(progressFrame);
+    progressFrame=0;
   }
 
   function applyPlacementFinal(){
@@ -234,23 +255,43 @@
     const fill=track.querySelector('.placement-progress-fill');
     const target=Number(track.dataset.afterFill||0);
     if (fill){fill.style.transition='none';fill.style.width=`${target}%`;}
-    track.querySelectorAll('.play-new-placement').forEach(node=>{
-      node.classList.add('done','latest','no-pop');
-    });
+    track.querySelectorAll('.play-new-placement').forEach(node=>node.classList.add('done','latest','no-pop'));
+  }
+
+  function setRankStage(rank,value,progressValue){
+    const card=overlay?.querySelector('#rankUpdateCard');
+    if (!card) return;
+    const iconWrap=card.querySelector('#updateRankIconWrap');
+    const rankNameEl=card.querySelector('#updateRankName');
+    const title=card.querySelector('#updateProgressTitle');
+    const pctEl=card.querySelector('#updateProgressPct');
+    const low=card.querySelector('#updateLow');
+    const high=card.querySelector('#updateHigh');
+    const remaining=card.querySelector('#updateRemaining');
+    if (iconWrap) iconWrap.innerHTML=rankGraphic(rank);
+    if (rankNameEl) rankNameEl.textContent=rank.label;
+    if (title) title.textContent=progressTitle(rank);
+    if (pctEl) pctEl.textContent=`${Math.round(progressValue)}%`;
+    if (low) low.textContent=String(Math.round(rank.min));
+    if (high) high.textContent=rank.key==='grandmaster'?'3000+':String(Math.round(rank.high));
+    if (remaining) remaining.textContent=remainingText(value,rank);
   }
 
   function applyRankFinal(){
-    const modal=overlay?.querySelector('.rank-update-modal');
-    if (!modal) return;
-    const after=Number(modal.dataset.ratingAfter||0);
-    const afterPct=Number(modal.dataset.afterPct||0);
-    const value=modal.querySelector('.play-rating-live');
-    const pctEl=modal.querySelector('.play-rank-pct-live');
-    const bar=modal.querySelector('.rank-progress i');
-    if (value) value.textContent=String(Math.round(after));
-    if (pctEl) pctEl.textContent=`${Math.round(afterPct)}%`;
+    const card=overlay?.querySelector('#rankUpdateCard');
+    if (!card) return;
+    const after=Number(card.dataset.ratingAfter||0);
+    const afterPct=Number(card.dataset.afterPct||0);
+    const newRank=RANKS.find(rank=>rank.key===card.dataset.newRank)||rankFor(after);
+    const bar=card.querySelector('#animatedUpdateBar');
+    const rankUp=card.dataset.rankUp==='1';
+    setRankStage(newRank,after,afterPct);
     if (bar){bar.style.transition='none';bar.style.width=`${afterPct}%`;}
-    overlay.classList.add('rank-transition-arrived');
+    const message=card.querySelector('#rankUpMessage');
+    if (message) message.hidden=!rankUp;
+    const newName=card.querySelector('#newRankName');
+    if (newName) newName.textContent=newRank.label;
+    card.classList.remove('rank-up');
   }
 
   function applyFinalVisuals(){
@@ -270,7 +311,7 @@
   function finishAnimationImmediately(){
     if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return false;
     clearAnimationWork();
-    overlay.classList.add('is-instant','is-animating','rank-transition-arrived');
+    overlay.classList.add('is-instant','is-animating');
     applyFinalVisuals();
     overlay.dataset.animationState='done';
     updateActionButton('close');
@@ -294,32 +335,68 @@
     animationTimer=setTimeout(markAnimationDone,PLACEMENT_ANIMATION_MS);
   }
 
-  function animateRanked(){
-    const modal=overlay?.querySelector('.rank-update-modal');
-    if (!modal){animationTimer=setTimeout(markAnimationDone,RANK_ANIMATION_MS);return;}
-    const before=Number(modal.dataset.ratingBefore||0);
-    const after=Number(modal.dataset.ratingAfter||before);
-    const beforePct=Number(modal.dataset.beforePct||0);
-    const afterPct=Number(modal.dataset.afterPct||beforePct);
-    const value=modal.querySelector('.play-rating-live');
-    const pctEl=modal.querySelector('.play-rank-pct-live');
-    const bar=modal.querySelector('.rank-progress i');
-    if (bar){
-      bar.style.transition=`width ${RANK_ANIMATION_MS}ms cubic-bezier(.2,.75,.2,1)`;
-      bar.style.width=`${afterPct}%`;
-    }
-    overlay.classList.add('rank-transition-arrived');
+  function animateProgressNumber(from,to,duration){
+    if (progressFrame) cancelAnimationFrame(progressFrame);
+    const pctEl=overlay?.querySelector('#updateProgressPct');
     const started=performance.now();
     const tick=now=>{
       if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return;
-      const p=Math.min(1,(now-started)/RANK_ANIMATION_MS);
-      const eased=1-Math.pow(1-p,3);
-      if (value) value.textContent=String(Math.round(before+(after-before)*eased));
-      if (pctEl) pctEl.textContent=`${Math.round(beforePct+(afterPct-beforePct)*eased)}%`;
-      if (p<1) ratingFrame=requestAnimationFrame(tick);
+      const p=Math.min(1,(now-started)/duration);
+      if (pctEl) pctEl.textContent=`${Math.round(from+(to-from)*p)}%`;
+      if (p<1) progressFrame=requestAnimationFrame(tick);
     };
-    ratingFrame=requestAnimationFrame(tick);
-    animationTimer=setTimeout(markAnimationDone,RANK_ANIMATION_MS+60);
+    progressFrame=requestAnimationFrame(tick);
+  }
+
+  function animateRanked(){
+    const card=overlay?.querySelector('#rankUpdateCard');
+    if (!card){animationTimer=setTimeout(markAnimationDone,RANK_SEGMENT_MS);return;}
+    const before=Number(card.dataset.ratingBefore||0);
+    const after=Number(card.dataset.ratingAfter||before);
+    const beforePct=Number(card.dataset.beforePct||0);
+    const afterPct=Number(card.dataset.afterPct||beforePct);
+    const oldRank=RANKS.find(rank=>rank.key===card.dataset.oldRank)||rankFor(before);
+    const newRank=RANKS.find(rank=>rank.key===card.dataset.newRank)||rankFor(after);
+    const rankChanged=card.dataset.rankChanged==='1';
+    const rankUp=card.dataset.rankUp==='1';
+    const bar=card.querySelector('#animatedUpdateBar');
+
+    card.style.setProperty('--hub-rank-pulse-duration','2.33s');
+    card.style.setProperty('--hub-rank-pulse-delay','3.67s');
+    card.style.setProperty('--hub-flare-duration','2.5s');
+    card.style.setProperty('--hub-flare-delay','3.67s');
+    card.style.setProperty('--hub-icon-duration','3s');
+    card.style.setProperty('--hub-icon-delay','3.42s');
+    if (rankUp) card.classList.add('rank-up');
+
+    if (!rankChanged) {
+      if (bar){bar.style.transition=`width ${RANK_SEGMENT_MS}ms cubic-bezier(.2,.75,.2,1)`;bar.style.width=`${afterPct}%`;}
+      animateProgressNumber(beforePct,afterPct,RANK_SEGMENT_MS);
+      animationTimer=setTimeout(markAnimationDone,RANK_SEGMENT_MS+80);
+      return;
+    }
+
+    const firstTarget=rankUp?100:0;
+    if (bar){bar.style.transition=`width ${RANK_SEGMENT_MS}ms cubic-bezier(.2,.75,.2,1)`;bar.style.width=`${firstTarget}%`;}
+    animateProgressNumber(beforePct,firstTarget,RANK_SEGMENT_MS);
+
+    switchTimer=setTimeout(()=>{
+      if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return;
+      setRankStage(newRank,after,rankUp?0:100);
+      const message=card.querySelector('#rankUpMessage');
+      if (message) message.hidden=!rankUp;
+      const newName=card.querySelector('#newRankName');
+      if (newName) newName.textContent=newRank.label;
+      if (bar){
+        bar.style.transition='none';
+        bar.style.width=rankUp?'0%':'100%';
+        void bar.offsetWidth;
+        bar.style.transition=`width ${RANK_SEGMENT_MS}ms cubic-bezier(.2,.75,.2,1)`;
+        bar.style.width=`${afterPct}%`;
+      }
+      animateProgressNumber(rankUp?0:100,afterPct,RANK_SEGMENT_MS);
+    },RANK_SEGMENT_MS+80);
+    animationTimer=setTimeout(markAnimationDone,(RANK_SEGMENT_MS*2)+180);
   }
 
   function beginAnimation(st){
@@ -342,7 +419,7 @@
     clearAnimationWork();
     overlay.innerHTML=!st.seen_is_ranked?placementMarkup(st):ratedMarkup(st);
     overlay.hidden=false;
-    overlay.classList.remove('is-closing','is-instant','is-animating','rank-transition-arrived');
+    overlay.classList.remove('is-closing','is-instant','is-animating');
     overlay.dataset.animationState='idle';
     document.body.classList.add('hub-play-rank-update-open');
     pauseGameForRankOverlay();
@@ -365,7 +442,7 @@
       overlay.hidden=true;
       overlay.innerHTML='';
       overlay.dataset.animationState='idle';
-      overlay.classList.remove('is-closing','is-animating','is-instant','rank-transition-arrived');
+      overlay.classList.remove('is-closing','is-animating','is-instant');
       document.body.classList.remove('hub-play-rank-update-open');
       activeState=null;
       resumeGameAfterRankOverlay();
