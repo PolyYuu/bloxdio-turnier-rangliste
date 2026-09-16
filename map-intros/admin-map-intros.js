@@ -10,7 +10,6 @@
   let liveCup = null;
   let assetsReady = false;
   let refreshTimer = 0;
-  let applyQueued = false;
 
   function injectStyles() {
     if (document.getElementById("hubMapIntroAdminStyles")) return;
@@ -152,14 +151,13 @@
     updateControls();
   }
 
-  function applyMapsVisibility() {
-    applyQueued = false;
+  function showMapsOnly() {
     const panel = document.getElementById("hubAdminMapsPanel");
     const mapsButton = document.querySelector("[data-hub-admin-maps]");
     if (!panel || !mapsButton) return;
-    panel.hidden = !mapsMode;
-    mapsButton.classList.toggle("active", mapsMode);
-    if (!mapsMode) return;
+
+    panel.hidden = false;
+    mapsButton.classList.add("active");
     document.querySelectorAll("#v3AdminPrimaryNav [data-v3-admin-section]").forEach(button => button.classList.remove("active"));
     document.querySelector(".admin-overview-v2")?.setAttribute("hidden", "");
     document.querySelector(".admin-workbench")?.setAttribute("hidden", "");
@@ -167,26 +165,40 @@
     document.getElementById("v3AdminCupSelect")?.setAttribute("hidden", "");
   }
 
-  function queueApplyVisibility() {
-    if (applyQueued) return;
-    applyQueued = true;
-    requestAnimationFrame(applyMapsVisibility);
+  function restoreNativeAdminSection(section) {
+    const panel = document.getElementById("hubAdminMapsPanel");
+    const mapsButton = document.querySelector("[data-hub-admin-maps]");
+    if (panel) panel.hidden = true;
+    mapsButton?.classList.remove("active");
+
+    const cups = section !== "players";
+    document.querySelector(".admin-overview-v2")?.toggleAttribute("hidden", !cups);
+    document.querySelector(".admin-workbench")?.toggleAttribute("hidden", !cups);
+    document.getElementById("v3AdminPlayersPanel")?.toggleAttribute("hidden", cups);
+    const cupSelect = document.getElementById("v3AdminCupSelect");
+    if (cupSelect) cupSelect.hidden = !cups;
+
+    document.querySelectorAll("#v3AdminPrimaryNav [data-v3-admin-section]").forEach(button => {
+      button.classList.toggle("active", button.dataset.v3AdminSection === (cups ? "cups" : "players"));
+    });
   }
 
   function openMaps() {
     mapsMode = true;
-    applyMapsVisibility();
+    showMapsOnly();
     refreshLiveCup();
     refreshAssetState();
   }
 
-  function leaveMaps() {
-    if (!mapsMode) return;
+  function leaveMaps(section) {
     mapsMode = false;
     const panel = document.getElementById("hubAdminMapsPanel");
     const mapsButton = document.querySelector("[data-hub-admin-maps]");
     if (panel) panel.hidden = true;
     mapsButton?.classList.remove("active");
+
+    // Let the native admin click handler run first, then only repair visibility if needed.
+    if (section) window.setTimeout(() => restoreNativeAdminSection(section), 0);
   }
 
   async function triggerSG7() {
@@ -234,14 +246,17 @@
       triggerSG7();
       return;
     }
-    if (target?.closest("[data-v3-admin-section]")) leaveMaps();
+
+    const nativeSection = target?.closest("[data-v3-admin-section]");
+    if (nativeSection && mapsMode) {
+      leaveMaps(nativeSection.dataset.v3AdminSection || "cups");
+    }
   }, true);
 
   const observer = new MutationObserver(() => {
-    if (ensureUi()) {
-      ensureChannel();
-      if (mapsMode) queueApplyVisibility();
-    }
+    if (!ensureUi()) return;
+    ensureChannel();
+    // Do not re-apply Maps visibility here. Native Cup/Players navigation owns itself.
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -253,13 +268,12 @@
     }
   };
   bootstrap();
+
   refreshTimer = window.setInterval(() => {
-    if (document.getElementById("v3AdminPrimaryNav")) {
-      ensureUi();
-      ensureChannel();
-      refreshLiveCup();
-      refreshAssetState();
-      if (mapsMode) queueApplyVisibility();
-    }
+    if (!document.getElementById("v3AdminPrimaryNav")) return;
+    ensureUi();
+    ensureChannel();
+    refreshLiveCup();
+    refreshAssetState();
   }, 3500);
 })();
