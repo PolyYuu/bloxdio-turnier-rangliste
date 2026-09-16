@@ -234,77 +234,186 @@ body.hub-play-rank-update-open #bloxdFrame{pointer-events:none!important;user-se
 #playRankUpdateOverlay .placement-ranked-complete .placement-rank-name{color:#fff;text-shadow:0 0 28px rgba(56,240,219,.38)}
 
 /* -------------------------------------------------------------------------
-   Ranked update — mirrors the HUB #roundUpdateModal / .rank-update-modal.
+   Ranked update — canonical HUB #roundUpdateModal / #rankUpdateCard layout.
    ------------------------------------------------------------------------- */
 #playRankUpdateOverlay .rank-update-modal{
   position:relative;
-  width:min(880px,calc(100% - 20px));
+  width:min(100%,1030px);
   max-height:calc(100% - 4px);
-  overflow:auto;
-  padding:35px 40px 32px;
+  overflow:hidden;
+  padding:42px 46px;
   border:1px solid rgba(121,77,238,.68);
   border-radius:15px;
   background:
     radial-gradient(circle at 50% 28%,rgba(69,74,178,.16),transparent 35%),
     linear-gradient(145deg,#160831,#0d0622 58%,#100725);
-  box-shadow:0 34px 100px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.025);
+  box-shadow:0 40px 120px rgba(0,0,0,.65),0 0 50px rgba(118,59,255,.15);
+  text-align:left;
 }
-#playRankUpdateOverlay .rank-update-header{text-align:center;margin-bottom:24px}
-#playRankUpdateOverlay .update-kicker{display:block;margin-bottom:10px;color:#39e2d1;font-size:10px;font-weight:950;letter-spacing:.16em;text-transform:uppercase}
-#playRankUpdateOverlay .rank-update-modal h2{
-  margin:0;
-  font-family:"Pixelify Sans",Montserrat,sans-serif;
-  font-size:38px;
-  font-weight:700;
-  line-height:1;
+#playRankUpdateOverlay .rank-update-grid{
+  display:grid;
+  grid-template-columns:.82fr 1.18fr;
+  gap:42px;
+  align-items:center;
+}
+#playRankUpdateOverlay .rank-update-visual{text-align:center}
+#playRankUpdateOverlay .update-kicker{
+  display:block;
+  margin-bottom:10px;
+  color:#39e2d1;
+  font-size:10px;
+  font-weight:950;
+  letter-spacing:.16em;
   text-transform:uppercase;
 }
-#playRankUpdateOverlay .rank-update-subtitle{margin:9px 0 0;color:#9f95b0;font-size:10px;font-weight:700}
-#playRankUpdateOverlay .rank-transition-wrap{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:22px;
-  margin:24px 0 25px;
+#playRankUpdateOverlay .rank-update-modal h2{
+  margin:0;
+  color:#fff;
+  font-family:"Pixelify Sans",Montserrat,sans-serif;
+  font-size:40px;
+  font-style:normal;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:.02em;
+  text-transform:uppercase;
 }
-#playRankUpdateOverlay .rank-transition-rank{
-  display:flex;
-  min-width:136px;
-  flex-direction:column;
-  align-items:center;
-  gap:9px;
-  transition:transform .45s ease,filter .45s ease,opacity .45s ease;
+#playRankUpdateOverlay .update-rank-icon{
+  position:relative;
+  isolation:isolate;
+  display:grid;
+  place-items:center;
 }
-#playRankUpdateOverlay .rank-transition-rank img{
-  width:118px;
-  height:118px;
+#playRankUpdateOverlay .update-rank-icon::before{
+  content:"";
+  position:absolute;
+  z-index:1;
+  inset:17%;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(119,61,255,.28),transparent 68%);
+  filter:blur(15px);
+}
+#playRankUpdateOverlay .update-rank-icon img,
+#playRankUpdateOverlay .update-rank-icon .rank-icon-fallback{
+  position:relative;
+  z-index:3;
+  width:315px;
+  height:315px;
   object-fit:contain;
-  filter:drop-shadow(0 8px 26px rgba(0,0,0,.35));
+  filter:drop-shadow(0 8px 22px rgba(0,0,0,.28));
 }
-#playRankUpdateOverlay .rank-icon-fallback{display:grid;width:118px;height:118px;place-items:center;color:#fff;font-size:65px;font-weight:900}
-#playRankUpdateOverlay .rank-transition-rank strong{max-width:140px;color:#fff;font-size:11px;font-weight:950;letter-spacing:.07em;text-align:center;text-transform:uppercase}
-#playRankUpdateOverlay .rank-transition-arrow{color:#777087;font-size:31px;font-style:normal;font-weight:900;transition:color .4s ease,transform .4s ease,text-shadow .4s ease}
-#playRankUpdateOverlay.rank-transition-arrived .rank-transition-rank.old-rank{transform:scale(.88);filter:saturate(.55) brightness(.7)}
-#playRankUpdateOverlay.rank-transition-arrived .rank-transition-rank.new-rank{opacity:1;transform:scale(1.1)}
-#playRankUpdateOverlay.rank-transition-arrived .rank-transition-arrow{color:#32e3c5;transform:translateX(3px) scale(1.08);text-shadow:0 0 22px rgba(48,233,203,.45)}
-#playRankUpdateOverlay .rank-rating-change{display:flex;align-items:baseline;justify-content:center;gap:13px;margin:0 0 5px}
-#playRankUpdateOverlay .rank-rating-change span{color:#8f86a1;font-size:24px;font-weight:900}
-#playRankUpdateOverlay .rank-rating-change i{color:#6f667e;font-style:normal;font-size:17px;font-weight:900}
-#playRankUpdateOverlay .rank-rating-change strong{color:#fff;font-size:40px;font-weight:950;letter-spacing:-.025em}
-#playRankUpdateOverlay .rank-delta{margin-bottom:20px;text-align:center;font-size:11px;font-weight:950;letter-spacing:.06em}
-#playRankUpdateOverlay .rank-delta.positive{color:#55e7b1}#playRankUpdateOverlay .rank-delta.negative{color:#ff718d}#playRankUpdateOverlay .rank-delta.neutral{color:#9a91a8}
-#playRankUpdateOverlay .progress-wrap{width:min(580px,100%);margin:0 auto}
-#playRankUpdateOverlay .progress-meta{display:flex;justify-content:space-between;gap:16px;margin-bottom:8px;color:#9d93ae;font-size:9px;font-weight:900;letter-spacing:.055em;text-transform:uppercase}
+#playRankUpdateOverlay .update-rank-name{
+  display:block;
+  margin-top:-16px;
+  color:#fff;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:.03em;
+  text-align:center;
+  text-transform:uppercase;
+}
+#playRankUpdateOverlay .rank-update-data{min-width:0}
+#playRankUpdateOverlay .rating-change{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:15px;
+  margin-top:0;
+}
+#playRankUpdateOverlay .rating-change span{color:#8f86a1}
+#playRankUpdateOverlay .rating-change i{color:#6f667e;font-style:normal;font-size:20px;font-weight:900}
+#playRankUpdateOverlay .rating-change span,
+#playRankUpdateOverlay .rating-change strong{font-size:48px;font-weight:950;letter-spacing:-.025em}
+#playRankUpdateOverlay .rating-change strong{color:#fff}
+#playRankUpdateOverlay .delta{margin:7px 0 5px;font-size:30px;font-weight:950}
+#playRankUpdateOverlay .delta.positive{color:#55e7b1}
+#playRankUpdateOverlay .delta.negative{color:#ff718d}
+#playRankUpdateOverlay .delta.neutral{color:#9a91a8}
+#playRankUpdateOverlay .update-progress{padding:28px 0 23px}
+#playRankUpdateOverlay .progress-meta{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:8px;
+  color:#9d93ae;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+}
 #playRankUpdateOverlay .progress-meta b{color:#fff}
-#playRankUpdateOverlay .rank-progress{height:10px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.025)}
-#playRankUpdateOverlay .rank-progress i{display:block;width:var(--rank-before-pct,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,#37ead7,#57c7ff,#a85aff);box-shadow:0 0 13px rgba(57,224,215,.24);transition:width 3.5s cubic-bezier(.2,.75,.2,1) .15s}
-#playRankUpdateOverlay.is-animating .rank-progress i{width:var(--rank-after-pct,0%)}
-#playRankUpdateOverlay.is-instant .rank-progress i{transition:none!important;width:var(--rank-after-pct,0%)}
-#playRankUpdateOverlay .progress-scale{display:flex;justify-content:space-between;gap:16px;margin-top:8px;color:#70677f;font-size:8px;font-weight:850}
-#playRankUpdateOverlay .rank-update-modal .cta-button{display:block;width:min(360px,100%);margin:26px auto 0}
+#playRankUpdateOverlay .rank-progress{
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025);
+}
+#playRankUpdateOverlay .thick-progress{height:20px;border:2px solid rgba(255,255,255,.025)}
+#playRankUpdateOverlay .thick-progress i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#37ead7,#57c7ff,#a85aff);
+  box-shadow:0 0 28px rgba(56,240,219,.48);
+}
+#playRankUpdateOverlay .progress-scale{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  margin-top:8px;
+  color:#70677f;
+  font-size:10px;
+  font-weight:850;
+}
+#playRankUpdateOverlay .rank-update-modal .cta-button{
+  width:100%;
+  min-height:52px;
+  margin:0;
+  font-size:12px;
+}
+#playRankUpdateOverlay .rankup-message{margin-top:13px;text-align:center}
+#playRankUpdateOverlay .rankup-message small,
+#playRankUpdateOverlay .rankup-message strong{display:block}
+#playRankUpdateOverlay .rankup-message small{color:#39e2d1;font-size:10px;font-weight:900;letter-spacing:.2em}
+#playRankUpdateOverlay .rankup-message strong{font-family:"Pixelify Sans",Montserrat,sans-serif;font-size:31px;text-transform:uppercase;text-shadow:0 0 26px rgba(56,240,219,.25)}
+
+#playRankUpdateOverlay .rankup-flare{position:absolute;inset:0;pointer-events:none;opacity:0}
+#playRankUpdateOverlay .rankup-flare i{
+  position:absolute;
+  left:50%;
+  top:46%;
+  width:4px;
+  height:160px;
+  border-radius:10px;
+  background:linear-gradient(transparent,#38f0db,transparent);
+  transform-origin:50% 100%;
+}
+#playRankUpdateOverlay .rankup-flare i:nth-child(1){transform:translate(-50%,-100%) rotate(0deg)}
+#playRankUpdateOverlay .rankup-flare i:nth-child(2){transform:translate(-50%,-100%) rotate(60deg)}
+#playRankUpdateOverlay .rankup-flare i:nth-child(3){transform:translate(-50%,-100%) rotate(120deg)}
+#playRankUpdateOverlay .rankup-flare i:nth-child(4){transform:translate(-50%,-100%) rotate(180deg)}
+#playRankUpdateOverlay .rankup-flare i:nth-child(5){transform:translate(-50%,-100%) rotate(240deg)}
+#playRankUpdateOverlay .rankup-flare i:nth-child(6){transform:translate(-50%,-100%) rotate(300deg)}
+#playRankUpdateOverlay #rankUpdateCard.rank-up{
+  animation:playRankCardPulse var(--hub-rank-pulse-duration,2.33s) ease var(--hub-rank-pulse-delay,3.67s) both;
+}
+#playRankUpdateOverlay #rankUpdateCard.rank-up .rankup-flare{
+  animation:playRankFlareBurst var(--hub-flare-duration,2.5s) ease var(--hub-flare-delay,3.67s) both;
+}
+#playRankUpdateOverlay #rankUpdateCard.rank-up .update-rank-icon{
+  animation:playRankIconAscend var(--hub-icon-duration,3s) cubic-bezier(.2,.8,.2,1) var(--hub-icon-delay,3.42s) both;
+}
 
 @keyframes playHubPlacementArrive{0%{transform:scale(.2);opacity:.15}68%{transform:scale(1.22);opacity:1}100%{transform:scale(1);opacity:1}}
 @keyframes playHubRankReveal{0%{opacity:.15;transform:scale(.72)}65%{opacity:1;transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+@keyframes playRankFlareBurst{0%{opacity:0;transform:scale(.3)}35%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
+@keyframes playRankIconAscend{0%{transform:scale(1);filter:none}45%{transform:scale(.8);filter:brightness(2)}70%{transform:scale(1.15);filter:drop-shadow(0 0 40px rgba(56,240,219,.55))}100%{transform:scale(1);filter:drop-shadow(0 8px 22px rgba(0,0,0,.28))}}
+@keyframes playRankCardPulse{0%{box-shadow:0 40px 120px rgba(0,0,0,.65),0 0 50px rgba(118,59,255,.15)}45%{box-shadow:0 40px 120px rgba(0,0,0,.65),0 0 90px rgba(56,240,219,.4),inset 0 0 90px rgba(56,240,219,.08)}100%{box-shadow:0 40px 120px rgba(0,0,0,.65),0 0 50px rgba(118,59,255,.15)}}
+
+@media(max-width:1180px){
+  #playRankUpdateOverlay .rank-update-grid{grid-template-columns:1fr;gap:8px}
+  #playRankUpdateOverlay .rank-update-modal{text-align:center;overflow:auto}
+  #playRankUpdateOverlay .rating-change{justify-content:center}
+}
 
 @media(max-width:760px){
   #playRankUpdateOverlay{padding:10px}
@@ -314,10 +423,12 @@ body.hub-play-rank-update-open #bloxdFrame{pointer-events:none!important;user-se
   #playRankUpdateOverlay .unranked-badge-wrap img{width:116px;height:116px}
   #playRankUpdateOverlay .placement-node{width:24px;height:24px;border-width:2px}
   #playRankUpdateOverlay .placement-node.done::after{font-size:13px}
-  #playRankUpdateOverlay .rank-update-modal{width:100%;padding:28px 20px 24px}
+  #playRankUpdateOverlay .rank-update-modal{width:100%;padding:31px 18px}
   #playRankUpdateOverlay .rank-update-modal h2{font-size:30px}
-  #playRankUpdateOverlay .rank-transition-wrap{gap:12px;margin-top:20px}
-  #playRankUpdateOverlay .rank-transition-rank{min-width:94px}
-  #playRankUpdateOverlay .rank-transition-rank img,#playRankUpdateOverlay .rank-icon-fallback{width:86px;height:86px}
-  #playRankUpdateOverlay .rank-transition-arrow{font-size:24px}
+  #playRankUpdateOverlay .update-rank-icon img,
+  #playRankUpdateOverlay .update-rank-icon .rank-icon-fallback{width:235px;height:235px}
+  #playRankUpdateOverlay .rating-change span,
+  #playRankUpdateOverlay .rating-change strong{font-size:38px}
+  #playRankUpdateOverlay .delta{font-size:24px}
+  #playRankUpdateOverlay .thick-progress{height:16px}
 }
