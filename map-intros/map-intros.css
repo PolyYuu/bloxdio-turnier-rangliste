@@ -4,9 +4,9 @@
  */
 #hubMapIntroOverlay[hidden]{display:none!important}
 #hubMapIntroOverlay{
-  position:fixed;
+  position:absolute;
   inset:0;
-  z-index:2147483000;
+  z-index:90;
   overflow:hidden;
   background:#05030a;
   color:#fff;
