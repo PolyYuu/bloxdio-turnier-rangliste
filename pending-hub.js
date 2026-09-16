@@ -173,7 +173,7 @@
   }
 
   installPlayNavigation();
-  load('map-intros/admin-map-intros.js?v=20260916a');
+  load('map-intros/admin-map-intros.js?v=20260916b');
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', installPlayNavigation, {once:true});
   }
