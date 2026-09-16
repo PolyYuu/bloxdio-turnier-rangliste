@@ -1,0 +1,180 @@
+/*
+ * PLAY competitive update overlay.
+ * Uses the same server-side animation checkpoint as the main HUB, but is isolated
+ * to PLAY so it can be removed without touching Cup/round rendering.
+ */
+#playRankUpdateOverlay[hidden]{display:none!important}
+#playRankUpdateOverlay{
+  position:absolute;
+  inset:0;
+  z-index:220;
+  display:grid;
+  place-items:center;
+  padding:22px;
+  overflow:hidden;
+  background:rgba(7,4,17,.78);
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .2s ease;
+  font-family:Montserrat,Arial,Helvetica,sans-serif;
+  color:#fff;
+}
+#playRankUpdateOverlay.is-open{opacity:1;pointer-events:auto}
+#playRankUpdateOverlay.is-closing{opacity:0}
+body.hub-play-rank-update-open #bloxdFrame{pointer-events:none!important;user-select:none!important}
+
+.play-rank-update-card{
+  position:relative;
+  width:min(720px,calc(100% - 16px));
+  overflow:hidden;
+  border:1px solid rgba(126,79,241,.52);
+  border-radius:16px;
+  background:linear-gradient(155deg,rgba(27,13,63,.985),rgba(11,7,31,.99));
+  box-shadow:0 30px 90px rgba(0,0,0,.54),inset 0 1px 0 rgba(255,255,255,.045);
+}
+.play-rank-update-card::before{
+  content:"";
+  position:absolute;
+  inset:-45% 46% 18% -22%;
+  background:radial-gradient(circle,rgba(57,226,211,.13),transparent 65%);
+  pointer-events:none;
+}
+.play-rank-update-close{
+  position:absolute;
+  z-index:5;
+  top:13px;
+  right:14px;
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:9px;
+  background:rgba(255,255,255,.045);
+  color:#9e94b0;
+  font:800 20px/1 Arial,sans-serif;
+  cursor:pointer;
+}
+.play-rank-update-close:hover{color:#fff;border-color:rgba(255,255,255,.25)}
+.play-rank-update-grid{
+  position:relative;
+  z-index:2;
+  display:grid;
+  grid-template-columns:245px minmax(0,1fr);
+  min-height:330px;
+}
+.play-rank-update-visual{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:34px 24px;
+  border-right:1px solid rgba(255,255,255,.07);
+  background:linear-gradient(180deg,rgba(79,42,164,.13),rgba(10,6,28,.03));
+  text-align:center;
+}
+.play-rank-update-orbit{
+  position:relative;
+  width:142px;
+  height:142px;
+  display:grid;
+  place-items:center;
+  margin-bottom:19px;
+  border:1px solid rgba(56,240,219,.16);
+  border-radius:50%;
+  box-shadow:inset 0 0 45px rgba(79,53,175,.15),0 0 50px rgba(65,217,210,.06);
+}
+.play-rank-update-orbit::before,
+.play-rank-update-orbit::after{
+  content:"";
+  position:absolute;
+  border-radius:50%;
+}
+.play-rank-update-orbit::before{inset:13px;border:1px dashed rgba(255,255,255,.13);animation:playRankOrbit 12s linear infinite}
+.play-rank-update-orbit::after{inset:28px;background:radial-gradient(circle,rgba(112,73,239,.20),rgba(20,10,54,.32) 67%,transparent 68%)}
+.play-rank-update-symbol{
+  position:relative;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  width:82px;
+  height:82px;
+  color:#fff;
+  font-size:48px;
+  font-weight:900;
+  text-shadow:0 0 28px rgba(56,240,219,.34);
+  transform:scale(.86);
+  opacity:.6;
+  transition:transform .65s cubic-bezier(.2,1.35,.32,1),opacity .45s ease,color .4s ease;
+}
+#playRankUpdateOverlay.is-open .play-rank-update-symbol{transform:scale(1);opacity:1}
+.play-rank-update-rank{font-size:22px;font-weight:950;letter-spacing:.06em}
+.play-rank-update-rating{margin-top:6px;color:#8f86a1;font-size:11px;font-weight:900;letter-spacing:.08em}
+
+.play-rank-update-data{display:flex;flex-direction:column;justify-content:center;padding:34px 34px 28px}
+.play-rank-update-kicker{display:block;margin-bottom:8px;color:#3ce6d4;font-size:9px;font-weight:950;letter-spacing:.17em;text-transform:uppercase}
+.play-rank-update-data h2{margin:0;color:#fff;font-size:28px;line-height:1.08;font-weight:950;letter-spacing:-.015em}
+.play-rank-update-copy{margin:9px 0 22px;color:#8f86a1;font-size:11px;line-height:1.55;font-weight:700}
+.play-rank-rating-change{display:flex;align-items:baseline;gap:12px;margin-bottom:7px}
+.play-rank-rating-change span{color:#8f86a1;font-size:23px;font-weight:900}
+.play-rank-rating-change i{color:#625977;font-style:normal;font-size:16px;font-weight:900}
+.play-rank-rating-change strong{color:#fff;font-size:36px;font-weight:950;letter-spacing:-.025em}
+.play-rank-delta{margin-bottom:20px;font-size:11px;font-weight:950;letter-spacing:.06em}
+.play-rank-delta.positive{color:#55e7b1}.play-rank-delta.negative{color:#ff718d}.play-rank-delta.neutral{color:#8f86a1}
+.play-rank-progress-meta{display:flex;justify-content:space-between;gap:15px;margin-bottom:7px;color:#9d93ae;font-size:9px;font-weight:900;letter-spacing:.055em;text-transform:uppercase}
+.play-rank-progress-meta b{color:#fff}
+.play-rank-progress{
+  height:8px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025);
+}
+.play-rank-progress i{
+  display:block;
+  width:var(--rank-before-pct,0%);
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#37ead7,#57c7ff,#a85aff);
+  box-shadow:0 0 13px rgba(57,224,215,.24);
+  transition:width 3.1s cubic-bezier(.2,.76,.2,1) .35s;
+}
+#playRankUpdateOverlay.is-animating .play-rank-progress i{width:var(--rank-after-pct,0%)}
+#playRankUpdateOverlay.is-instant .play-rank-progress i{transition:none!important;width:var(--rank-after-pct,0%)}
+.play-rank-progress-scale{display:flex;justify-content:space-between;gap:15px;margin-top:7px;color:#6f667e;font-size:8px;font-weight:850}
+.play-rank-update-button{
+  width:100%;
+  min-height:43px;
+  margin-top:25px;
+  border:0;
+  border-radius:8px;
+  background:#f0edf5;
+  color:#0d0819;
+  font:950 9px/1 Montserrat,Arial,sans-serif;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.play-rank-update-button:hover{background:#fff}
+
+/* Placement variant */
+#playRankUpdateOverlay.is-placement .play-rank-update-symbol{font-size:39px;color:#c8c1d5;text-shadow:none}
+.play-placement-count{display:flex;align-items:baseline;gap:5px;margin:2px 0 17px;color:#fff;font-size:44px;font-weight:950;letter-spacing:-.04em}
+.play-placement-count small{color:#756c86;font-size:15px;font-weight:900;letter-spacing:0}
+.play-placement-dots{display:grid;grid-template-columns:repeat(15,1fr);gap:4px;margin-top:9px}
+.play-placement-dots i{height:7px;border-radius:2px;background:rgba(255,255,255,.08);transform:scaleY(.72);transition:background .35s ease,transform .35s ease}
+.play-placement-dots i.done{background:#38dfcf;transform:scaleY(1)}
+.play-placement-dots i.latest{animation:playPlacementPop .75s cubic-bezier(.2,1.4,.3,1) .3s both}
+
+@keyframes playRankOrbit{to{transform:rotate(360deg)}}
+@keyframes playPlacementPop{0%{transform:scale(.2)}65%{transform:scale(1.55)}100%{transform:scale(1)}}
+
+@media(max-width:700px){
+  #playRankUpdateOverlay{padding:12px}
+  .play-rank-update-grid{grid-template-columns:1fr;max-height:calc(100% - 10px);overflow:auto}
+  .play-rank-update-visual{padding:20px;border-right:0;border-bottom:1px solid rgba(255,255,255,.07)}
+  .play-rank-update-orbit{width:100px;height:100px;margin-bottom:12px}.play-rank-update-symbol{font-size:35px;width:62px;height:62px}
+  .play-rank-update-rank{font-size:18px}.play-rank-update-data{padding:22px}.play-rank-update-data h2{font-size:23px}
+}
