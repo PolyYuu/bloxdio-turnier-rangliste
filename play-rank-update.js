@@ -60,8 +60,9 @@
         const unranked = html.match(/(?:const|let|var)\s+UNRANKED_ICON\s*=\s*['\"]([^'\"]+)['\"]/);
         if (unranked) iconCache.unranked = unranked[1];
         for (const rank of RANKS) {
-          const rx = new RegExp(rank.key+"\\s*:\\s*['\\\"]([^'\\\"]+)['\\\"]",'i');
-          const hit = html.match(rx);
+          const objectKey = new RegExp(`["']?${rank.key}["']?\\s*:\\s*["']([^"']+)["']`,'i');
+          const indexedKey = new RegExp(`RANK_ICONS\\s*\\[\\s*["']${rank.key}["']\\s*\\]\\s*=\\s*["']([^"']+)["']`,'i');
+          const hit = html.match(objectKey) || html.match(indexedKey);
           if (hit) iconCache.ranks[rank.key] = hit[1];
         }
       } catch (_) {}
@@ -107,7 +108,6 @@
     const done=Math.max(0,Math.min(15,Number(st.current_placement_games||0)));
     const completed=!!st.current_is_ranked;
     const rank=completed?rankFor(Number(st.current_rating||0)):null;
-    const pctDone=Math.round(done/15*100);
     const emblem=completed
       ? rankGraphic(rank)
       : iconCache.unranked
@@ -136,9 +136,7 @@
     const after=Number(st.current_rating||before);
     const oldRank=rankFor(before),newRank=rankFor(after);
     const delta=after-before;
-    const beforePct=oldRank.key===newRank.key?pct(before,oldRank):0;
     const afterPct=pct(after,newRank);
-    const rankChanged=oldRank.key!==newRank.key;
     const gameNo=Number(st.current_finalized_games||0);
     return `
       <section class="rank-update-modal" role="dialog" aria-modal="true" aria-labelledby="playRankTitle">
