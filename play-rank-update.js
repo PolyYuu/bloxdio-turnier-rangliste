@@ -12,6 +12,9 @@
   const bloxdFrame = document.getElementById('bloxdFrame');
   if (!roundOverlay || !gameStage) return;
 
+  const RANK_ANIMATION_MS = 3700;
+  const PLACEMENT_ANIMATION_MS = 1800;
+
   const RANKS = [
     {key:'wood',label:'WOOD',min:0,high:750,symbol:'◇'},
     {key:'iron',label:'IRON',min:750,high:1000,symbol:'⬡'},
@@ -23,7 +26,7 @@
   ];
 
   const COPY = {
-    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANKUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrankung nicht angezeigt.',unranked:'UNRANKED',continue:'WEITER',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rankSubtitle:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',toNext:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG'},
+    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANGUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrangung nicht angezeigt.',unranked:'UNRANKED',continue:'WEITER',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rankSubtitle:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',toNext:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG'},
     en:{placementKicker:'PLACEMENT UPDATE',placements:'YOUR PLACEMENTS',placementSubtitle:'Complete 15 ranked rounds to reveal your first rank.',currentStatus:'CURRENT STATUS',progress:'PLACEMENT PROGRESS',help:'Only completed matches are marked. Your hidden rating is not shown during placements.',unranked:'UNRANKED',continue:'CONTINUE',rankKicker:'RANKED UPDATE',rankTitle:'YOUR PROGRESS',rankSubtitle:'This is how your competitive rating changed after this round.',rating:'RATING',toNext:'PROGRESS TO NEXT RANK',top:'TOP RANK',left:'left',currentRank:'CURRENT RANK'},
     fr:{placementKicker:'MISE À JOUR PLACEMENT',placements:'TES PLACEMENTS',placementSubtitle:'Termine 15 manches classées pour révéler ton premier rang.',currentStatus:'STATUT ACTUEL',progress:'PROGRESSION PLACEMENT',help:'Seuls les matchs terminés sont marqués. Ton rating caché reste invisible pendant les placements.',unranked:'UNRANKED',continue:'CONTINUER',rankKicker:'MISE À JOUR RANKED',rankTitle:'TA PROGRESSION',rankSubtitle:'Voici comment ton rating compétitif a changé après cette manche.',rating:'RATING',toNext:'PROGRESSION VERS LE RANG SUIVANT',top:'RANG MAXIMAL',left:'restants',currentRank:'RANG ACTUEL'}
   };
@@ -32,8 +35,10 @@
   let busy = false;
   let activeState = null;
   let closeTimer = 0;
+  let animationTimer = 0;
   let hadRoundOverlayOpen = !roundOverlay.hidden;
   let iconPromise = null;
+  let previousFrameTabIndex = null;
   const iconCache = {unranked:'',ranks:{}};
 
   function lang(){
@@ -83,6 +88,7 @@
     overlay = document.createElement('section');
     overlay.id = 'playRankUpdateOverlay';
     overlay.hidden = true;
+    overlay.tabIndex = -1;
     gameStage.appendChild(overlay);
     overlay.addEventListener('click',event=>{
       if (event.target === overlay) handleClose(false);
@@ -119,7 +125,7 @@
         <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
         <span class="placement-kicker">${completed?'PLACEMENTS COMPLETE':`${c.placementKicker} · ROUND ${done}`}</span>
         <h2 id="playPlacementTitle">${completed?c.currentRank:c.placements}</h2>
-        <p class="placement-subtitle">${completed?(lang()==='de'?'Deine 15 Einrankungsmatches sind abgeschlossen.':lang()==='fr'?'Tes 15 matchs de placement sont terminés.':'Your 15 placement games are complete.'):c.placementSubtitle}</p>
+        <p class="placement-subtitle">${completed?(lang()==='de'?'Deine 15 Einrangungsmatches sind abgeschlossen.':lang()==='fr'?'Tes 15 matchs de placement sont terminés.':'Your 15 placement games are complete.'):c.placementSubtitle}</p>
         <div class="unranked-badge-wrap">${emblem}</div>
         <span class="placement-rank-label">${completed?c.currentRank:c.currentStatus}</span>
         <strong class="placement-rank-name">${completed?rank.label:c.unranked}</strong>
@@ -162,47 +168,102 @@
       </section>`;
   }
 
+  function forceOverlayFocus(){
+    if (!overlay || overlay.hidden) return;
+    try{window.focus();}catch(_){}
+    try{document.exitPointerLock?.();}catch(_){}
+    try{bloxdFrame?.blur();}catch(_){}
+    try{overlay.focus({preventScroll:true});}
+    catch(_){try{overlay.focus();}catch(__){}}
+  }
+
+  function pauseGameForRankOverlay(){
+    if (!bloxdFrame) return;
+    previousFrameTabIndex = bloxdFrame.getAttribute('tabindex');
+    bloxdFrame.setAttribute('tabindex','-1');
+    bloxdFrame.style.pointerEvents='none';
+    try{bloxdFrame.blur();}catch(_){}
+  }
+
+  function resumeGameAfterRankOverlay(){
+    if (!bloxdFrame) return;
+    if (previousFrameTabIndex == null) bloxdFrame.removeAttribute('tabindex');
+    else bloxdFrame.setAttribute('tabindex',previousFrameTabIndex);
+    previousFrameTabIndex=null;
+    bloxdFrame.style.removeProperty('pointer-events');
+    setTimeout(()=>{try{bloxdFrame.focus();}catch(_){}},0);
+  }
+
+  function markAnimationDone(){
+    if (!overlay || overlay.hidden) return;
+    clearTimeout(animationTimer);
+    animationTimer=0;
+    overlay.dataset.animationState='done';
+    overlay.classList.add('rank-transition-arrived');
+  }
+
+  function finishAnimationImmediately(){
+    if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return false;
+    clearTimeout(animationTimer);
+    animationTimer=0;
+    overlay.classList.add('is-instant','is-animating','rank-transition-arrived');
+    overlay.dataset.animationState='done';
+    forceOverlayFocus();
+    return true;
+  }
+
+  function beginAnimation(st){
+    clearTimeout(animationTimer);
+    overlay.dataset.animationState='running';
+    requestAnimationFrame(()=>{
+      if (!overlay || overlay.hidden) return;
+      overlay.classList.add('is-animating','rank-transition-arrived');
+      animationTimer=setTimeout(markAnimationDone,st.seen_is_ranked?RANK_ANIMATION_MS:PLACEMENT_ANIMATION_MS);
+    });
+  }
+
   async function open(st){
     build();
     await loadCanonicalIcons();
     activeState=st;
     clearTimeout(closeTimer);
+    clearTimeout(animationTimer);
     overlay.innerHTML = !st.seen_is_ranked ? placementMarkup(st) : ratedMarkup(st);
     overlay.style.setProperty('--rank-before-pct',`${!st.seen_is_ranked?0:(rankFor(Number(st.seen_rating||0)).key===rankFor(Number(st.current_rating||0)).key?pct(Number(st.seen_rating||0),rankFor(Number(st.seen_rating||0))):0)}%`);
     overlay.style.setProperty('--rank-after-pct',`${!st.seen_is_ranked?0:pct(Number(st.current_rating||0),rankFor(Number(st.current_rating||0)))}%`);
     overlay.hidden=false;
     overlay.classList.remove('is-closing','is-instant','is-animating','rank-transition-arrived');
+    overlay.dataset.animationState='idle';
     document.body.classList.add('hub-play-rank-update-open');
+    pauseGameForRankOverlay();
     void overlay.offsetWidth;
     overlay.classList.add('is-open');
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      overlay.classList.add('is-animating');
-      if (st.seen_is_ranked) setTimeout(()=>overlay?.classList.add('rank-transition-arrived'),500);
-    }));
-    overlay.dataset.openedAt=String(performance.now());
+    forceOverlayFocus();
+    [20,60,120,240].forEach(delay=>setTimeout(()=>{
+      if (overlay && !overlay.hidden) forceOverlayFocus();
+    },delay));
+    beginAnimation(st);
     try{window.postMessage({type:'OVERLAY_OPEN'},'*');}catch(_){}
   }
 
   async function handleClose(instant){
     if (!overlay || overlay.hidden) return;
-    if (!instant && !overlay.classList.contains('is-instant')) {
-      const started=overlay.classList.contains('is-animating');
-      if (started && performance.now()-Number(overlay.dataset.openedAt||0)<3300) {
-        overlay.classList.add('is-instant','rank-transition-arrived');
-        return;
-      }
-    }
+    if (!instant && finishAnimationImmediately()) return;
+
+    clearTimeout(animationTimer);
+    animationTimer=0;
     try{await acknowledge();}catch(error){console.warn('[The HUB] Could not acknowledge PLAY rank update',error);}
     overlay.classList.add('is-closing');
     overlay.classList.remove('is-open');
     closeTimer=setTimeout(()=>{
       overlay.hidden=true;
       overlay.innerHTML='';
+      overlay.dataset.animationState='idle';
       overlay.classList.remove('is-closing','is-animating','is-instant','rank-transition-arrived');
       document.body.classList.remove('hub-play-rank-update-open');
       activeState=null;
+      resumeGameAfterRankOverlay();
       try{window.postMessage({type:'OVERLAY_CLOSE'},'*');}catch(_){}
-      try{bloxdFrame?.focus();}catch(_){}
     },220);
   }
 
@@ -229,10 +290,15 @@
   });
   observer.observe(roundOverlay,{attributes:true,attributeFilter:['hidden']});
 
+  document.addEventListener('focusin',event=>{
+    if (!overlay || overlay.hidden) return;
+    if (event.target===bloxdFrame) setTimeout(forceOverlayFocus,0);
+  },true);
+
   document.addEventListener('keydown',event=>{
-    if (!overlay || overlay.hidden || event.code!=='Space') return;
+    if (!overlay || overlay.hidden || (event.code!=='Space' && event.key!==' ')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    handleClose(false);
+    if (!finishAnimationImmediately()) handleClose(false);
   },true);
 })();
