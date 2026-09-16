@@ -12,8 +12,10 @@
   const bloxdFrame = document.getElementById('bloxdFrame');
   if (!roundOverlay || !gameStage) return;
 
-  const RANK_ANIMATION_MS = 3700;
-  const PLACEMENT_ANIMATION_MS = 1800;
+  const PRE_ANIMATION_HOLD_MS = 650;
+  const RANK_ANIMATION_MS = 3500;
+  const PLACEMENT_LINE_MS = 2080;
+  const PLACEMENT_ANIMATION_MS = 2900;
 
   const RANKS = [
     {key:'wood',label:'WOOD',min:0,high:750,symbol:'◇'},
@@ -26,16 +28,19 @@
   ];
 
   const COPY = {
-    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANGUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrangung nicht angezeigt.',unranked:'UNRANKED',continue:'WEITER',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rankSubtitle:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',toNext:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG'},
-    en:{placementKicker:'PLACEMENT UPDATE',placements:'YOUR PLACEMENTS',placementSubtitle:'Complete 15 ranked rounds to reveal your first rank.',currentStatus:'CURRENT STATUS',progress:'PLACEMENT PROGRESS',help:'Only completed matches are marked. Your hidden rating is not shown during placements.',unranked:'UNRANKED',continue:'CONTINUE',rankKicker:'RANKED UPDATE',rankTitle:'YOUR PROGRESS',rankSubtitle:'This is how your competitive rating changed after this round.',rating:'RATING',toNext:'PROGRESS TO NEXT RANK',top:'TOP RANK',left:'left',currentRank:'CURRENT RANK'},
-    fr:{placementKicker:'MISE À JOUR PLACEMENT',placements:'TES PLACEMENTS',placementSubtitle:'Termine 15 manches classées pour révéler ton premier rang.',currentStatus:'STATUT ACTUEL',progress:'PROGRESSION PLACEMENT',help:'Seuls les matchs terminés sont marqués. Ton rating caché reste invisible pendant les placements.',unranked:'UNRANKED',continue:'CONTINUER',rankKicker:'MISE À JOUR RANKED',rankTitle:'TA PROGRESSION',rankSubtitle:'Voici comment ton rating compétitif a changé après cette manche.',rating:'RATING',toNext:'PROGRESSION VERS LE RANG SUIVANT',top:'RANG MAXIMAL',left:'restants',currentRank:'RANG ACTUEL'}
+    de:{placementKicker:'PLACEMENT UPDATE',placements:'DEINE EINRANGUNG',placementSubtitle:'Schließe 15 Ranked-Runden ab, um deinen ersten Rang freizuschalten.',currentStatus:'AKTUELLER STATUS',progress:'EINRANGUNGSFORTSCHRITT',help:'Nur abgeschlossene Matches werden markiert. Dein verstecktes Rating wird während der Einrangung nicht angezeigt.',unranked:'UNRANKED',rankKicker:'RANKED UPDATE',rankTitle:'DEIN FORTSCHRITT',rankSubtitle:'So hat sich dein Competitive Rating nach dieser Runde verändert.',rating:'RATING',toNext:'FORTSCHRITT ZUM NÄCHSTEN RANG',top:'HÖCHSTER RANG',left:'übrig',currentRank:'AKTUELLER RANG',skip:'LEERTASTE DRÜCKEN ZUM ÜBERSPRINGEN',close:'LEERTASTE DRÜCKEN ZUM SCHLIESSEN'},
+    en:{placementKicker:'PLACEMENT UPDATE',placements:'YOUR PLACEMENTS',placementSubtitle:'Complete 15 ranked rounds to reveal your first rank.',currentStatus:'CURRENT STATUS',progress:'PLACEMENT PROGRESS',help:'Only completed matches are marked. Your hidden rating is not shown during placements.',unranked:'UNRANKED',rankKicker:'RANKED UPDATE',rankTitle:'YOUR PROGRESS',rankSubtitle:'This is how your competitive rating changed after this round.',rating:'RATING',toNext:'PROGRESS TO NEXT RANK',top:'TOP RANK',left:'left',currentRank:'CURRENT RANK',skip:'PRESS SPACE TO SKIP',close:'PRESS SPACE TO CLOSE'},
+    fr:{placementKicker:'MISE À JOUR PLACEMENT',placements:'TES PLACEMENTS',placementSubtitle:'Termine 15 manches classées pour révéler ton premier rang.',currentStatus:'STATUT ACTUEL',progress:'PROGRESSION PLACEMENT',help:'Seuls les matchs terminés sont marqués. Ton rating caché reste invisible pendant les placements.',unranked:'UNRANKED',rankKicker:'MISE À JOUR RANKED',rankTitle:'TA PROGRESSION',rankSubtitle:'Voici comment ton rating compétitif a changé après cette manche.',rating:'RATING',toNext:'PROGRESSION VERS LE RANG SUIVANT',top:'RANG MAXIMAL',left:'restants',currentRank:'RANG ACTUEL',skip:'APPUYEZ SUR ESPACE POUR PASSER',close:'APPUYEZ SUR ESPACE POUR FERMER'}
   };
 
   let overlay = null;
   let busy = false;
   let activeState = null;
   let closeTimer = 0;
+  let startTimer = 0;
   let animationTimer = 0;
+  let nodeTimer = 0;
+  let ratingFrame = 0;
   let hadRoundOverlayOpen = !roundOverlay.hidden;
   let iconPromise = null;
   let previousFrameTabIndex = null;
@@ -48,6 +53,8 @@
     return 'en';
   }
   function t(){ return COPY[lang()] || COPY.en; }
+  function clampPlacement(value){ return Math.max(0,Math.min(15,Number(value||0))); }
+  function placementFill(done){ return done <= 1 ? 0 : ((done-1)/14*93.8); }
   function rankFor(value){
     const n = Number(value || 0);
     return RANKS.slice().reverse().find(r => n >= r.min) || RANKS[0];
@@ -91,8 +98,7 @@
     overlay.tabIndex = -1;
     gameStage.appendChild(overlay);
     overlay.addEventListener('click',event=>{
-      if (event.target === overlay) handleClose(false);
-      if (event.target.closest('[data-play-rank-close]')) handleClose(false);
+      if (event.target === overlay || event.target.closest('[data-play-rank-close]')) handleClose(false);
     });
   }
 
@@ -109,9 +115,23 @@
     return !!st && Number(st.current_finalized_games||0) > Number(st.seen_finalized_games||0);
   }
 
+  function actionButtonLabel(mode){
+    return mode === 'close' ? t().close : t().skip;
+  }
+  function updateActionButton(mode){
+    const button = overlay?.querySelector('.cta-button');
+    if (!button) return;
+    const label = actionButtonLabel(mode);
+    button.textContent = label;
+    button.setAttribute('aria-label',label);
+  }
+
   function placementMarkup(st){
     const c=t();
-    const done=Math.max(0,Math.min(15,Number(st.current_placement_games||0)));
+    const done=clampPlacement(st.current_placement_games);
+    const fallbackBefore=Math.max(0,done-1);
+    const seenRaw=Number(st.seen_placement_games);
+    const beforeDone=Number.isFinite(seenRaw) ? Math.min(done,clampPlacement(seenRaw)) : fallbackBefore;
     const completed=!!st.current_is_ranked;
     const rank=completed?rankFor(Number(st.current_rating||0)):null;
     const emblem=completed
@@ -119,7 +139,13 @@
       : iconCache.unranked
         ? `<img src="${iconCache.unranked}" alt="Unranked">`
         : `<div class="placement-fallback-emblem" aria-hidden="true">◇</div>`;
-    const nodes=Array.from({length:15},(_,i)=>`<span class="placement-node ${i<done?'done':''} ${i===done-1?'latest':''}"></span>`).join('');
+    const nodes=Array.from({length:15},(_,i)=>{
+      const doneBefore=i<beforeDone;
+      const newlyDone=i>=beforeDone && i<done;
+      return `<span class="placement-node ${doneBefore?'done':''} ${newlyDone?'play-new-placement':''}" data-placement-index="${i+1}"></span>`;
+    }).join('');
+    const beforeFill=placementFill(beforeDone);
+    const afterFill=placementFill(done);
     return `
       <section class="placement-modal ${completed?'placement-ranked-complete':''}" role="dialog" aria-modal="true" aria-labelledby="playPlacementTitle">
         <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
@@ -130,9 +156,9 @@
         <span class="placement-rank-label">${completed?c.currentRank:c.currentStatus}</span>
         <strong class="placement-rank-name">${completed?rank.label:c.unranked}</strong>
         <div class="placement-progress-copy">${completed?`<b>${Math.round(Number(st.current_rating||0))}</b> RATING`:`${c.progress}: <b>${done}/15</b>`}</div>
-        ${completed?'':`<div class="placement-track" style="--placement-fill:${done<=1?0:((done-1)/14*93.8)}%"><i class="placement-progress-fill"></i>${nodes}</div>`}
+        ${completed?'':`<div class="placement-track" data-before-fill="${beforeFill}" data-after-fill="${afterFill}"><i class="placement-progress-fill" style="width:${beforeFill}%;transition:none"></i>${nodes}</div>`}
         <p class="placement-help">${completed?(lang()==='de'?'Ab jetzt zählt jedes weitere Game als normales Ranked-Game.':lang()==='fr'?'Les prochaines parties utilisent maintenant le système Ranked normal.':'Future games now use the normal Ranked system.'):c.help}</p>
-        <button class="cta-button" type="button" data-play-rank-close>${c.continue}</button>
+        <button class="cta-button" type="button" data-play-rank-close>${c.skip}</button>
       </section>`;
   }
 
@@ -142,10 +168,11 @@
     const after=Number(st.current_rating||before);
     const oldRank=rankFor(before),newRank=rankFor(after);
     const delta=after-before;
+    const beforePct=oldRank.key===newRank.key?pct(before,oldRank):0;
     const afterPct=pct(after,newRank);
     const gameNo=Number(st.current_finalized_games||0);
     return `
-      <section class="rank-update-modal" role="dialog" aria-modal="true" aria-labelledby="playRankTitle">
+      <section class="rank-update-modal" role="dialog" aria-modal="true" aria-labelledby="playRankTitle" data-rating-before="${before}" data-rating-after="${after}" data-before-pct="${beforePct}" data-after-pct="${afterPct}">
         <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
         <div class="rank-update-header">
           <span class="update-kicker">${c.rankKicker}${gameNo?` · GAME ${gameNo}`:''}</span>
@@ -157,14 +184,14 @@
           <i class="rank-transition-arrow">→</i>
           <div class="rank-transition-rank new-rank">${rankGraphic(newRank)}<strong>${newRank.label}</strong></div>
         </div>
-        <div class="rank-rating-change"><span>${Math.round(before)}</span><i>→</i><strong>${Math.round(after)}</strong></div>
+        <div class="rank-rating-change"><span>${Math.round(before)}</span><i>→</i><strong class="play-rating-live">${Math.round(before)}</strong></div>
         <div class="rank-delta ${delta>0?'positive':delta<0?'negative':'neutral'}">${delta>=0?'+':''}${Math.round(delta)} ${c.rating}</div>
         <div class="progress-wrap">
-          <div class="progress-meta"><span>${newRank.key==='grandmaster'?c.top:c.toNext}</span><b>${Math.round(afterPct)}%</b></div>
-          <div class="rank-progress"><i></i></div>
+          <div class="progress-meta"><span>${newRank.key==='grandmaster'?c.top:c.toNext}</span><b class="play-rank-pct-live">${Math.round(beforePct)}%</b></div>
+          <div class="rank-progress"><i style="width:${beforePct}%;transition:none"></i></div>
           <div class="progress-scale"><span>${Math.round(newRank.min)}</span><span>${newRank.key==='grandmaster'?c.top:`${Math.max(0,Math.round(newRank.high-after))} ${c.left}`}</span><span>${newRank.key==='grandmaster'?'3000+':Math.round(newRank.high)}</span></div>
         </div>
-        <button class="cta-button" type="button" data-play-rank-close>${c.continue}</button>
+        <button class="cta-button" type="button" data-play-rank-close>${c.skip}</button>
       </section>`;
   }
 
@@ -173,13 +200,12 @@
     try{window.focus();}catch(_){}
     try{document.exitPointerLock?.();}catch(_){}
     try{bloxdFrame?.blur();}catch(_){}
-    try{overlay.focus({preventScroll:true});}
-    catch(_){try{overlay.focus();}catch(__){}}
+    try{overlay.focus({preventScroll:true});}catch(_){try{overlay.focus();}catch(__){}}
   }
 
   function pauseGameForRankOverlay(){
     if (!bloxdFrame) return;
-    previousFrameTabIndex = bloxdFrame.getAttribute('tabindex');
+    previousFrameTabIndex=bloxdFrame.getAttribute('tabindex');
     bloxdFrame.setAttribute('tabindex','-1');
     bloxdFrame.style.pointerEvents='none';
     try{bloxdFrame.blur();}catch(_){}
@@ -194,32 +220,118 @@
     setTimeout(()=>{try{bloxdFrame.focus();}catch(_){}},0);
   }
 
+  function clearAnimationWork(){
+    clearTimeout(startTimer); startTimer=0;
+    clearTimeout(animationTimer); animationTimer=0;
+    clearTimeout(nodeTimer); nodeTimer=0;
+    if (ratingFrame) cancelAnimationFrame(ratingFrame);
+    ratingFrame=0;
+  }
+
+  function applyPlacementFinal(){
+    const track=overlay?.querySelector('.placement-track');
+    if (!track) return;
+    const fill=track.querySelector('.placement-progress-fill');
+    const target=Number(track.dataset.afterFill||0);
+    if (fill){fill.style.transition='none';fill.style.width=`${target}%`;}
+    track.querySelectorAll('.play-new-placement').forEach(node=>{
+      node.classList.add('done','latest','no-pop');
+    });
+  }
+
+  function applyRankFinal(){
+    const modal=overlay?.querySelector('.rank-update-modal');
+    if (!modal) return;
+    const after=Number(modal.dataset.ratingAfter||0);
+    const afterPct=Number(modal.dataset.afterPct||0);
+    const value=modal.querySelector('.play-rating-live');
+    const pctEl=modal.querySelector('.play-rank-pct-live');
+    const bar=modal.querySelector('.rank-progress i');
+    if (value) value.textContent=String(Math.round(after));
+    if (pctEl) pctEl.textContent=`${Math.round(afterPct)}%`;
+    if (bar){bar.style.transition='none';bar.style.width=`${afterPct}%`;}
+    overlay.classList.add('rank-transition-arrived');
+  }
+
+  function applyFinalVisuals(){
+    if (!activeState) return;
+    if (activeState.seen_is_ranked) applyRankFinal();
+    else applyPlacementFinal();
+  }
+
   function markAnimationDone(){
     if (!overlay || overlay.hidden) return;
-    clearTimeout(animationTimer);
-    animationTimer=0;
+    clearAnimationWork();
+    applyFinalVisuals();
     overlay.dataset.animationState='done';
-    overlay.classList.add('rank-transition-arrived');
+    updateActionButton('close');
   }
 
   function finishAnimationImmediately(){
     if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return false;
-    clearTimeout(animationTimer);
-    animationTimer=0;
+    clearAnimationWork();
     overlay.classList.add('is-instant','is-animating','rank-transition-arrived');
+    applyFinalVisuals();
     overlay.dataset.animationState='done';
+    updateActionButton('close');
     forceOverlayFocus();
     return true;
   }
 
+  function animatePlacement(){
+    const track=overlay?.querySelector('.placement-track');
+    if (!track){animationTimer=setTimeout(markAnimationDone,600);return;}
+    const fill=track.querySelector('.placement-progress-fill');
+    const target=Number(track.dataset.afterFill||0);
+    if (fill){
+      fill.style.transition=`width ${PLACEMENT_LINE_MS}ms cubic-bezier(.2,.75,.2,1)`;
+      fill.style.width=`${target}%`;
+    }
+    nodeTimer=setTimeout(()=>{
+      if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return;
+      track.querySelectorAll('.play-new-placement').forEach(node=>node.classList.add('done','latest'));
+    },PLACEMENT_LINE_MS-100);
+    animationTimer=setTimeout(markAnimationDone,PLACEMENT_ANIMATION_MS);
+  }
+
+  function animateRanked(){
+    const modal=overlay?.querySelector('.rank-update-modal');
+    if (!modal){animationTimer=setTimeout(markAnimationDone,RANK_ANIMATION_MS);return;}
+    const before=Number(modal.dataset.ratingBefore||0);
+    const after=Number(modal.dataset.ratingAfter||before);
+    const beforePct=Number(modal.dataset.beforePct||0);
+    const afterPct=Number(modal.dataset.afterPct||beforePct);
+    const value=modal.querySelector('.play-rating-live');
+    const pctEl=modal.querySelector('.play-rank-pct-live');
+    const bar=modal.querySelector('.rank-progress i');
+    if (bar){
+      bar.style.transition=`width ${RANK_ANIMATION_MS}ms cubic-bezier(.2,.75,.2,1)`;
+      bar.style.width=`${afterPct}%`;
+    }
+    overlay.classList.add('rank-transition-arrived');
+    const started=performance.now();
+    const tick=now=>{
+      if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return;
+      const p=Math.min(1,(now-started)/RANK_ANIMATION_MS);
+      const eased=1-Math.pow(1-p,3);
+      if (value) value.textContent=String(Math.round(before+(after-before)*eased));
+      if (pctEl) pctEl.textContent=`${Math.round(beforePct+(afterPct-beforePct)*eased)}%`;
+      if (p<1) ratingFrame=requestAnimationFrame(tick);
+    };
+    ratingFrame=requestAnimationFrame(tick);
+    animationTimer=setTimeout(markAnimationDone,RANK_ANIMATION_MS+60);
+  }
+
   function beginAnimation(st){
-    clearTimeout(animationTimer);
+    clearAnimationWork();
     overlay.dataset.animationState='running';
-    requestAnimationFrame(()=>{
-      if (!overlay || overlay.hidden) return;
-      overlay.classList.add('is-animating','rank-transition-arrived');
-      animationTimer=setTimeout(markAnimationDone,st.seen_is_ranked?RANK_ANIMATION_MS:PLACEMENT_ANIMATION_MS);
-    });
+    updateActionButton('skip');
+    startTimer=setTimeout(()=>{
+      if (!overlay || overlay.hidden || overlay.dataset.animationState!=='running') return;
+      overlay.classList.add('is-animating');
+      if (st.seen_is_ranked) animateRanked();
+      else animatePlacement();
+    },PRE_ANIMATION_HOLD_MS);
   }
 
   async function open(st){
@@ -227,10 +339,8 @@
     await loadCanonicalIcons();
     activeState=st;
     clearTimeout(closeTimer);
-    clearTimeout(animationTimer);
-    overlay.innerHTML = !st.seen_is_ranked ? placementMarkup(st) : ratedMarkup(st);
-    overlay.style.setProperty('--rank-before-pct',`${!st.seen_is_ranked?0:(rankFor(Number(st.seen_rating||0)).key===rankFor(Number(st.current_rating||0)).key?pct(Number(st.seen_rating||0),rankFor(Number(st.seen_rating||0))):0)}%`);
-    overlay.style.setProperty('--rank-after-pct',`${!st.seen_is_ranked?0:pct(Number(st.current_rating||0),rankFor(Number(st.current_rating||0)))}%`);
+    clearAnimationWork();
+    overlay.innerHTML=!st.seen_is_ranked?placementMarkup(st):ratedMarkup(st);
     overlay.hidden=false;
     overlay.classList.remove('is-closing','is-instant','is-animating','rank-transition-arrived');
     overlay.dataset.animationState='idle';
@@ -239,9 +349,7 @@
     void overlay.offsetWidth;
     overlay.classList.add('is-open');
     forceOverlayFocus();
-    [20,60,120,240].forEach(delay=>setTimeout(()=>{
-      if (overlay && !overlay.hidden) forceOverlayFocus();
-    },delay));
+    [20,60,120,240].forEach(delay=>setTimeout(()=>{if (overlay && !overlay.hidden) forceOverlayFocus();},delay));
     beginAnimation(st);
     try{window.postMessage({type:'OVERLAY_OPEN'},'*');}catch(_){}
   }
@@ -249,9 +357,7 @@
   async function handleClose(instant){
     if (!overlay || overlay.hidden) return;
     if (!instant && finishAnimationImmediately()) return;
-
-    clearTimeout(animationTimer);
-    animationTimer=0;
+    clearAnimationWork();
     try{await acknowledge();}catch(error){console.warn('[The HUB] Could not acknowledge PLAY rank update',error);}
     overlay.classList.add('is-closing');
     overlay.classList.remove('is-open');
@@ -296,9 +402,10 @@
   },true);
 
   document.addEventListener('keydown',event=>{
-    if (!overlay || overlay.hidden || (event.code!=='Space' && event.key!==' ')) return;
+    if (!overlay || overlay.hidden || (event.code!=='Space'&&event.key!==' ')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (event.repeat) return;
     if (!finishAnimationImmediately()) handleClose(false);
   },true);
 })();
