@@ -5,7 +5,7 @@
   const SUPABASE_KEY = "sb_publishable_TawTg_9H-hw2TDWFyHH3ow_PTPPfoND";
   const CHANNEL_NAME = "hub-map-intros-v1";
   const EVENT_NAME = "map_intro";
-  const CSS_SRC = "map-intros/map-intros.css?v=20260916a";
+  const CSS_SRC = "map-intros/map-intros.css?v=20260916b";
   const MAPS = {
     SG7: {
       key: "SG7",
@@ -57,6 +57,9 @@
 
   function buildOverlay() {
     if (overlay) return overlay;
+    const gameStage = document.getElementById("gameStage");
+    if (!gameStage) return null;
+
     overlay = document.createElement("section");
     overlay.id = "hubMapIntroOverlay";
     overlay.hidden = true;
@@ -81,7 +84,7 @@
       </div>
       <audio class="hub-map-intro-audio" preload="auto"></audio>
     `;
-    document.body.appendChild(overlay);
+    gameStage.appendChild(overlay);
     audio = overlay.querySelector(".hub-map-intro-audio");
     return overlay;
   }
@@ -150,7 +153,7 @@
     const config = MAPS[mapKey];
     if (!config) return;
 
-    buildOverlay();
+    if (!buildOverlay()) return;
     const image = overlay.querySelector(".hub-map-intro-image");
     const title = overlay.querySelector(".hub-map-intro-title");
     const kicker = overlay.querySelector(".hub-map-intro-kicker");
