@@ -1,0 +1,128 @@
+/*
+ * HUB Map Intros - isolated visual layer.
+ * Removing this file + play-map-intros.js removes the entire player-side feature.
+ */
+#hubMapIntroOverlay[hidden]{display:none!important}
+#hubMapIntroOverlay{
+  position:fixed;
+  inset:0;
+  z-index:2147483000;
+  overflow:hidden;
+  background:#05030a;
+  color:#fff;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .24s ease;
+  font-family:Montserrat,Arial,Helvetica,sans-serif;
+}
+#hubMapIntroOverlay.is-open{
+  opacity:1;
+  pointer-events:auto;
+}
+#hubMapIntroOverlay.is-closing{opacity:0}
+#hubMapIntroOverlay .hub-map-intro-image,
+#hubMapIntroOverlay .hub-map-intro-vignette{
+  position:absolute;
+  inset:0;
+}
+#hubMapIntroOverlay .hub-map-intro-image{
+  background-size:cover;
+  background-position:center center;
+  transform:scale(1.012);
+}
+#hubMapIntroOverlay .hub-map-intro-vignette{
+  background:
+    radial-gradient(circle at 84% 82%,rgba(0,0,0,0) 0 15%,rgba(0,0,0,.08) 38%,rgba(0,0,0,.46) 80%,rgba(0,0,0,.72) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.03),rgba(0,0,0,.10) 55%,rgba(0,0,0,.30));
+}
+#hubMapIntroOverlay .hub-map-intro-footer{
+  position:absolute;
+  right:52px;
+  bottom:42px;
+  display:flex;
+  align-items:center;
+  gap:110px;
+}
+#hubMapIntroOverlay .hub-map-intro-text{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+}
+#hubMapIntroOverlay .hub-map-intro-kicker{
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.24em;
+  color:rgba(255,255,255,.72);
+}
+#hubMapIntroOverlay .hub-map-intro-title{
+  font-size:66px;
+  line-height:.92;
+  font-weight:900;
+  letter-spacing:.04em;
+  text-shadow:0 8px 28px rgba(0,0,0,.48);
+}
+#hubMapIntroOverlay .hub-map-intro-loader{
+  position:relative;
+  width:150px;
+  height:150px;
+  flex:0 0 150px;
+}
+#hubMapIntroOverlay .hub-map-intro-logo{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:104px;
+  max-height:72px;
+  height:auto;
+  object-fit:contain;
+  transform:translate(-50%,-50%);
+  z-index:4;
+  filter:drop-shadow(0 10px 24px rgba(0,0,0,.42));
+}
+#hubMapIntroOverlay .hub-map-intro-inner-spinner,
+#hubMapIntroOverlay .hub-map-intro-outer-spinner{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+#hubMapIntroOverlay .hub-map-intro-inner-spinner{
+  z-index:2;
+  animation:hubMapIntroSpin 3.13s linear infinite;
+}
+#hubMapIntroOverlay .hub-map-intro-outer-spinner{
+  z-index:1;
+  animation:hubMapIntroSpinReverse 2.1s linear infinite;
+}
+#hubMapIntroOverlay .hub-map-intro-inner-spinner svg,
+#hubMapIntroOverlay .hub-map-intro-outer-spinner svg{
+  display:block;
+  width:100%;
+  height:100%;
+  transform:rotate(-90deg);
+}
+#hubMapIntroOverlay .hub-map-intro-gold-arc{
+  fill:none;
+  stroke:#ffd20d;
+  stroke-width:10;
+  stroke-linecap:butt;
+  stroke-dasharray:126 264;
+  filter:drop-shadow(0 0 4px rgba(255,210,13,.28));
+}
+#hubMapIntroOverlay .hub-map-intro-grey-arc{
+  fill:none;
+  stroke:#8d8b8b;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-dasharray:357 89;
+}
+@keyframes hubMapIntroSpin{to{transform:rotate(360deg)}}
+@keyframes hubMapIntroSpinReverse{to{transform:rotate(-360deg)}}
+@media(max-width:800px){
+  #hubMapIntroOverlay .hub-map-intro-footer{right:24px;bottom:24px;gap:100px}
+  #hubMapIntroOverlay .hub-map-intro-title{font-size:54px}
+  #hubMapIntroOverlay .hub-map-intro-loader{width:126px;height:126px;flex-basis:126px}
+  #hubMapIntroOverlay .hub-map-intro-logo{width:88px;max-height:62px}
+}
