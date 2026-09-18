@@ -267,7 +267,14 @@
     const low=card.querySelector('#updateLow');
     const high=card.querySelector('#updateHigh');
     const remaining=card.querySelector('#updateRemaining');
-    if (iconWrap) iconWrap.innerHTML=rankGraphic(rank);
+    if (iconWrap) {
+      const nextGraphic=document.createElement('div');
+      nextGraphic.innerHTML=rankGraphic(rank);
+      const nextNode=nextGraphic.firstElementChild;
+      const currentGraphic=Array.from(iconWrap.children).find(el=>!el.classList.contains('rankup-flare'));
+      if (currentGraphic && nextNode) currentGraphic.replaceWith(nextNode);
+      else if (nextNode) iconWrap.appendChild(nextNode);
+    }
     if (rankNameEl) rankNameEl.textContent=rank.label;
     if (title) title.textContent=progressTitle(rank);
     if (pctEl) pctEl.textContent=`${Math.round(progressValue)}%`;
