@@ -192,12 +192,11 @@
         data-rating-before="${before}" data-rating-after="${after}" data-before-pct="${beforePct}" data-after-pct="${afterPct}"
         data-old-rank="${oldRank.key}" data-new-rank="${newRank.key}" data-rank-changed="${rankChanged?'1':'0'}" data-rank-up="${rankUp?'1':'0'}">
         <button class="modal-close" type="button" data-play-rank-close aria-label="Close">×</button>
-        <div class="rankup-flare" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="rank-update-grid">
           <div class="rank-update-visual">
             <span class="update-kicker" id="updateKicker">${c.rankKicker}${gameNo?` · GAME ${gameNo}`:''}</span>
             <h2 id="rankUpdateTitle">${c.rankTitle}</h2>
-            <div class="update-rank-icon" id="updateRankIconWrap">${rankGraphic(oldRank)}</div>
+            <div class="update-rank-icon" id="updateRankIconWrap"><div class="rankup-flare" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>${rankGraphic(oldRank)}</div>
             <span class="update-rank-name" id="updateRankName">${oldRank.label}</span>
             <div class="rankup-message" id="rankUpMessage" hidden><small>${c.rankUp}</small><strong id="newRankName">${newRank.label}</strong></div>
           </div>
