@@ -376,23 +376,34 @@ body.hub-play-rank-update-open #bloxdFrame{pointer-events:none!important;user-se
 #playRankUpdateOverlay .rankup-message small{color:#39e2d1;font-size:10px;font-weight:900;letter-spacing:.2em}
 #playRankUpdateOverlay .rankup-message strong{font-family:"Pixelify Sans",Montserrat,sans-serif;font-size:31px;text-transform:uppercase;text-shadow:0 0 26px rgba(56,240,219,.25)}
 
-#playRankUpdateOverlay .rankup-flare{position:absolute;inset:0;pointer-events:none;opacity:0}
-#playRankUpdateOverlay .rankup-flare i{
+#playRankUpdateOverlay .update-rank-icon .rankup-flare{
   position:absolute;
+  z-index:2;
   left:50%;
-  top:46%;
-  width:4px;
-  height:160px;
-  border-radius:10px;
-  background:linear-gradient(transparent,#38f0db,transparent);
+  top:50%;
+  width:1px;
+  height:1px;
+  overflow:visible;
+  pointer-events:none;
+  opacity:0;
+}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i{
+  position:absolute;
+  left:0;
+  top:0;
+  width:5px;
+  height:180px;
+  border-radius:999px;
+  background:linear-gradient(180deg,transparent 0%,rgba(255,255,255,.25) 18%,#38f0db 65%,#ab61ff 100%);
+  box-shadow:0 0 22px rgba(56,240,219,.48);
   transform-origin:50% 100%;
 }
-#playRankUpdateOverlay .rankup-flare i:nth-child(1){transform:translate(-50%,-100%) rotate(0deg)}
-#playRankUpdateOverlay .rankup-flare i:nth-child(2){transform:translate(-50%,-100%) rotate(60deg)}
-#playRankUpdateOverlay .rankup-flare i:nth-child(3){transform:translate(-50%,-100%) rotate(120deg)}
-#playRankUpdateOverlay .rankup-flare i:nth-child(4){transform:translate(-50%,-100%) rotate(180deg)}
-#playRankUpdateOverlay .rankup-flare i:nth-child(5){transform:translate(-50%,-100%) rotate(240deg)}
-#playRankUpdateOverlay .rankup-flare i:nth-child(6){transform:translate(-50%,-100%) rotate(300deg)}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i:nth-child(1){transform:translate(-50%,-100%) rotate(0deg)}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i:nth-child(2){transform:translate(-50%,-100%) rotate(60deg)}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i:nth-child(3){transform:translate(-50%,-100%) rotate(120deg)}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i:nth-child(4){transform:translate(-50%,-100%) rotate(180deg)}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i:nth-child(5){transform:translate(-50%,-100%) rotate(240deg)}
+#playRankUpdateOverlay .update-rank-icon .rankup-flare i:nth-child(6){transform:translate(-50%,-100%) rotate(300deg)}
 #playRankUpdateOverlay #rankUpdateCard.rank-up{
   animation:playRankCardPulse var(--hub-rank-pulse-duration,2.33s) ease var(--hub-rank-pulse-delay,3.67s) both;
 }
