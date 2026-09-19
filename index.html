@@ -2377,8 +2377,21 @@ window.HubAPI = (() => {
     });
   }
 
-  function openAccountMenu() {
-    if(!live.session || !live.player) return openAuth('login');
+  let accountMenuShouldStayOpen=false;
+  let accountMenuRestoreQueued=false;
+  const accountModalObserver=new MutationObserver(()=>{
+    if(!accountMenuShouldStayOpen||accountMenuRestoreQueued||document.getElementById('v3AccountModal')||!live.session||!live.player)return;
+    accountMenuRestoreQueued=true;
+    queueMicrotask(()=>{
+      accountMenuRestoreQueued=false;
+      if(accountMenuShouldStayOpen&&!document.getElementById('v3AccountModal')&&live.session&&live.player)openAccountMenu(true);
+    });
+  });
+  accountModalObserver.observe(document.body,{childList:true});
+
+  function openAccountMenu(recovered=false) {
+    if(!live.session || !live.player){accountMenuShouldStayOpen=false;return openAuth('login');}
+    accountMenuShouldStayOpen=true;
     const m=modalShell('v3AccountModal',`<section class="v3-modal v3-account-modal">
       <button class="modal-close" data-v3-close type="button">×</button>
       <span class="eyebrow">ACCOUNT</span><h2>${escapeHtml(live.player.current_name)}</h2>
@@ -2388,9 +2401,13 @@ window.HubAPI = (() => {
         <button class="ghost-button wide danger" id="v3Logout">${copy('Log out','Abmelden','Se déconnecter')}</button>
       </div>
     </section>`);
-    $('#v3GoProfile',m).onclick=()=>{m.remove();openOwnProfile();};
-    $('#v3ChangePassword',m).onclick=()=>{m.remove();openPasswordModal();};
-    $('#v3Logout',m).onclick=async()=>{try{if(window.HubPresenceClear)await window.HubPresenceClear();}catch(_){}await api.logout();m.remove();await restoreAuth(false);setPage('cup');toast(copy('Logged out.','Abgemeldet.','Déconnecté.'));};
+    m.dataset.accountPersistent='1';
+    m.addEventListener('click',e=>{
+      if(e.target===m||e.target.closest('[data-v3-close]')) accountMenuShouldStayOpen=false;
+    },true);
+    $('#v3GoProfile',m).onclick=()=>{accountMenuShouldStayOpen=false;m.remove();openOwnProfile();};
+    $('#v3ChangePassword',m).onclick=()=>{accountMenuShouldStayOpen=false;m.remove();openPasswordModal();};
+    $('#v3Logout',m).onclick=async()=>{accountMenuShouldStayOpen=false;try{if(window.HubPresenceClear)await window.HubPresenceClear();}catch(_){}await api.logout();m.remove();await restoreAuth(false);setPage('cup');toast(copy('Logged out.','Abgemeldet.','Déconnecté.'));};
   }
 
   function openPasswordModal() {
@@ -2490,22 +2507,27 @@ window.HubAPI = (() => {
 
   async function syncOwnProfileToUi() {
     if(!live.player)return;
+    const previousOwn=state.ownPlayer;
+    const viewedProfile=state.profilePlayer;
+    const viewingOwn=!viewedProfile||viewedProfile===previousOwn||viewedProfile===live.player.current_name;
     cacheAvatar(live.player); ensureDemoPlayer(live.player);
-    state.ownPlayer=live.player.current_name; state.profilePlayer=live.player.current_name;
-    const name=$('#profilePlayerName');if(name)name.textContent=live.player.current_name;
-    const av=$('#profileAvatar');if(av&&live.player.avatar_pixels)av.src=pixelDataUrl(live.player.avatar_pixels);
-    const owns=state?.profilePlayer===state?.ownPlayer;
-    $('#editAvatarButton')?.toggleAttribute('hidden',!owns); $('#renameButton')?.toggleAttribute('hidden',!owns);
-    if(live.player.ranking_experience_enabled!==false){
-      if(live.player.is_ranked){
-        const rank=rankKey(Number(live.player.rating));
-        if($('#profileRankName'))$('#profileRankName').textContent=rankLabel(rank);
-        if($('#profileRating'))$('#profileRating').textContent=Math.round(Number(live.player.rating));
-        if($('#profilePeak'))$('#profilePeak').textContent=`Peak: ${Math.round(Number(live.player.peak_rating||live.player.rating))}`;
+    state.ownPlayer=live.player.current_name;
+    if(viewingOwn){
+      state.profilePlayer=live.player.current_name;
+      const name=$('#profilePlayerName');if(name)name.textContent=live.player.current_name;
+      const av=$('#profileAvatar');if(av&&live.player.avatar_pixels)av.src=pixelDataUrl(live.player.avatar_pixels);
+      $('#editAvatarButton')?.removeAttribute('hidden'); $('#renameButton')?.removeAttribute('hidden');
+      if(live.player.ranking_experience_enabled!==false){
+        if(live.player.is_ranked){
+          const rank=rankKey(Number(live.player.rating));
+          if($('#profileRankName'))$('#profileRankName').textContent=rankLabel(rank);
+          if($('#profileRating'))$('#profileRating').textContent=Math.round(Number(live.player.rating));
+          if($('#profilePeak'))$('#profilePeak').textContent=`Peak: ${Math.round(Number(live.player.peak_rating||live.player.rating))}`;
+        }
+        if(live.stats) renderLiveStats(live.stats);
       }
-      if(live.stats) renderLiveStats(live.stats);
+      renderPlacementOwnProfile();
     }
-    renderPlacementOwnProfile();
     if(live.player.avatar_reset_notice){toast(copy('Your profile picture was reset by an administrator.','Dein Profilbild wurde von einem Administrator zurückgesetzt.','Ton image de profil a été réinitialisée par un administrateur.'));api.acknowledgeAvatarReset().catch(()=>{});live.player.avatar_reset_notice=false;}
     addRankingPreferenceButton();
   }
@@ -3109,9 +3131,18 @@ window.HubAPI = (() => {
     const friends=real.social?.friends||[];const others=(live.globalPlayers||[]).filter(p=>p.id!==live.player.id&&!friends.some(f=>f.id===p.id));const opts=(arr)=>arr.map(p=>`<option value="${p.id}">${esc(p.current_name)}</option>`).join('');const m=document.createElement('div');m.id='v3RegisterLive';m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal"><button class="modal-close" data-v3-reg-close>×</button><span class="eyebrow">${esc(cup.name)} · ${MODE[cup.mode]}</span><h2>${copy('Register team','Team anmelden','Inscrire l’équipe')}</h2><p>${copy('Your team is only registered after every invited player accepts.','Euer Team ist erst angemeldet, wenn alle eingeladenen Spieler angenommen haben.','L’équipe est confirmée seulement après acceptation de tous les invités.')}</p><form id="v3RegForm">${Array.from({length:needed},(_,i)=>`<label><span>${copy('Player','Spieler','Joueur')} ${i+2}</span><select class="v3-reg-mate" required><option value="">${copy('Select player …','Spieler auswählen …','Choisir un joueur …')}</option>${friends.length?`<optgroup label="${copy('Friends','Freunde','Amis')}">${opts(friends)}</optgroup>`:''}<optgroup label="${copy('Other players','Andere Spieler','Autres joueurs')}">${opts(others)}</optgroup></select></label>`).join('')}<div class="v3-form-error" id="v3RegErr"></div><button class="cta-button wide">${copy('Send invitation','Einladung senden','Envoyer l’invitation')}</button></form></section>`;document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-v3-reg-close]'))m.remove();});$('#v3RegForm',m).onsubmit=async e=>{e.preventDefault();const ids=$$('.v3-reg-mate',m).map(s=>s.value);if(new Set(ids).size!==ids.length){$('#v3RegErr',m).textContent=copy('Choose different players.','Wähle unterschiedliche Spieler.','Choisis des joueurs différents.');return;}e.submitter.disabled=true;try{await api.createCupRegistration(cup.id,ids);m.remove();real.cupCache.delete(cup.id);toast(copy('Invitation sent. Registration is pending until everyone accepts.','Einladung gesendet. Die Anmeldung ist ausstehend, bis alle angenommen haben.','Invitation envoyée.'));await refreshSocial();await refreshCups();}catch(err){$('#v3RegErr',m).textContent=err.message;e.submitter.disabled=false;}};
   }
 
-  function openCupTeamProfile(teamId){
-    const cup=real.cups.find(c=>c.id===real.selectedCupId),data=real.cupCache.get(real.selectedCupId);if(!cup||!data)return;
-    const team=data.teams.find(t=>t.id===teamId),players=data.players.filter(p=>p.team_id===teamId);if(!team||!players.length)return;
+  async function openCupTeamProfile(teamId){
+    try{
+      const selected=String(real.selectedCupId??'');
+      let cup=real.cups.find(c=>String(c.id)===selected);
+      if(!cup){await refreshCups();cup=real.cups.find(c=>String(c.id)===String(real.selectedCupId??''));}
+      if(!cup)return;
+      let data=real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id));
+      if(!data)data=await cupData(cup.id,true);
+      let team=data?.teams?.find(t=>String(t.id)===String(teamId));
+      if(!team){data=await cupData(cup.id,true);team=data?.teams?.find(t=>String(t.id)===String(teamId));}
+      const players=(data?.players||[]).filter(p=>String(p.team_id)===String(team?.id??teamId));
+      if(!team||!players.length)return;
     const stats=players.map(p=>statsForPlayer(p,data)),total=stats.reduce((a,b)=>a+b.points,0),kills=stats.reduce((a,b)=>a+b.k,0),dm=stats.reduce((a,b)=>a+b.dm,0),wins=stats.reduce((a,b)=>a+b.w,0);
     const modal=$('#teamDetailModal');if(!modal)return;
     $('#teamDetailTitle').textContent=players.map(p=>p.name).join(' + ');
@@ -3129,11 +3160,21 @@ window.HubAPI = (() => {
       const rows=Array.from({length:Number(cup.current_round||0)},(_,i)=>`<div class="v3-generic-round-row"><strong>${i+1}</strong>${players.map(p=>{const st=roundStatsForPlayer(p,data,i+1);return `<span>${st.points} PTS · ${st.k} K · ${st.dm} DM · ${st.w} W</span>`;}).join('')}</div>`).join('');
       $('#teamRoundTable').className='v3-generic-round-table';$('#teamRoundTable').innerHTML=head+rows;
     }
-    modal.hidden=false;
+      modal.hidden=false;
+    }catch(err){console.error('open Cup team profile',err);toast?.(err?.message||String(err),true);}
   }
-  function openCupPlayerProfile(playerId){
-    const cup=real.cups.find(c=>c.id===real.selectedCupId),data=real.cupCache.get(real.selectedCupId),p=data?.players.find(x=>x.id===playerId);if(!cup||!data||!p)return;
-    const s=statsForPlayer(p,data),team=data.teams.find(t=>t.id===p.team_id),members=data.players.filter(x=>x.team_id===p.team_id),ranked=competitionRanks(data.players.slice(),x=>statsForPlayer(x,data).points),placement=ranked.find(x=>x.x.id===p.id)?.rank||'—';
+  async function openCupPlayerProfile(playerId){
+    try{
+      const selected=String(real.selectedCupId??'');
+      let cup=real.cups.find(c=>String(c.id)===selected);
+      if(!cup){await refreshCups();cup=real.cups.find(c=>String(c.id)===String(real.selectedCupId??''));}
+      if(!cup)return;
+      let data=real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id));
+      if(!data)data=await cupData(cup.id,true);
+      let p=data?.players?.find(x=>String(x.id)===String(playerId));
+      if(!p){data=await cupData(cup.id,true);p=data?.players?.find(x=>String(x.id)===String(playerId));}
+      if(!data||!p)return;
+    const s=statsForPlayer(p,data),team=data.teams.find(t=>String(t.id)===String(p.team_id)),members=data.players.filter(x=>String(x.team_id)===String(p.team_id)),ranked=competitionRanks(data.players.slice(),x=>statsForPlayer(x,data).points),placement=ranked.find(x=>String(x.x.id)===String(p.id))?.rank||'—';
     const modal=$('#cupPlayerDetailModal');if(!modal)return;
     $('#cupPlayerDetailTitle').textContent=p.name;
     $('#cupPlayerDetailSummary').innerHTML=[
@@ -3142,7 +3183,8 @@ window.HubAPI = (() => {
     $('#cupPlayerCardWrap').innerHTML=`<article><h3><button type="button" data-profile-player="${esc(p.name)}">${esc(p.name)} ↗</button></h3><div class="player-mini-stats single-player-stats"><div><span>Points</span><b>${s.points}</b></div><div><span>Kills</span><b>${s.k}</b></div><div><span>DM</span><b>${s.dm}</b></div><div><span>${copy('Wins','Siege','Victoires')}</span><b>${s.w}</b></div><div><span>${copy('Deaths','Tode','Morts')}</span><b>${cupDeaths(p,cup,data)}</b></div></div></article>`;
     const head=`<div class="team-round-row head individual-round-head"><span>${copy('Round','Runde','Manche')}</span><span>${copy('Player','Spieler','Joueur')}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span></div>`;
     const rows=Array.from({length:Number(cup.current_round||0)},(_,i)=>{const r=i+1,st=roundStatsForPlayer(p,data,r);return `<div class="team-round-row individual-round-row"><strong class="${st.w?'winner':''}">${r}</strong><strong>${esc(p.name)}</strong><span class="round-total">${st.points}</span><span>${st.k}</span><span>${st.dm}</span><span>${st.w}</span></div>`;}).join('');
-    const table=$('#cupPlayerRoundTable');table.className='team-round-table individual-round-table';table.innerHTML=head+rows;modal.hidden=false;
+      const table=$('#cupPlayerRoundTable');table.className='team-round-table individual-round-table';table.innerHTML=head+rows;modal.hidden=false;
+    }catch(err){console.error('open Cup player profile',err);toast?.(err?.message||String(err),true);}
   }
 
   function profileBounds(r){if(r>=2000)return{low:2000,high:3000,next:null};if(r>=1750)return{low:1750,high:2000,next:'grandmaster'};if(r>=1500)return{low:1500,high:1750,next:'master'};if(r>=1250)return{low:1250,high:1500,next:'diamond'};if(r>=1000)return{low:1000,high:1250,next:'emerald'};if(r>=750)return{low:750,high:1000,next:'gold'};return{low:0,high:750,next:'iron'};}
@@ -3550,6 +3592,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
       const teamModal=$('#teamDetailModal'), playerModal=$('#cupPlayerDetailModal');
       if(teamModal)teamModal.hidden=true;
       if(playerModal)playerModal.hidden=true;
+      state.profilePlayer=pp.dataset.profilePlayer;
       setPage('profile');
       setTimeout(()=>renderProfileLive(pp.dataset.profilePlayer),0);
       return;
@@ -3653,7 +3696,12 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
   async function refreshForAuth(){
     try{live.globalPlayers=await api.getGlobalPlayers();await refreshFakeProfiles();}catch(_){}
     renderRealRanking();await renderOwnOverview();await refreshSocial();await refreshCups();ensureFinalizeButton();
-    if(location.hash==='#profile'&&live.player)await renderProfileLive(live.player.current_name);startPresence();
+    if(location.hash==='#profile'&&live.player){
+      const requested=window.state?.profilePlayer;
+      const exists=requested&&(requested===live.player.current_name||live.globalPlayers.some(p=>p.current_name===requested));
+      await renderProfileLive(exists?requested:live.player.current_name);
+    }
+    startPresence();
   }
   async function boot(){
     // Keep the legacy/demo markup hidden until the real Supabase state has replaced it.
