@@ -1303,7 +1303,7 @@ function applyLanguage(lang){
 window.HubAnimationUX=window.HubAnimationUX||{
   current:null,atFinal:true,
   label(final=false){
-    const lang=(window.state?.lang||document.documentElement.lang||'de');
+    const lang=(state?.lang||document.documentElement.lang||'de');
     if(final)return lang==='de'?'WEITER':lang==='fr'?'CONTINUER':'CONTINUE';
     return lang==='de'?'ANIMATION ÜBERSPRINGEN':lang==='fr'?"PASSER L’ANIMATION":'SKIP ANIMATION';
   },
@@ -1781,7 +1781,7 @@ window.addEventListener("hashchange",()=>setPage(location.hash.replace("#","")||
       clearTimeout(window.simulatePlacementRatingEvent._finishTimer);
       if(completed){
         const rating=Math.round(Number(payload.rating)),key=payload.rankAfter||getRankKey(rating),kicker=modal.querySelector('#placementKicker'),title=modal.querySelector('#placementTitle'),subtitle=modal.querySelector('#placementSubtitle'),status=modal.querySelector('#placementStatusLabel'),name=modal.querySelector('#placementRankName'),copyEl=modal.querySelector('#placementProgressCopy'),help=modal.querySelector('#placementHelp'),img=modal.querySelector('.unranked-badge-wrap img');
-        const lang=(window.state?.lang||document.documentElement.lang||'de');modal.classList.add('placement-ranked-complete');
+        const lang=(state?.lang||document.documentElement.lang||'de');modal.classList.add('placement-ranked-complete');
         if(kicker)kicker.textContent=lang==='de'?'EINRANKUNG ABGESCHLOSSEN':lang==='fr'?'CLASSEMENT TERMINÉ':'PLACEMENTS COMPLETE';
         if(title)title.textContent=lang==='de'?'DEIN RANG':lang==='fr'?'TON RANG':'YOUR RANK';
         if(subtitle)subtitle.textContent=lang==='de'?'Deine 15 Einrankungsmatches sind abgeschlossen.':lang==='fr'?'Tes 15 matchs de placement sont terminés.':'Your 15 placement games are complete.';
@@ -2325,7 +2325,7 @@ window.HubAPI = (() => {
 
   const $ = (s, root=document) => root.querySelector(s);
   const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-  const lang = () => (window.state?.lang || document.documentElement.lang || 'en');
+  const lang = () => (state?.lang || document.documentElement.lang || 'en');
   const copy = (en,de,fr) => lang()==='de'?de:lang()==='fr'?fr:en;
 
   function toast(message, bad=false) {
@@ -2861,6 +2861,7 @@ window.HubAPI = (() => {
   const COLORS=[['Lime Green','#7CFC00'],['Cyan','#00DCEB'],['Dark Blue','#1E3A8A'],['Pink','#EC4899'],['Dark Green','#166534'],['White','#F8FAFC'],['Brown','#8B5E3C'],['Orange','#F97316'],['Yellow','#FACC15'],['Purple','#7E22CE'],['Magenta','#D946EF'],['Baby Blue','#7DD3FC']];
   const COLOR_MAP=new Map(COLORS.map(x=>[x[0].toLowerCase(),x]));
   const real={social:null,cups:[],selectedCupId:null,adminCupId:null,adminRound:1,cupCache:new Map(),refreshTimer:0,fakeProfiles:[],onlinePlayers:[],myHistory:[],adminAccounts:[],adminSection:'cups',presenceTimer:0,presenceSession:null};
+  const sameId=(a,b)=>String(a??'')===String(b??'');
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const px=p=>Array.isArray(p)&&p.length===256?core.pixelDataUrl(p):'';
@@ -3029,8 +3030,10 @@ window.HubAPI = (() => {
     ensureUpcomingColumnLayout();
     try{
       real.cups=await api.getTournaments(); live.tournaments=real.cups;
-      if(!real.selectedCupId||!real.cups.some(c=>c.id===real.selectedCupId)) real.selectedCupId=defaultPublicCup()?.id||null;
-      if(!real.adminCupId||!real.cups.some(c=>c.id===real.adminCupId)) real.adminCupId=(real.cups.find(c=>c.status==='live')||real.cups.find(c=>c.status==='registration')||real.cups[0])?.id||null;
+      const selectedCup=real.cups.find(c=>sameId(c.id,real.selectedCupId));
+      real.selectedCupId=selectedCup?.id??defaultPublicCup()?.id??null;
+      const selectedAdminCup=real.cups.find(c=>sameId(c.id,real.adminCupId));
+      real.adminCupId=selectedAdminCup?.id??(real.cups.find(c=>c.status==='live')||real.cups.find(c=>c.status==='registration')||real.cups[0])?.id??null;
       renderCupNav(); await renderSelectedCup(); if(live.isAdmin)await renderAdminLive();
     }catch(err){console.error('cup refresh',err);}
   }
@@ -3038,7 +3041,7 @@ window.HubAPI = (() => {
     const active=real.cups.find(c=>c.status==='live')||real.cups.find(c=>c.status==='registration');
     const badge=$('.primary-nav .cup-priority em'); if(badge){badge.className='';if(active?.status==='live'){badge.textContent='LIVE';badge.classList.add('cup-status-live');}else if(active?.status==='registration'){badge.textContent=copy('REGISTER','ANMELDEN','INSCRIPTION');badge.classList.add('cup-status-register');}else{badge.textContent='';badge.classList.add('cup-status-hidden');}}
     const top=$('.next-cup-cta');if(top)top.hidden=!real.cups.some(c=>c.status==='registration');
-    const sel=$('#cupSelect');if(sel){sel.innerHTML=real.cups.map(c=>`<option value="${c.id}" ${c.id===real.selectedCupId?'selected':''}>${esc(c.name)}${c.status==='live'?' · LIVE':c.status==='registration'?` · ${copy('Registration','Anmeldung','Inscription')}`:''}</option>`).join('');}
+    const sel=$('#cupSelect');if(sel){sel.innerHTML=real.cups.map(c=>`<option value="${c.id}" ${sameId(c.id,real.selectedCupId)?'selected':''}>${esc(c.name)}${c.status==='live'?' · LIVE':c.status==='registration'?` · ${copy('Registration','Anmeldung','Inscription')}`:''}</option>`).join('');}
     updateOverviewCupCards();
   }
   function formatDate(v){if(!v)return '—';try{return new Intl.DateTimeFormat(document.documentElement.lang||'en',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v));}catch{return v;}}
@@ -3050,7 +3053,8 @@ window.HubAPI = (() => {
   function cupDeaths(player,cup,data){const s=statsForPlayer(player,data);return Math.max(0,Number(cup.current_round||0)-s.w);}
   function maxRoundPoints(player,cup,data){let m=0;for(let r=1;r<=Number(cup.current_round||0);r++)m=Math.max(m,roundStatsForPlayer(player,data,r).points);return m;}
   async function renderSelectedCup(){
-    const cup=real.cups.find(c=>c.id===real.selectedCupId);if(!cup)return;
+    const cup=real.cups.find(c=>sameId(c.id,real.selectedCupId));if(!cup)return;
+    real.selectedCupId=cup.id;
     const data=await cupData(cup.id,true);
     const upcoming=['draft','registration'].includes(cup.status); if($('#pastCupView'))$('#pastCupView').hidden=upcoming;if($('#upcomingCupView'))$('#upcomingCupView').hidden=!upcoming;
     if(upcoming)await renderUpcomingCup(cup,data); else renderPastCup(cup,data);
@@ -3133,10 +3137,15 @@ window.HubAPI = (() => {
 
   async function openCupTeamProfile(teamId){
     try{
-      const selected=String(real.selectedCupId??'');
-      let cup=real.cups.find(c=>String(c.id)===selected);
-      if(!cup){await refreshCups();cup=real.cups.find(c=>String(c.id)===String(real.selectedCupId??''));}
+      const selected=String($('#cupSelect')?.value||real.selectedCupId||'');
+      let cup=real.cups.find(c=>sameId(c.id,selected));
+      if(!cup){
+        await refreshCups();
+        const retrySelected=String($('#cupSelect')?.value||real.selectedCupId||'');
+        cup=real.cups.find(c=>sameId(c.id,retrySelected));
+      }
       if(!cup)return;
+      real.selectedCupId=cup.id;
       let data=real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id));
       if(!data)data=await cupData(cup.id,true);
       let team=data?.teams?.find(t=>String(t.id)===String(teamId));
@@ -3165,10 +3174,15 @@ window.HubAPI = (() => {
   }
   async function openCupPlayerProfile(playerId){
     try{
-      const selected=String(real.selectedCupId??'');
-      let cup=real.cups.find(c=>String(c.id)===selected);
-      if(!cup){await refreshCups();cup=real.cups.find(c=>String(c.id)===String(real.selectedCupId??''));}
+      const selected=String($('#cupSelect')?.value||real.selectedCupId||'');
+      let cup=real.cups.find(c=>sameId(c.id,selected));
+      if(!cup){
+        await refreshCups();
+        const retrySelected=String($('#cupSelect')?.value||real.selectedCupId||'');
+        cup=real.cups.find(c=>sameId(c.id,retrySelected));
+      }
       if(!cup)return;
+      real.selectedCupId=cup.id;
       let data=real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id));
       if(!data)data=await cupData(cup.id,true);
       let p=data?.players?.find(x=>String(x.id)===String(playerId));
@@ -3565,7 +3579,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     const cd=e.target.closest('[data-v3-cup-decline]');if(cd){e.preventDefault();e.stopImmediatePropagation();api.respondCupInvite(cd.dataset.v3CupDecline,false).then(refreshSocial).catch(x=>toast(x.message,true));return;}
     const ct=e.target.closest('[data-v3-cup-team]');if(ct){e.preventDefault();e.stopImmediatePropagation();openCupTeamProfile(ct.dataset.v3CupTeam);return;}
     const cp=e.target.closest('[data-v3-cup-player-id]');if(cp){e.preventDefault();e.stopImmediatePropagation();openCupPlayerProfile(cp.dataset.v3CupPlayerId);return;}
-    const cr=e.target.closest('[data-v3-cup-round]');if(cr){e.preventDefault();e.stopImmediatePropagation();const cup=real.cups.find(c=>c.id===real.selectedCupId),data=real.cupCache.get(real.selectedCupId);if(cup&&data)renderRoundSummary(cup,data,Number(cr.dataset.v3CupRound));return;}
+    const cr=e.target.closest('[data-v3-cup-round]');if(cr){e.preventDefault();e.stopImmediatePropagation();const cup=real.cups.find(c=>sameId(c.id,real.selectedCupId)),data=cup?(real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id))):null;if(cup&&data)renderRoundSummary(cup,data,Number(cr.dataset.v3CupRound));return;}
     const adminSection=e.target.closest('[data-v3-admin-section]');if(adminSection&&live.isAdmin){e.preventDefault();e.stopImmediatePropagation();setAdminSection(adminSection.dataset.v3AdminSection);return;}
     const manageGlobal=e.target.closest('[data-v3-manage-global]');if(manageGlobal&&live.isAdmin){e.preventDefault();e.stopImmediatePropagation();openManageGlobalPlayer(manageGlobal.dataset.v3ManageGlobal);return;}
     const manage=e.target.closest('[data-v3-manage-player]');if(manage&&live.isAdmin){e.preventDefault();e.stopImmediatePropagation();openManagePlayer(manage.dataset.v3ManagePlayer);return;}
@@ -3602,7 +3616,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
   });
 
   $('#friendSearchInput')?.addEventListener('input',e=>renderFriendSearch(e.target.value),true);$('#friendSearchButton')?.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();renderFriendSearch($('#friendSearchInput')?.value||'');},true);
-  $('#cupSelect')?.addEventListener('change',e=>{e.stopImmediatePropagation();real.selectedCupId=e.target.value;renderSelectedCup();},true);
+  $('#cupSelect')?.addEventListener('change',e=>{e.stopImmediatePropagation();const cup=real.cups.find(c=>sameId(c.id,e.target.value));real.selectedCupId=cup?.id??e.target.value;renderSelectedCup();},true);
   $('#rankingSearch')?.addEventListener('input',renderRealRanking);$('#rankFilter')?.addEventListener('change',renderRealRanking);
 
   function renderMateHint(){/* options are built in the real registration modal */}
@@ -3610,7 +3624,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     try{
       if(live.session&&live.player){const latest=await api.getMyProfile();if(latest)live.player=latest;live.stats=await api.getCareerStatsFor(live.player.id);}
       live.globalPlayers=await api.getGlobalPlayers();await refreshFakeProfiles();renderRealRanking();await renderOwnOverview();await refreshSocial();await refreshCups();
-      if(location.hash==='#profile'&&live.player){const shown=(window.state?.profilePlayer)||live.player.current_name;await renderProfileLive(shown);}
+      if(location.hash==='#profile'&&live.player){const shown=(state?.profilePlayer)||live.player.current_name;await renderProfileLive(shown);}
       if(live.isAdmin&&real.adminSection==='players')await renderAdminAccountPlayers(true);
     }catch(e){console.error('live surface refresh',e);}
   }
@@ -3697,7 +3711,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     try{live.globalPlayers=await api.getGlobalPlayers();await refreshFakeProfiles();}catch(_){}
     renderRealRanking();await renderOwnOverview();await refreshSocial();await refreshCups();ensureFinalizeButton();
     if(location.hash==='#profile'&&live.player){
-      const requested=window.state?.profilePlayer;
+      const requested=state?.profilePlayer;
       const exists=requested&&(requested===live.player.current_name||live.globalPlayers.some(p=>p.current_name===requested));
       await renderProfileLive(exists?requested:live.player.current_name);
     }
