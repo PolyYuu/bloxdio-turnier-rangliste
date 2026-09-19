@@ -3065,7 +3065,7 @@ window.HubAPI = (() => {
     const eyebrow=$('.cup-board .eyebrow');if(eyebrow)eyebrow.textContent=`${cup.status==='live'?'LIVE':copy('Finished','Abgeschlossen','Terminé')} · ${cup.current_round} ${copy('rounds','Runden','manches')}`;
     const teams=data.teams.map(t=>({team:t,players:data.players.filter(p=>p.team_id===t.id)}));
     const rankedTeams=competitionRanks(teams,x=>x.players.reduce((sum,p)=>sum+statsForPlayer(p,data).points,0));
-    const rows=$('#cupTeamRows');if(rows)rows.innerHTML=rankedTeams.map(({x,rank,points},idx)=>`<div class="cup-row cup-team-row v3-cup-team-row team-size-${x.players.length} ${idx===0?'top':''}" tabindex="0" role="button" data-v3-cup-team="${x.team.id}" data-v3-cup-id="${cup.id}">
+    const rows=$('#cupTeamRows');if(rows)rows.innerHTML=rankedTeams.map(({x,rank,points},idx)=>`<div class="cup-row cup-team-row v3-cup-team-row team-size-${x.players.length} ${idx===0?'top':''}" tabindex="0" role="button" data-v3-cup-team="${x.team.id}" data-v3-cup-id="${cup.id}" data-v3-team-player-ids="${x.players.map(p=>p.id).join(',')}">
       <span class="cup-rank">${rank}</span>
       <span class="cup-team-name">${x.players.map((p,i)=>`${i?'<i>+</i>':''}${playerAvatarFromCup(p)}<b>${esc(p.name)}</b>`).join('')}</span>
       <span class="cup-points">${points}</span></div>`).join('');
@@ -3076,7 +3076,7 @@ window.HubAPI = (() => {
     $$('#roundPicker [data-v3-cup-round]').forEach(b=>b.classList.toggle('active',Number(b.dataset.v3CupRound)===round));
     const teams=data.teams.map(t=>({team:t,players:data.players.filter(p=>p.team_id===t.id)})).map(x=>({...x,points:x.players.reduce((sum,p)=>sum+roundStatsForPlayer(p,data,round).points,0)}));
     teams.sort((a,b)=>b.points-a.points||a.players.map(p=>p.name).join(' + ').localeCompare(b.players.map(p=>p.name).join(' + ')));
-    const el=$('#roundSummary');if(el)el.innerHTML=teams.map((x,i)=>`<div class="round-card" data-v3-cup-team="${x.team.id}" data-v3-cup-id="${cup.id}" tabindex="0" role="button"><span>${i===0?copy('Round winner','Rundensieger','Vainqueur de la manche'):copy(`Place ${i+1}`,`Platz ${i+1}`,`Place ${i+1}`)}</span><strong>${x.players.map(p=>esc(p.name)).join(' <i>+</i> ')}</strong><span style="margin-top:5px">${x.points} ${copy('points','Punkte','points')}</span></div>`).join('');
+    const el=$('#roundSummary');if(el)el.innerHTML=teams.map((x,i)=>`<div class="round-card" data-v3-cup-team="${x.team.id}" data-v3-cup-id="${cup.id}" data-v3-team-player-ids="${x.players.map(p=>p.id).join(',')}" tabindex="0" role="button"><span>${i===0?copy('Round winner','Rundensieger','Vainqueur de la manche'):copy(`Place ${i+1}`,`Platz ${i+1}`,`Place ${i+1}`)}</span><strong>${x.players.map(p=>esc(p.name)).join(' <i>+</i> ')}</strong><span style="margin-top:5px">${x.points} ${copy('points','Punkte','points')}</span></div>`).join('');
   }
   async function registrationStateForCup(cup){if(!live.session||!cup)return null;try{return await api.getMyCupRegistrationState(cup.id);}catch(e){console.warn('registration state',e);return null;}}
   function registrationActionLabel(st){if(!st)return copy('Register team','Team anmelden','Inscrire l’équipe');if(st.registration_status==='confirmed')return copy('Leave team registration','Team abmelden','Annuler l’inscription');if(st.is_creator)return copy('Withdraw request','Anfrage zurückziehen','Retirer la demande');if(st.member_status==='pending')return copy('Decline request','Anfrage ablehnen','Refuser la demande');return copy('Withdraw registration','Anmeldung zurückziehen','Retirer l’inscription');}
@@ -3135,7 +3135,7 @@ window.HubAPI = (() => {
     const friends=real.social?.friends||[];const others=(live.globalPlayers||[]).filter(p=>p.id!==live.player.id&&!friends.some(f=>f.id===p.id));const opts=(arr)=>arr.map(p=>`<option value="${p.id}">${esc(p.current_name)}</option>`).join('');const m=document.createElement('div');m.id='v3RegisterLive';m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal"><button class="modal-close" data-v3-reg-close>×</button><span class="eyebrow">${esc(cup.name)} · ${MODE[cup.mode]}</span><h2>${copy('Register team','Team anmelden','Inscrire l’équipe')}</h2><p>${copy('Your team is only registered after every invited player accepts.','Euer Team ist erst angemeldet, wenn alle eingeladenen Spieler angenommen haben.','L’équipe est confirmée seulement après acceptation de tous les invités.')}</p><form id="v3RegForm">${Array.from({length:needed},(_,i)=>`<label><span>${copy('Player','Spieler','Joueur')} ${i+2}</span><select class="v3-reg-mate" required><option value="">${copy('Select player …','Spieler auswählen …','Choisir un joueur …')}</option>${friends.length?`<optgroup label="${copy('Friends','Freunde','Amis')}">${opts(friends)}</optgroup>`:''}<optgroup label="${copy('Other players','Andere Spieler','Autres joueurs')}">${opts(others)}</optgroup></select></label>`).join('')}<div class="v3-form-error" id="v3RegErr"></div><button class="cta-button wide">${copy('Send invitation','Einladung senden','Envoyer l’invitation')}</button></form></section>`;document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-v3-reg-close]'))m.remove();});$('#v3RegForm',m).onsubmit=async e=>{e.preventDefault();const ids=$$('.v3-reg-mate',m).map(s=>s.value);if(new Set(ids).size!==ids.length){$('#v3RegErr',m).textContent=copy('Choose different players.','Wähle unterschiedliche Spieler.','Choisis des joueurs différents.');return;}e.submitter.disabled=true;try{await api.createCupRegistration(cup.id,ids);m.remove();real.cupCache.delete(cup.id);toast(copy('Invitation sent. Registration is pending until everyone accepts.','Einladung gesendet. Die Anmeldung ist ausstehend, bis alle angenommen haben.','Invitation envoyée.'));await refreshSocial();await refreshCups();}catch(err){$('#v3RegErr',m).textContent=err.message;e.submitter.disabled=false;}};
   }
 
-  async function openCupTeamProfile(teamId,cupIdHint=null){
+  async function openCupTeamProfile(teamId,cupIdHint=null,playerIdsHint=''){
     try{
       // Team rows carry their Cup identity explicitly. Do not depend on selectedCupId
       // surviving an auth/focus refresh, because Supabase may refresh the session while
@@ -3151,24 +3151,45 @@ window.HubAPI = (() => {
       real.selectedCupId=cup.id;
       let data=real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id));
       if(!data)data=await cupData(cup.id,true);
+
+      const hintedPlayerIds=String(playerIdsHint||'').split(',').map(x=>x.trim()).filter(Boolean);
+      let players=hintedPlayerIds.length
+        ? (data?.players||[]).filter(p=>hintedPlayerIds.some(id=>sameId(p.id,id)))
+        : [];
       let team=data?.teams?.find(t=>sameId(t.id,teamId));
-      if(!team){
-        data=await cupData(cup.id,true);
-        team=data?.teams?.find(t=>sameId(t.id,teamId));
+
+      // The rendered row already knows its concrete players. Prefer that identity over
+      // reconstructing the team through a refreshed teams array.
+      if(players.length<2){
+        players=(data?.players||[]).filter(p=>sameId(p.team_id,team?.id??teamId));
       }
 
-      // Last-resort recovery: if a refresh changed the visible Cup between pointerdown
-      // and click, resolve the globally unique team id against the remaining Cups.
-      if(!team){
+      if(players.length<2){
+        data=await cupData(cup.id,true);
+        team=data?.teams?.find(t=>sameId(t.id,teamId));
+        players=hintedPlayerIds.length
+          ? (data?.players||[]).filter(p=>hintedPlayerIds.some(id=>sameId(p.id,id)))
+          : [];
+        if(players.length<2)players=(data?.players||[]).filter(p=>sameId(p.team_id,team?.id??teamId));
+      }
+
+      // Last-resort recovery across Cups. Resolve by the concrete player ids first,
+      // because those remain stable even if the selected Cup state changes on focus.
+      if(players.length<2){
         for(const candidate of real.cups){
           if(sameId(candidate.id,cup.id))continue;
           const candidateData=real.cupCache.get(candidate.id)||real.cupCache.get(String(candidate.id))||await cupData(candidate.id,true);
           const candidateTeam=candidateData?.teams?.find(t=>sameId(t.id,teamId));
-          if(candidateTeam){cup=candidate;data=candidateData;team=candidateTeam;real.selectedCupId=candidate.id;break;}
+          let candidatePlayers=hintedPlayerIds.length
+            ? (candidateData?.players||[]).filter(p=>hintedPlayerIds.some(id=>sameId(p.id,id)))
+            : [];
+          if(candidatePlayers.length<2)candidatePlayers=(candidateData?.players||[]).filter(p=>sameId(p.team_id,candidateTeam?.id??teamId));
+          if(candidatePlayers.length>=2){
+            cup=candidate;data=candidateData;team=candidateTeam;players=candidatePlayers;real.selectedCupId=candidate.id;break;
+          }
         }
       }
-      const players=(data?.players||[]).filter(p=>sameId(p.team_id,team?.id??teamId));
-      if(!team||!players.length)return;
+      if(players.length<2)return;
     const stats=players.map(p=>statsForPlayer(p,data)),total=stats.reduce((a,b)=>a+b.points,0),kills=stats.reduce((a,b)=>a+b.k,0),dm=stats.reduce((a,b)=>a+b.dm,0),wins=stats.reduce((a,b)=>a+b.w,0);
     const modal=$('#teamDetailModal');if(!modal)return;
     $('#teamDetailTitle').textContent=players.map(p=>p.name).join(' + ');
@@ -3594,7 +3615,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     const rm=e.target.closest('[data-v3-remove-friend]');if(rm){e.preventDefault();e.stopImmediatePropagation();api.removeFriend(rm.dataset.v3RemoveFriend).then(refreshSocial).catch(x=>toast(x.message,true));return;}
     const ca=e.target.closest('[data-v3-cup-accept]');if(ca){e.preventDefault();e.stopImmediatePropagation();api.respondCupInvite(ca.dataset.v3CupAccept,true).then(async()=>{toast(copy('Team confirmed.','Team bestätigt.','Équipe confirmée.'));await refreshSocial();await refreshCups();}).catch(x=>toast(x.message,true));return;}
     const cd=e.target.closest('[data-v3-cup-decline]');if(cd){e.preventDefault();e.stopImmediatePropagation();api.respondCupInvite(cd.dataset.v3CupDecline,false).then(refreshSocial).catch(x=>toast(x.message,true));return;}
-    const ct=e.target.closest('[data-v3-cup-team]');if(ct){e.preventDefault();e.stopImmediatePropagation();openCupTeamProfile(ct.dataset.v3CupTeam,ct.dataset.v3CupId);return;}
+    const ct=e.target.closest('[data-v3-cup-team]');if(ct){e.preventDefault();e.stopImmediatePropagation();openCupTeamProfile(ct.dataset.v3CupTeam,ct.dataset.v3CupId,ct.dataset.v3TeamPlayerIds);return;}
     const cp=e.target.closest('[data-v3-cup-player-id]');if(cp){e.preventDefault();e.stopImmediatePropagation();openCupPlayerProfile(cp.dataset.v3CupPlayerId);return;}
     const cr=e.target.closest('[data-v3-cup-round]');if(cr){e.preventDefault();e.stopImmediatePropagation();const cup=real.cups.find(c=>sameId(c.id,real.selectedCupId)),data=cup?(real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id))):null;if(cup&&data)renderRoundSummary(cup,data,Number(cr.dataset.v3CupRound));return;}
     const adminSection=e.target.closest('[data-v3-admin-section]');if(adminSection&&live.isAdmin){e.preventDefault();e.stopImmediatePropagation();setAdminSection(adminSection.dataset.v3AdminSection);return;}
