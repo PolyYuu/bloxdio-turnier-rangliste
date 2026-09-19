@@ -5,7 +5,7 @@ const BLOXD_URL='https://bloxd.io/play/classic_playerSchematic%7CHT_Y95VcEQaUBLb
 const REG_INGEST_URL='https://nxzrgbpaxukgjyzwupjp.supabase.co/functions/v1/hub-extension-assertion-ingest';
 const LIVE_INGEST_URL='https://nxzrgbpaxukgjyzwupjp.supabase.co/functions/v1/hub-extension-live-ingest';
 const MAX_RECENT=80,MAX_LIVE_RECENT=120;
-const DEFAULT_STATE={bloxdSeenAt:0,totalAssertionsObserved:0,totalAssertionsUploaded:0,recentAssertions:[],uploadedKeys:[],latestRegistrationCode:null,latestUpload:null,totalLiveObserved:0,totalLiveUploaded:0,recentLive:[],latestLiveUpload:null,relayMode:'hub-verify-full-relay',uploadEnabled:true,hubLanguage:'en',identityNames:{},ownDbId:null};
+const DEFAULT_STATE={bloxdSeenAt:0,totalAssertionsObserved:0,totalAssertionsUploaded:0,recentAssertions:[],uploadedKeys:[],latestRegistrationCode:null,latestSelfCode:null,latestUpload:null,totalLiveObserved:0,totalLiveUploaded:0,recentLive:[],latestLiveUpload:null,relayMode:'hub-verify-full-relay',uploadEnabled:true,hubLanguage:'en',identityNames:{},ownDbId:null};
 const snapshotBuffers=new Map();
 
 async function getState(){return{...DEFAULT_STATE,...await chrome.storage.local.get(DEFAULT_STATE)};}
@@ -25,12 +25,13 @@ async function recordLive(raw,status,result=null,error=null){const state=await g
 async function uploadSingleLive(raw){try{const result=await post(LIVE_INGEST_URL,{raw});await recordLive(raw,'uploaded',result);return{ok:true,result};}catch(error){await recordLive(raw,'error',null,error);return{ok:false,error:String(error?.message||error)};}}
 async function handleSnapshotMarker(raw){const type=markerType(raw),matchId=markerMatchId(raw);if(!matchId)return{ok:false,error:'missing_match_id'};if(type==='SNAPBEGIN'){snapshotBuffers.set(matchId,{markers:[raw],startedAt:Date.now()});await recordLive(raw,'buffered');return{ok:true,buffered:true};}const buf=snapshotBuffers.get(matchId);if(!buf)return{ok:false,error:'snapshot_buffer_missing'};buf.markers.push(raw);if(buf.markers.length>102){snapshotBuffers.delete(matchId);return{ok:false,error:'snapshot_too_large'};}if(type!=='SNAPEND'){await recordLive(raw,'buffered');return{ok:true,buffered:true};}snapshotBuffers.delete(matchId);try{const result=await post(LIVE_INGEST_URL,{markers:buf.markers});for(const marker of buf.markers)await recordLive(marker,'uploaded',result);return{ok:true,result};}catch(error){for(const marker of buf.markers)await recordLive(marker,'error',null,error);return{ok:false,error:String(error?.message||error)};}}
 
-chrome.runtime.onInstalled.addListener(async()=>{const old=await chrome.storage.local.get(null);await chrome.storage.local.set({...DEFAULT_STATE,totalAssertionsObserved:Number(old.totalAssertionsObserved||0),totalAssertionsUploaded:Number(old.totalAssertionsUploaded||0),recentAssertions:Array.isArray(old.recentAssertions)?old.recentAssertions.slice(0,MAX_RECENT):[],uploadedKeys:Array.isArray(old.uploadedKeys)?old.uploadedKeys.slice(-500):[],totalLiveObserved:Number(old.totalLiveObserved||0),totalLiveUploaded:Number(old.totalLiveUploaded||0),recentLive:Array.isArray(old.recentLive)?old.recentLive.slice(0,MAX_LIVE_RECENT):[],hubLanguage:['en','de','fr'].includes(old.hubLanguage)?old.hubLanguage:'en'});await badge();});
+chrome.runtime.onInstalled.addListener(async()=>{const old=await chrome.storage.local.get(null);await chrome.storage.local.set({...DEFAULT_STATE,totalAssertionsObserved:Number(old.totalAssertionsObserved||0),totalAssertionsUploaded:Number(old.totalAssertionsUploaded||0),recentAssertions:Array.isArray(old.recentAssertions)?old.recentAssertions.slice(0,MAX_RECENT):[],uploadedKeys:Array.isArray(old.uploadedKeys)?old.uploadedKeys.slice(-500):[],latestRegistrationCode:old.latestRegistrationCode||null,latestSelfCode:cleanCode(old.latestSelfCode||'')||null,totalLiveObserved:Number(old.totalLiveObserved||0),totalLiveUploaded:Number(old.totalLiveUploaded||0),recentLive:Array.isArray(old.recentLive)?old.recentLive.slice(0,MAX_LIVE_RECENT):[],hubLanguage:['en','de','fr'].includes(old.hubLanguage)?old.hubLanguage:'en',identityNames:(old.identityNames&&typeof old.identityNames==='object')?old.identityNames:{},ownDbId:old.ownDbId?String(old.ownDbId):null});await badge();});
 chrome.runtime.onStartup.addListener(badge);
 
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{(async()=>{const type=String(message?.type||'');
   if(type==='BLOXD_EXTENSION_READY'){const state=await setState({bloxdSeenAt:Date.now(),relayMode:'hub-verify-full-relay',uploadEnabled:true});await badge();sendResponse({ok:true,state});return;}
   if(type==='BLOXD_EXTENSION_HEARTBEAT'){const state=await setState({bloxdSeenAt:Date.now(),relayMode:'hub-verify-full-relay',uploadEnabled:true});await badge();sendResponse({ok:true,state});return;}
+  if(type==='BLOXD_REGSELF_CODE'){const code=cleanCode(message.code);if(!code){sendResponse({ok:false,error:'invalid_self_code'});return;}const state=await setState({bloxdSeenAt:Date.now(),latestSelfCode:code});await badge();sendResponse({ok:true,state});return;}
   if(type==='BLOXD_GLOBAL_REGASSERT'){
     const raw=cleanRegRaw(message.raw);if(!raw){sendResponse({ok:false,error:'invalid_regassert'});return;}
     const state=await getState(),key=rawKey(raw),code=rawCode(raw),identity=rawIdentity(raw),recent=Array.isArray(state.recentAssertions)?state.recentAssertions:[],existing=recent.find(x=>x&&x.key===key);let total=Number(state.totalAssertionsObserved||0),next=recent;if(!existing){total+=1;next=[{key,seenAt:Date.now(),uploadStatus:'pending'},...recent].slice(0,MAX_RECENT);}
@@ -38,7 +39,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{(async()=>{
       const uploadedKeys=Array.isArray(state.uploadedKeys)?state.uploadedKeys:[],known=await post(REG_INGEST_URL,{mode:'status',code});
       const identityNames=(state.identityNames&&typeof state.identityNames==='object')?{...state.identityNames}:{};
       const oldName=identity?.dbId?String(identityNames[identity.dbId]||known.playerName||''):'';
-      const selfCode=cleanCode(state.latestRegistrationCode?.code||'');
+      const selfCode=cleanCode(state.latestSelfCode||state.latestRegistrationCode?.code||'');
       let ownDbId=state.ownDbId?String(state.ownDbId):null;
       if(selfCode&&code===selfCode&&identity?.dbId)ownDbId=identity.dbId;
       if(known.linked===true&&identity?.playerName&&String(known.playerName||'')===identity.playerName){
@@ -57,7 +58,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{(async()=>{
   }
   if(type==='BLOXD_REGISTRATION_CODE'){const code=cleanCode(message.code);if(!code){sendResponse({ok:false,error:'invalid_code'});return;}const now=Date.now(),state=await setState({bloxdSeenAt:now,latestRegistrationCode:{code,seenAt:now}});await badge();try{const status=await post(REG_INGEST_URL,{mode:'status',code});if(status.linked===true)sendResponse({ok:true,state,notifySelf:true,verifiedPlayerName:status.playerName||null});else sendResponse({ok:true,state,silent:true});}catch(_){sendResponse({ok:true,state,silent:true});}return;}
   if(type==='HUB_EXTENSION_GET_STATE'){sendResponse({ok:true,version:chrome.runtime.getManifest().version,state:await getState()});return;}
-  if(type==='HUB_EXTENSION_CLEAR'){snapshotBuffers.clear();const state=await setState({totalAssertionsObserved:0,totalAssertionsUploaded:0,recentAssertions:[],uploadedKeys:[],latestRegistrationCode:null,latestUpload:null,totalLiveObserved:0,totalLiveUploaded:0,recentLive:[],latestLiveUpload:null});sendResponse({ok:true,state});return;}
+  if(type==='HUB_EXTENSION_CLEAR'){snapshotBuffers.clear();const state=await setState({totalAssertionsObserved:0,totalAssertionsUploaded:0,recentAssertions:[],uploadedKeys:[],latestRegistrationCode:null,latestSelfCode:null,latestUpload:null,totalLiveObserved:0,totalLiveUploaded:0,recentLive:[],latestLiveUpload:null});sendResponse({ok:true,state});return;}
   if(type==='OPEN_HUB'){await chrome.tabs.create({url:HUB_URL});sendResponse({ok:true});return;}
   if(type==='OPEN_BLOXD'){await chrome.tabs.create({url:BLOXD_URL});sendResponse({ok:true});return;}
   sendResponse({ok:false,error:'unknown_message'});
