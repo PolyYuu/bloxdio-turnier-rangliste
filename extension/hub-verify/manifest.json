@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HUB Verify",
   "short_name": "HUB Verify",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "Passive Bloxd.io verification and tournament live-sync bridge for HUB Survival Games.",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -19,7 +19,13 @@
   },
   "action": {
     "default_title": "HUB Verify · Passive Bridge",
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/hub-logo.png",
+      "32": "assets/hub-logo.png",
+      "48": "assets/hub-logo.png",
+      "128": "assets/hub-logo.png"
+    }
   },
   "content_scripts": [
     {
@@ -32,5 +38,11 @@
       "run_at": "document_start",
       "all_frames": true
     }
-  ]
+  ],
+  "icons": {
+    "16": "assets/hub-logo.png",
+    "32": "assets/hub-logo.png",
+    "48": "assets/hub-logo.png",
+    "128": "assets/hub-logo.png"
+  }
 }
