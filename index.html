@@ -3210,6 +3210,62 @@ window.HubAPI = (() => {
       modal.hidden=false;
     }catch(err){console.error('open Cup team profile',err);toast?.(err?.message||String(err),true);}
   }
+  async function openCupTeamFromRow(row){
+    if(!row)return;
+    const teamId=row.dataset.v3CupTeam||'';
+    const cupId=row.dataset.v3CupId||$('#cupSelect')?.value||real.selectedCupId||'';
+    const playerIds=row.dataset.v3TeamPlayerIds||'';
+
+    // New live rows: use the stable ids first.
+    if(teamId){
+      await openCupTeamProfile(teamId,cupId,playerIds);
+      const modal=$('#teamDetailModal');
+      if(modal&&!modal.hidden)return;
+    }
+
+    // Compatibility fallback for any legacy row that may reappear after a refresh.
+    // Resolve the Duo from the names actually shown in the clicked row.
+    const visibleNames=[...row.querySelectorAll('.cup-team-name b,.cup-team-button span')]
+      .map(el=>el.textContent.trim()).filter(Boolean);
+    let cup=real.cups.find(c=>sameId(c.id,cupId))||real.cups.find(c=>sameId(c.id,$('#cupSelect')?.value||real.selectedCupId));
+    if(!cup){await refreshCups();cup=real.cups.find(c=>sameId(c.id,$('#cupSelect')?.value||real.selectedCupId));}
+    if(!cup)return;
+    const data=await cupData(cup.id,true);
+
+    let players=[];
+    if(visibleNames.length){
+      players=(data.players||[]).filter(p=>visibleNames.includes(String(p.name)));
+    }
+    if(players.length<2&&row.dataset.teamIndex!==undefined){
+      const idx=Number(row.dataset.teamIndex);
+      const rankedTeams=competitionRanks(
+        (data.teams||[]).map(t=>({team:t,players:(data.players||[]).filter(p=>sameId(p.team_id,t.id))})),
+        x=>x.players.reduce((sum,p)=>sum+statsForPlayer(p,data).points,0)
+      );
+      players=rankedTeams[idx]?.x?.players||[];
+    }
+    if(players.length<2)return;
+
+    const resolvedTeam=(data.teams||[]).find(t=>players.every(p=>sameId(p.team_id,t.id)))||
+      (data.teams||[]).find(t=>sameId(t.id,players[0]?.team_id));
+    const stats=players.map(p=>statsForPlayer(p,data));
+    const total=stats.reduce((a,b)=>a+b.points,0),kills=stats.reduce((a,b)=>a+b.k,0),dm=stats.reduce((a,b)=>a+b.dm,0),wins=stats.reduce((a,b)=>a+b.w,0);
+    const modal=$('#teamDetailModal');if(!modal)return;
+    $('#teamDetailTitle').textContent=players.map(p=>p.name).join(' + ');
+    $('#teamDetailSummary').innerHTML=[
+      [copy('Team points','Team-Punkte','Points équipe'),total],['Kills',kills],['Deathmatches',dm],[copy('Wins','Siege','Victoires'),wins]
+    ].map(([label,value])=>`<div><span>${label}</span><strong>${value}</strong></div>`).join('');
+    $('#teamPlayerCards').innerHTML=players.map((p,i)=>{const st=stats[i];return `<article><h3><button type="button" data-profile-player="${esc(p.name)}">${esc(p.name)} ↗</button></h3><div class="player-mini-stats"><div><span>Points</span><b>${st.points}</b></div><div><span>Kills</span><b>${st.k}</b></div><div><span>DM</span><b>${st.dm}</b></div><div><span>${copy('Wins','Siege','Victoires')}</span><b>${st.w}</b></div><div><span>${copy('Deaths','Tode','Morts')}</span><b>${cupDeaths(p,cup,data)}</b></div></div></article>`;}).join('');
+    const [a,b]=players;
+    if(a&&b){
+      const head=`<div class="team-round-row head"><span>${copy('Round','Runde','Manche')}</span><span>${esc(a.name)}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span><span>${esc(b.name)}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span></div>`;
+      const rows=Array.from({length:Number(cup.current_round||0)},(_,i)=>{const r=i+1,sa=roundStatsForPlayer(a,data,r),sb=roundStatsForPlayer(b,data,r),winner=sa.w||sb.w;return `<div class="team-round-row"><strong class="${winner?'winner':''}">${r}</strong><strong>${esc(a.name)}</strong><span class="round-total">${sa.points}</span><span>${sa.k}</span><span>${sa.dm}</span><span>${sa.w}</span><strong>${esc(b.name)}</strong><span class="round-total">${sb.points}</span><span>${sb.k}</span><span>${sb.dm}</span><span>${sb.w}</span></div>`;}).join('');
+      $('#teamRoundTable').className='team-round-table';$('#teamRoundTable').innerHTML=head+rows;
+    }
+    real.selectedCupId=cup.id;
+    modal.hidden=false;
+  }
+
   async function openCupPlayerProfile(playerId){
     try{
       const selected=String($('#cupSelect')?.value||real.selectedCupId||'');
@@ -3615,7 +3671,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     const rm=e.target.closest('[data-v3-remove-friend]');if(rm){e.preventDefault();e.stopImmediatePropagation();api.removeFriend(rm.dataset.v3RemoveFriend).then(refreshSocial).catch(x=>toast(x.message,true));return;}
     const ca=e.target.closest('[data-v3-cup-accept]');if(ca){e.preventDefault();e.stopImmediatePropagation();api.respondCupInvite(ca.dataset.v3CupAccept,true).then(async()=>{toast(copy('Team confirmed.','Team bestätigt.','Équipe confirmée.'));await refreshSocial();await refreshCups();}).catch(x=>toast(x.message,true));return;}
     const cd=e.target.closest('[data-v3-cup-decline]');if(cd){e.preventDefault();e.stopImmediatePropagation();api.respondCupInvite(cd.dataset.v3CupDecline,false).then(refreshSocial).catch(x=>toast(x.message,true));return;}
-    const ct=e.target.closest('[data-v3-cup-team]');if(ct){e.preventDefault();e.stopImmediatePropagation();openCupTeamProfile(ct.dataset.v3CupTeam,ct.dataset.v3CupId,ct.dataset.v3TeamPlayerIds);return;}
+    const ct=e.target.closest('[data-v3-cup-team],.cup-row[data-team-index],.round-card[data-team-index]');if(ct){e.preventDefault();e.stopImmediatePropagation();openCupTeamFromRow(ct).catch(err=>{console.error('open Cup team row',err);toast?.(err?.message||String(err),true);});return;}
     const cp=e.target.closest('[data-v3-cup-player-id]');if(cp){e.preventDefault();e.stopImmediatePropagation();openCupPlayerProfile(cp.dataset.v3CupPlayerId);return;}
     const cr=e.target.closest('[data-v3-cup-round]');if(cr){e.preventDefault();e.stopImmediatePropagation();const cup=real.cups.find(c=>sameId(c.id,real.selectedCupId)),data=cup?(real.cupCache.get(cup.id)||real.cupCache.get(String(cup.id))):null;if(cup&&data)renderRoundSummary(cup,data,Number(cr.dataset.v3CupRound));return;}
     const adminSection=e.target.closest('[data-v3-admin-section]');if(adminSection&&live.isAdmin){e.preventDefault();e.stopImmediatePropagation();setAdminSection(adminSection.dataset.v3AdminSection);return;}
