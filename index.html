@@ -627,10 +627,66 @@ body:before{z-index:-4;opacity:.44}
     .v3-rating-graph svg{display:block;width:100%;height:100%;overflow:visible}
     .v3-rating-grid{stroke:rgba(128,102,182,.12);stroke-width:1;vector-effect:non-scaling-stroke}.v3-rating-area{fill:url(#v3RatingFill)}
     .v3-rating-line{fill:none;stroke:#38ead8;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 6px rgba(56,234,216,.24))}
-    .v3-rating-point{fill:#38ead8;stroke:#0b071c;stroke-width:1.5;vector-effect:non-scaling-stroke}
+    .v3-rating-points-layer{position:absolute;z-index:4;left:46px;right:12px;top:8px;bottom:28px;pointer-events:none}
+    .v3-rating-point{
+      position:absolute;
+      width:9px;
+      height:9px;
+      margin:0;
+      padding:0;
+      border:1.5px solid #0b071c;
+      border-radius:50%;
+      background:#38ead8;
+      box-shadow:0 0 0 1px rgba(56,234,216,.16),0 0 8px rgba(56,234,216,.16);
+      transform:translate(-50%,-50%);
+      pointer-events:auto;
+      cursor:default;
+      appearance:none;
+      -webkit-appearance:none;
+    }
+    .v3-rating-point:hover,.v3-rating-point:focus-visible{
+      z-index:6;
+      outline:none;
+      box-shadow:0 0 0 3px rgba(56,234,216,.18),0 0 14px rgba(56,234,216,.45);
+    }
+    .v3-rating-tooltip{
+      position:absolute;
+      left:50%;
+      bottom:calc(100% + 10px);
+      min-width:max-content;
+      padding:8px 10px;
+      border:1px solid rgba(112,76,212,.55);
+      border-radius:7px;
+      background:rgba(12,7,31,.97);
+      box-shadow:0 10px 30px rgba(0,0,0,.42);
+      color:#fff;
+      font:800 9px/1.35 Montserrat,sans-serif;
+      letter-spacing:.015em;
+      text-align:left;
+      white-space:nowrap;
+      opacity:0;
+      pointer-events:none;
+      transform:translate(-50%,4px);
+      transition:opacity .14s ease,transform .14s ease;
+    }
+    .v3-rating-tooltip::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      top:100%;
+      width:8px;
+      height:8px;
+      border-right:1px solid rgba(112,76,212,.55);
+      border-bottom:1px solid rgba(112,76,212,.55);
+      background:rgba(12,7,31,.97);
+      transform:translate(-50%,-4px) rotate(45deg);
+    }
+    .v3-rating-tooltip strong{display:block;color:#38ead8;font-size:10px}
+    .v3-rating-tooltip span{display:block;margin-top:2px;color:#b8aec8;font-size:8px;font-weight:700}
+    .v3-rating-point:hover .v3-rating-tooltip,.v3-rating-point:focus-visible .v3-rating-tooltip{opacity:1;transform:translate(-50%,0)}
     .v3-rating-ylabels{position:absolute;left:4px;top:17px;bottom:37px;width:38px;display:flex;flex-direction:column;justify-content:space-between;color:#706486;font:700 8px/1 Montserrat,sans-serif;text-align:right}
     .v3-rating-xlabels{position:absolute;left:52px;right:13px;bottom:8px;display:flex;justify-content:space-between;color:#706486;font:800 7px/1 Montserrat,sans-serif;letter-spacing:.04em}
-    @media(max-width:700px){.v3-rating-graph{height:220px;padding-left:38px}.v3-rating-ylabels{width:31px;font-size:7px}.v3-rating-xlabels{left:44px}}
+    @media(max-width:700px){.v3-rating-graph{height:220px;padding-left:38px}.v3-rating-points-layer{left:38px}.v3-rating-ylabels{width:31px;font-size:7px}.v3-rating-xlabels{left:44px}}
   </style>
 
 
@@ -3114,7 +3170,7 @@ window.HubAPI = (() => {
     const rows=`<div class="v3-history-list">${display.map((x,idx)=>{const game=Number(x.game_number||0),hidden=x.final_delta===null||x.final_delta===undefined||game<=15,delta=hidden?copy('HIDDEN','VERDECKT','CACHÉ'):`${Number(x.final_delta)>=0?'+':''}${Math.round(Number(x.final_delta))}`;return `<div class="v3-history-row"><div class="v3-history-game"><strong>Game ${game}</strong><small>${copy('Round','Runde','Manche')} ${Number(x.round||0)}</small></div><div class="v3-history-cup"><strong>${esc(x.tournament_name||copy('Competitive Cup','Competitive Cup','Cup compétitif'))}</strong><small>${x.created_at?new Date(x.created_at).toLocaleDateString():''}</small></div><div class="v3-history-stats"><i>K ${Number(x.round_kills||0)}</i><i>DM ${Number(x.round_deathmatches||0)}</i><i>W ${Number(x.round_wins||0)}</i><i>PTS ${Number(x.individual_points||0)}</i></div><div class="v3-history-delta ${hidden?'hidden-rating':Number(x.final_delta)>=0?'positive':'negative'}">${delta}</div></div>`;}).join('')}</div>`;
     const ranked=h.filter(x=>Number(x.game_number||0)>=16&&x.rating_after!==null&&x.rating_after!==undefined&&Number.isFinite(Number(x.rating_after)));
     let graph='';
-    if(ranked.length){const first=ranked[0],firstGame=Number(first.game_number||16),firstAfter=Number(first.rating_after),firstDelta=Number(first.final_delta||0),points=[{game:Math.max(15,firstGame-1),rating:firstAfter-firstDelta,start:true},...ranked.map(x=>({game:Number(x.game_number),rating:Number(x.rating_after)}))],vals=points.map(x=>x.rating);let lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(100,hi-lo),pad=Math.max(25,span*.18);lo=Math.floor((lo-pad)/25)*25;hi=Math.ceil((hi+pad)/25)*25;if(hi-lo<100){const mid=(hi+lo)/2;lo=Math.floor((mid-50)/25)*25;hi=lo+100;}const W=720,H=236,L=12,R=12,T=12,B=24,plotW=W-L-R,plotH=H-T-B,xAt=i=>L+(points.length===1?plotW/2:(i/(points.length-1))*plotW),yAt=v=>T+((hi-v)/(hi-lo))*plotH,coords=points.map((pt,i)=>[xAt(i),yAt(pt.rating)]),line=coords.map((c,i)=>`${i?'L':'M'} ${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' '),area=`${line} L ${coords[coords.length-1][0].toFixed(2)} ${(T+plotH).toFixed(2)} L ${coords[0][0].toFixed(2)} ${(T+plotH).toFixed(2)} Z`,ticks=Array.from({length:5},(_,i)=>hi-(hi-lo)*(i/4));graph=`<div class="v3-rating-graph"><div class="v3-rating-ylabels">${ticks.map(v=>`<span>${Math.round(v)}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Rating Verlauf"><defs><linearGradient id="v3RatingFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38ead8" stop-opacity=".30"/><stop offset="100%" stop-color="#38ead8" stop-opacity=".025"/></linearGradient></defs>${ticks.map(v=>`<line class="v3-rating-grid" x1="${L}" y1="${yAt(v)}" x2="${W-R}" y2="${yAt(v)}"/>`).join('')}<path class="v3-rating-area" d="${area}"/><path class="v3-rating-line" d="${line}"/>${coords.map((c,i)=>`<circle class="v3-rating-point" cx="${c[0]}" cy="${c[1]}" r="3"><title>${points[i].start?copy('Starting rating','Start-Rating','Rating initial'):`Game ${points[i].game}`}: ${Math.round(points[i].rating)}</title></circle>`).join('')}</svg><div class="v3-rating-xlabels"><span>${copy('START','START','DÉBUT')}</span><span>Game ${points[points.length-1].game}</span></div></div>`;}
+    if(ranked.length){const first=ranked[0],firstGame=Number(first.game_number||16),firstAfter=Number(first.rating_after),firstDelta=Number(first.final_delta||0),points=[{game:Math.max(15,firstGame-1),rating:firstAfter-firstDelta,start:true},...ranked.map(x=>({game:Number(x.game_number),rating:Number(x.rating_after)}))],vals=points.map(x=>x.rating);let lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(100,hi-lo),pad=Math.max(25,span*.18);lo=Math.floor((lo-pad)/25)*25;hi=Math.ceil((hi+pad)/25)*25;if(hi-lo<100){const mid=(hi+lo)/2;lo=Math.floor((mid-50)/25)*25;hi=lo+100;}const W=720,H=236,L=12,R=12,T=12,B=24,plotW=W-L-R,plotH=H-T-B,xAt=i=>L+(points.length===1?plotW/2:(i/(points.length-1))*plotW),yAt=v=>T+((hi-v)/(hi-lo))*plotH,coords=points.map((pt,i)=>[xAt(i),yAt(pt.rating)]),line=coords.map((c,i)=>`${i?'L':'M'} ${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' '),area=`${line} L ${coords[coords.length-1][0].toFixed(2)} ${(T+plotH).toFixed(2)} L ${coords[0][0].toFixed(2)} ${(T+plotH).toFixed(2)} Z`,ticks=Array.from({length:5},(_,i)=>hi-(hi-lo)*(i/4));graph=`<div class="v3-rating-graph"><div class="v3-rating-ylabels">${ticks.map(v=>`<span>${Math.round(v)}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Rating Verlauf"><defs><linearGradient id="v3RatingFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38ead8" stop-opacity=".30"/><stop offset="100%" stop-color="#38ead8" stop-opacity=".025"/></linearGradient></defs>${ticks.map(v=>`<line class="v3-rating-grid" x1="${L}" y1="${yAt(v)}" x2="${W-R}" y2="${yAt(v)}"/>`).join('')}<path class="v3-rating-area" d="${area}"/><path class="v3-rating-line" d="${line}"/></svg><div class="v3-rating-points-layer">${coords.map((c,i)=>{const pt=points[i],rankKey=core.rankKey(Number(pt.rating)),rankLabel=core.rankLabel(rankKey),pointLabel=pt.start?copy('Starting rating','Start-Rating','Rating initial'):`Game ${pt.game}`,elo=Math.round(pt.rating);return `<button type="button" class="v3-rating-point" style="left:${(c[0]/W*100).toFixed(3)}%;top:${(c[1]/H*100).toFixed(3)}%" aria-label="${esc(pointLabel)} · ${elo} ELO · ${esc(rankLabel)}"><span class="v3-rating-tooltip"><strong>${elo} ELO · ${esc(rankLabel)}</strong><span>${esc(pointLabel)}</span></span></button>`;}).join('')}</div><div class="v3-rating-xlabels"><span>${copy('START','START','DÉBUT')}</span><span>Game ${points[points.length-1].game}</span></div></div>`;}
     const more=h.length>10?`<div class="v3-history-more"><button type="button" class="ghost-button v3-history-more-button">${renderHistoryGraphV4.expanded?copy('Show less','Weniger anzeigen','Afficher moins'):copy('Show more','Mehr anzeigen','Afficher plus')}</button></div>`:'';
     chart.innerHTML=graph+rows+more;
     chart.querySelector('.v3-history-more-button')?.addEventListener('click',()=>{renderHistoryGraphV4.expanded=!renderHistoryGraphV4.expanded;renderHistoryGraphV4(renderHistoryGraphV4._history||[]);});
