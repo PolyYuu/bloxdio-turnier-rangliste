@@ -3137,21 +3137,46 @@ window.HubAPI = (() => {
 
   function ensureCupTeamDetailModal(){
     let modal=$('#cupTeamDetailModal');
-    if(modal)return modal;
-    modal=document.createElement('div');
-    modal.className='modal-backdrop';
-    modal.id='cupTeamDetailModal';
-    modal.hidden=true;
-    modal.innerHTML=`<section class="team-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cupTeamDetailTitle">
-      <button class="modal-close" type="button" data-close-modal="cupTeamDetailModal" aria-label="Close">×</button>
-      <span class="eyebrow">${copy('Cup duo profile','Cup-Duo-Profil','Profil duo Cup')}</span>
-      <h2 id="cupTeamDetailTitle"></h2>
-      <div class="team-detail-summary" id="cupTeamDetailSummary"></div>
-      <div class="team-player-cards" id="cupTeamPlayerCards"></div>
-      <div class="team-round-table-wrap"><h3>${copy('Round by round','Runde für Runde','Manche par manche')}</h3><div id="cupTeamRoundTable"></div></div>
-    </section>`;
-    document.body.appendChild(modal);
+    const isValid=modal &&
+      modal.querySelector('#cupTeamDetailTitle') &&
+      modal.querySelector('#cupTeamDetailSummary') &&
+      modal.querySelector('#cupTeamPlayerCards') &&
+      modal.querySelector('#cupTeamRoundTable');
+
+    if(modal&&!isValid){
+      modal.remove();
+      modal=null;
+    }
+    if(!modal){
+      modal=document.createElement('div');
+      modal.className='modal-backdrop';
+      modal.id='cupTeamDetailModal';
+      modal.hidden=true;
+      modal.innerHTML=`<section class="team-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cupTeamDetailTitle">
+        <button class="modal-close" type="button" data-close-modal="cupTeamDetailModal" aria-label="Close">×</button>
+        <span class="eyebrow">${copy('Cup duo profile','Cup-Duo-Profil','Profil duo Cup')}</span>
+        <h2 id="cupTeamDetailTitle"></h2>
+        <div class="team-detail-summary" id="cupTeamDetailSummary"></div>
+        <div class="team-player-cards" id="cupTeamPlayerCards"></div>
+        <div class="team-round-table-wrap"><h3>${copy('Round by round','Runde für Runde','Manche par manche')}</h3><div id="cupTeamRoundTable"></div></div>
+      </section>`;
+      document.body.appendChild(modal);
+    }
     return modal;
+  }
+
+  function cupTeamModalParts(){
+    const modal=ensureCupTeamDetailModal();
+    if(!modal)return null;
+    const parts={
+      modal,
+      title:modal.querySelector('#cupTeamDetailTitle'),
+      summary:modal.querySelector('#cupTeamDetailSummary'),
+      cards:modal.querySelector('#cupTeamPlayerCards'),
+      table:modal.querySelector('#cupTeamRoundTable')
+    };
+    if(!parts.title||!parts.summary||!parts.cards||!parts.table)return null;
+    return parts;
   }
 
   async function openCupTeamProfile(teamId,cupIdHint=null,playerIdsHint=''){
@@ -3210,21 +3235,22 @@ window.HubAPI = (() => {
       }
       if(players.length<2)return;
     const stats=players.map(p=>statsForPlayer(p,data)),total=stats.reduce((a,b)=>a+b.points,0),kills=stats.reduce((a,b)=>a+b.k,0),dm=stats.reduce((a,b)=>a+b.dm,0),wins=stats.reduce((a,b)=>a+b.w,0);
-    const modal=ensureCupTeamDetailModal();if(!modal)return;
-    $('#cupTeamDetailTitle').textContent=players.map(p=>p.name).join(' + ');
-    $('#cupTeamDetailSummary').innerHTML=[
+    const teamModal=cupTeamModalParts();if(!teamModal)return;
+    const {modal,title,summary,cards,table}=teamModal;
+    title.textContent=players.map(p=>p.name).join(' + ');
+    summary.innerHTML=[
       [copy('Team points','Team-Punkte','Points équipe'),total],['Kills',kills],['Deathmatches',dm],[copy('Wins','Siege','Victoires'),wins]
     ].map(([label,value])=>`<div><span>${label}</span><strong>${value}</strong></div>`).join('');
-    $('#cupTeamPlayerCards').innerHTML=players.map((p,i)=>{const st=stats[i];return `<article><h3><button type="button" data-profile-player="${esc(p.name)}">${esc(p.name)} ↗</button></h3><div class="player-mini-stats"><div><span>Points</span><b>${st.points}</b></div><div><span>Kills</span><b>${st.k}</b></div><div><span>DM</span><b>${st.dm}</b></div><div><span>${copy('Wins','Siege','Victoires')}</span><b>${st.w}</b></div><div><span>${copy('Deaths','Tode','Morts')}</span><b>${cupDeaths(p,cup,data)}</b></div></div></article>`;}).join('');
+    cards.innerHTML=players.map((p,i)=>{const st=stats[i];return `<article><h3><button type="button" data-profile-player="${esc(p.name)}">${esc(p.name)} ↗</button></h3><div class="player-mini-stats"><div><span>Points</span><b>${st.points}</b></div><div><span>Kills</span><b>${st.k}</b></div><div><span>DM</span><b>${st.dm}</b></div><div><span>${copy('Wins','Siege','Victoires')}</span><b>${st.w}</b></div><div><span>${copy('Deaths','Tode','Morts')}</span><b>${cupDeaths(p,cup,data)}</b></div></div></article>`;}).join('');
     if(players.length===2){
       const [a,b]=players;
       const head=`<div class="team-round-row head"><span>${copy('Round','Runde','Manche')}</span><span>${esc(a.name)}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span><span>${esc(b.name)}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span></div>`;
       const rows=Array.from({length:Number(cup.current_round||0)},(_,i)=>{const r=i+1,sa=roundStatsForPlayer(a,data,r),sb=roundStatsForPlayer(b,data,r),winner=sa.w||sb.w;return `<div class="team-round-row"><strong class="${winner?'winner':''}">${r}</strong><strong>${esc(a.name)}</strong><span class="round-total">${sa.points}</span><span>${sa.k}</span><span>${sa.dm}</span><span>${sa.w}</span><strong>${esc(b.name)}</strong><span class="round-total">${sb.points}</span><span>${sb.k}</span><span>${sb.dm}</span><span>${sb.w}</span></div>`;}).join('');
-      $('#cupTeamRoundTable').className='team-round-table';$('#cupTeamRoundTable').innerHTML=head+rows;
+      table.className='team-round-table';table.innerHTML=head+rows;
     }else{
       const head=`<div class="v3-generic-round-row head"><span>${copy('Round','Runde','Manche')}</span>${players.map(p=>`<span>${esc(p.name)}</span>`).join('')}</div>`;
       const rows=Array.from({length:Number(cup.current_round||0)},(_,i)=>`<div class="v3-generic-round-row"><strong>${i+1}</strong>${players.map(p=>{const st=roundStatsForPlayer(p,data,i+1);return `<span>${st.points} PTS · ${st.k} K · ${st.dm} DM · ${st.w} W</span>`;}).join('')}</div>`).join('');
-      $('#cupTeamRoundTable').className='v3-generic-round-table';$('#cupTeamRoundTable').innerHTML=head+rows;
+      table.className='v3-generic-round-table';table.innerHTML=head+rows;
     }
       modal.hidden=false;
     }catch(err){console.error('open Cup team profile',err);toast?.(err?.message||String(err),true);}
@@ -3269,17 +3295,18 @@ window.HubAPI = (() => {
       (data.teams||[]).find(t=>sameId(t.id,players[0]?.team_id));
     const stats=players.map(p=>statsForPlayer(p,data));
     const total=stats.reduce((a,b)=>a+b.points,0),kills=stats.reduce((a,b)=>a+b.k,0),dm=stats.reduce((a,b)=>a+b.dm,0),wins=stats.reduce((a,b)=>a+b.w,0);
-    const modal=ensureCupTeamDetailModal();if(!modal)return;
-    $('#cupTeamDetailTitle').textContent=players.map(p=>p.name).join(' + ');
-    $('#cupTeamDetailSummary').innerHTML=[
+    const teamModal=cupTeamModalParts();if(!teamModal)return;
+    const {modal,title,summary,cards,table}=teamModal;
+    title.textContent=players.map(p=>p.name).join(' + ');
+    summary.innerHTML=[
       [copy('Team points','Team-Punkte','Points équipe'),total],['Kills',kills],['Deathmatches',dm],[copy('Wins','Siege','Victoires'),wins]
     ].map(([label,value])=>`<div><span>${label}</span><strong>${value}</strong></div>`).join('');
-    $('#cupTeamPlayerCards').innerHTML=players.map((p,i)=>{const st=stats[i];return `<article><h3><button type="button" data-profile-player="${esc(p.name)}">${esc(p.name)} ↗</button></h3><div class="player-mini-stats"><div><span>Points</span><b>${st.points}</b></div><div><span>Kills</span><b>${st.k}</b></div><div><span>DM</span><b>${st.dm}</b></div><div><span>${copy('Wins','Siege','Victoires')}</span><b>${st.w}</b></div><div><span>${copy('Deaths','Tode','Morts')}</span><b>${cupDeaths(p,cup,data)}</b></div></div></article>`;}).join('');
+    cards.innerHTML=players.map((p,i)=>{const st=stats[i];return `<article><h3><button type="button" data-profile-player="${esc(p.name)}">${esc(p.name)} ↗</button></h3><div class="player-mini-stats"><div><span>Points</span><b>${st.points}</b></div><div><span>Kills</span><b>${st.k}</b></div><div><span>DM</span><b>${st.dm}</b></div><div><span>${copy('Wins','Siege','Victoires')}</span><b>${st.w}</b></div><div><span>${copy('Deaths','Tode','Morts')}</span><b>${cupDeaths(p,cup,data)}</b></div></div></article>`;}).join('');
     const [a,b]=players;
     if(a&&b){
       const head=`<div class="team-round-row head"><span>${copy('Round','Runde','Manche')}</span><span>${esc(a.name)}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span><span>${esc(b.name)}</span><span>PTS</span><span>K</span><span>DM</span><span>W</span></div>`;
       const rows=Array.from({length:Number(cup.current_round||0)},(_,i)=>{const r=i+1,sa=roundStatsForPlayer(a,data,r),sb=roundStatsForPlayer(b,data,r),winner=sa.w||sb.w;return `<div class="team-round-row"><strong class="${winner?'winner':''}">${r}</strong><strong>${esc(a.name)}</strong><span class="round-total">${sa.points}</span><span>${sa.k}</span><span>${sa.dm}</span><span>${sa.w}</span><strong>${esc(b.name)}</strong><span class="round-total">${sb.points}</span><span>${sb.k}</span><span>${sb.dm}</span><span>${sb.w}</span></div>`;}).join('');
-      $('#cupTeamRoundTable').className='team-round-table';$('#cupTeamRoundTable').innerHTML=head+rows;
+      table.className='team-round-table';table.innerHTML=head+rows;
     }
     real.selectedCupId=cup.id;
     modal.hidden=false;
