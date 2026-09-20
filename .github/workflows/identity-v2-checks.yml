@@ -1,0 +1,41 @@
+name: Identity v2 isolated checks
+on:
+  push:
+    branches: [fix/identity-v2-staging-20260920]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Preserve the exact extension and its original PNG assets
+        run: |
+          mkdir -p "$RUNNER_TEMP/identity-v2-results"
+          python - <<'PY'
+          import zipfile, pathlib, os, hashlib, json
+          root=pathlib.Path('extension/hub-verify')
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'identity-v2-results'
+          with zipfile.ZipFile(out/'HUB-Verify-1.0.9-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for f in root.rglob('*'):
+                  if f.is_file(): z.write(f,str(f.relative_to(root)))
+          manifest={str(f.relative_to(root)):hashlib.sha256(f.read_bytes()).hexdigest() for f in root.rglob('*') if f.is_file()}
+          (out/'baseline-hashes.json').write_text(json.dumps(manifest,indent=2))
+          PY
+      - name: Run candidate browser checks when staged
+        if: hashFiles('.github/identity-v2/browser_tests.py') != ''
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+          python .github/identity-v2/browser_tests.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: identity-v2-evidence
+          path: ${{ runner.temp }}/identity-v2-results/
+          retention-days: 14
