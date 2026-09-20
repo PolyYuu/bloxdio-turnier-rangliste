@@ -110,7 +110,7 @@ def patch(root: Path, backup: Path, output: Path) -> None:
         raise RuntimeError("Unexpected direct global_players query remains")
     changed[name] = text
 
-    # Cache bust only the modified entry points; do not alter layout or media.
+    # Cache bust only quoted, complete script URLs, with or without a version.
     for name, scripts in {
         "play.html": ["play.js", "play-presence.js", "play-ui-runtime.js"],
         "pending-hub.js": ["profile-live-guard.js"],
@@ -118,10 +118,13 @@ def patch(root: Path, backup: Path, output: Path) -> None:
     }.items():
         text = changed[name]
         for script in scripts:
-            pattern = re.escape(script) + r"\?v=[^\s\"'<>]+"
+            pattern = r"(?<=[\"'])" + re.escape(script) + r"(?:\?v=[^\s\"'<>]+)?(?=[\"'])"
+            hits = re.findall(pattern, text)
+            print(f"Cache source {name}: {hits}")
             text, count = re.subn(pattern, script + "?v=" + VERSION, text)
             if count != 1:
-                raise RuntimeError(f"Expected one cache URL for {script} in {name}; got {count}")
+                context = re.findall(r".{0,60}" + re.escape(script) + r".{0,90}", text)
+                raise RuntimeError(f"Expected one cache URL for {script} in {name}; got {count}: {context}")
         changed[name] = text
 
     # Validate everything before the first write. Backups never enter web root.
