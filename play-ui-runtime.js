@@ -189,16 +189,22 @@
   }
 
   function applyLanguage() {
-    const lang = language();
-    const c = COPY[lang] || COPY.en;
-    document.documentElement.lang = lang;
-    translateSidePanel(c);
-    translateRoundUi(c);
-    translateTeamModal(c);
-    translateImages(c);
-    const loading = $('.side-loading');
-    if (loading) loading.textContent = lang === 'de' ? 'VERBINDE MIT HUB…' : lang === 'fr' ? 'CONNEXION AU HUB…' : 'CONNECTING TO HUB…';
-    syncFullscreenLabel();
+    // Observe external UI updates, not this synchronous translation pass.
+    observer.disconnect();
+    try {
+      const lang = language();
+      const c = COPY[lang] || COPY.en;
+      document.documentElement.lang = lang;
+      translateSidePanel(c);
+      translateRoundUi(c);
+      translateTeamModal(c);
+      translateImages(c);
+      const loading = $('.side-loading');
+      if (loading) loading.textContent = lang === 'de' ? 'VERBINDE MIT HUB…' : lang === 'fr' ? 'CONNEXION AU HUB…' : 'CONNECTING TO HUB…';
+      syncFullscreenLabel();
+    } finally {
+      observer.observe(document.documentElement, translationObserverOptions);
+    }
   }
 
   let translateFrame = 0;
@@ -239,7 +245,7 @@
   function syncFullscreenLabel() {
     if (!fullscreenButton) return;
     const c = copy();
-    fullscreenButton.textContent = document.fullscreenElement === gameStage ? c.exitFullscreen : c.fullscreen;
+    setText('#fullscreenButton', document.fullscreenElement === gameStage ? c.exitFullscreen : c.fullscreen);
   }
 
   fullscreenButton?.addEventListener('pointerdown', event => {
@@ -262,8 +268,9 @@
     scheduleTranslation();
   });
 
+  const translationObserverOptions = {subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','aria-label','alt']};
   const observer = new MutationObserver(scheduleTranslation);
-  observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','aria-label','alt']});
+  observer.observe(document.documentElement, translationObserverOptions);
   window.addEventListener('storage', event => {
     if (['sg-lang','hub_language','hubLang'].includes(event.key)) scheduleTranslation();
   });

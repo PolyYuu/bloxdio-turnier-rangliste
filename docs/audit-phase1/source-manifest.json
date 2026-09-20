@@ -1,0 +1,30 @@
+{
+  "play-ui-runtime.js": {
+    "before": "3944d3112c25cf434be4d8c2673d893cdc4e2632",
+    "after": "f44ecb039def6186f81d337b4879635eaa0999bb"
+  },
+  "profile-live-guard.js": {
+    "before": "76464564888a60271f44fc6536151be50927d901",
+    "after": "3995e171d138d4b3fc1b8cecdc51b5a83c2f321f"
+  },
+  "play-presence.js": {
+    "before": "4263e7d9f9bbfb5c81d3ee284d5178a0dde9248d",
+    "after": "a9e0f4261addb94d2f50cc58a982af5606c7f05e"
+  },
+  "play.js": {
+    "before": "65f4c615458b7754d291d80bea36a8cfa10309f2",
+    "after": "ab35ed4bfb383f49038887329f4dd70bdeea888d"
+  },
+  "play.html": {
+    "before": "910395b838b17a145ac8296cc293bf655f421601",
+    "after": "6a87a52230a14d601b8e725bfd63615f9153ad49"
+  },
+  "pending-hub.js": {
+    "before": "3d68970ab7e67ea363c21e6912540c2a65f0c020",
+    "after": "2fa3fb4cc6e0e0562e78fc297df9d186e69e089d"
+  },
+  "index.html": {
+    "before": "6a141eb8d8e5eb1479644bcf553f68658c8527d6",
+    "after": "2fff31a33b50fd890b518bafb27d9cd99abe80e7"
+  }
+}

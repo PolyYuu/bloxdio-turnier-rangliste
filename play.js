@@ -336,11 +336,13 @@
       const {data,error} = await db.rpc("my_global_player_id");
       if (!error && data) myGlobalPlayerId = data;
       if (!myGlobalPlayerId) return false;
-      const res = await db.from("global_players")
-        .select("id,current_name,rating,placement_games,is_ranked,peak_rating,avatar_pixels")
-        .eq("id",myGlobalPlayerId)
-        .maybeSingle();
-      if (!res.error) myGlobalPlayer = res.data || null;
+      const res = await db.rpc("get_my_profile");
+      if (res.error) {
+        console.warn("Play profile unavailable", res.error);
+      } else {
+        const profile = Array.isArray(res.data) ? res.data[0] : res.data;
+        if (profile && String(profile.id) === String(myGlobalPlayerId)) myGlobalPlayer = profile;
+      }
       return !!myGlobalPlayerId;
     } catch (_) {
       return false;
@@ -424,7 +426,7 @@
     const gpIds = [...new Set(players.map(player => player.global_player_id).filter(Boolean))];
     globalPlayers = new Map();
     if (gpIds.length) {
-      const gpRes = await db.from("global_players")
+      const gpRes = await db.from("player_directory")
         .select("id,current_name,avatar_pixels,rating,placement_games,is_ranked,peak_rating")
         .in("id", gpIds);
       if (!gpRes.error) (gpRes.data || []).forEach(player => globalPlayers.set(player.id,player));

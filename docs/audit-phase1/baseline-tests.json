@@ -1,0 +1,138 @@
+{
+  "mode": "baseline",
+  "isolated": true,
+  "production_requests": 0,
+  "results": [
+    {
+      "test": "JavaScript syntax",
+      "passed": true,
+      "detail": [
+        "play-ui-runtime.js",
+        "play-presence.js",
+        "profile-live-guard.js",
+        "play.js",
+        "pending-hub.js"
+      ]
+    },
+    {
+      "test": "Translation reaches idle rather than self-triggering",
+      "passed": true,
+      "detail": {
+        "idle_translation_frames": 21,
+        "expected_defect_on_baseline": true
+      }
+    },
+    {
+      "test": "External UI changes and language switching still translate",
+      "passed": true,
+      "detail": {
+        "english_round": "ROUND 4",
+        "french_round": "MANCHE 4"
+      }
+    },
+    {
+      "test": "Fullscreen pointer gesture does not toggle twice",
+      "passed": true,
+      "detail": [
+        "enter",
+        "exit"
+      ]
+    },
+    {
+      "test": "Presence resumes after repeated back-forward lifecycle",
+      "passed": true,
+      "detail": {
+        "beats": 1,
+        "clears": 1,
+        "timers": 0
+      }
+    },
+    {
+      "test": "Presence does not write after a delayed session resolves on a stopped page",
+      "passed": true,
+      "detail": {
+        "heartbeats_after_stop": 1
+      }
+    },
+    {
+      "test": "Profile error renders names as text, not HTML",
+      "passed": true,
+      "detail": {
+        "HTML_elements_from_player_name": 1
+      }
+    },
+    {
+      "test": "Public profile success and temporary viewer restoration preserved",
+      "passed": true,
+      "detail": {
+        "name": "AuditPlayer",
+        "public_viewer_restored": true
+      }
+    },
+    {
+      "test": "PLAY safe profile access: rated",
+      "passed": true,
+      "detail": {
+        "mode": "rated",
+        "tables": [
+          "global_players",
+          "tournaments"
+        ],
+        "RPCs": [
+          "my_global_player_id",
+          "my_global_player_id"
+        ],
+        "side_text": "Dein Profil konnte gerade nicht geladen werden."
+      }
+    },
+    {
+      "test": "PLAY safe profile access: unranked",
+      "passed": true,
+      "detail": {
+        "mode": "unranked",
+        "tables": [
+          "global_players",
+          "tournaments"
+        ],
+        "RPCs": [
+          "my_global_player_id",
+          "my_global_player_id"
+        ],
+        "side_text": "Dein Profil konnte gerade nicht geladen werden."
+      }
+    },
+    {
+      "test": "PLAY safe profile access: cup",
+      "passed": true,
+      "detail": {
+        "mode": "cup",
+        "tables": [
+          "global_players",
+          "tournaments",
+          "tournaments",
+          "teams",
+          "players",
+          "rating_rounds",
+          "events",
+          "global_players"
+        ],
+        "RPCs": [
+          "my_global_player_id",
+          "my_global_player_id"
+        ],
+        "side_text": "#1\nAuditPlayer\n+\nPartner\n1PTS"
+      }
+    },
+    {
+      "test": "Only modified script entry points receive new cache versions",
+      "passed": true,
+      "detail": {
+        "play.js": 0,
+        "play-presence.js": 0,
+        "play-ui-runtime.js": 0,
+        "profile-live-guard.js": 0,
+        "pending-hub.js": 0
+      }
+    }
+  ]
+}

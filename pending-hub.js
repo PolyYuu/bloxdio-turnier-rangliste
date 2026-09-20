@@ -190,7 +190,7 @@
   load('pending-hub-core.js?v=20260915b', () => {
     installPendingPublicProfileAccess();
     installPlayNavigation();
-    load('profile-live-guard.js?v=20260915', () => {
+    load('profile-live-guard.js?v=20260920audit1', () => {
       load('admin-pending-reset.js?v=20260915');
     });
   });
