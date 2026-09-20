@@ -1,0 +1,138 @@
+{
+  "mode": "fixed",
+  "isolated": true,
+  "production_requests": 0,
+  "results": [
+    {
+      "test": "JavaScript syntax",
+      "passed": true,
+      "detail": [
+        "play-ui-runtime.js",
+        "play-presence.js",
+        "profile-live-guard.js",
+        "play.js",
+        "pending-hub.js"
+      ]
+    },
+    {
+      "test": "Translation reaches idle rather than self-triggering",
+      "passed": true,
+      "detail": {
+        "idle_translation_frames": 0,
+        "expected_defect_on_baseline": false
+      }
+    },
+    {
+      "test": "External UI changes and language switching still translate",
+      "passed": true,
+      "detail": {
+        "english_round": "ROUND 4",
+        "french_round": "MANCHE 4"
+      }
+    },
+    {
+      "test": "Fullscreen pointer gesture does not toggle twice",
+      "passed": true,
+      "detail": [
+        "enter",
+        "exit"
+      ]
+    },
+    {
+      "test": "Presence resumes after repeated back-forward lifecycle",
+      "passed": true,
+      "detail": {
+        "beats": 5,
+        "clears": 2,
+        "timers": 1
+      }
+    },
+    {
+      "test": "Presence does not write after a delayed session resolves on a stopped page",
+      "passed": true,
+      "detail": {
+        "heartbeats_after_stop": 0
+      }
+    },
+    {
+      "test": "Profile error renders names as text, not HTML",
+      "passed": true,
+      "detail": {
+        "HTML_elements_from_player_name": 0
+      }
+    },
+    {
+      "test": "Public profile success and temporary viewer restoration preserved",
+      "passed": true,
+      "detail": {
+        "name": "AuditPlayer",
+        "public_viewer_restored": true
+      }
+    },
+    {
+      "test": "PLAY safe profile access: rated",
+      "passed": true,
+      "detail": {
+        "mode": "rated",
+        "tables": [
+          "tournaments"
+        ],
+        "RPCs": [
+          "my_global_player_id",
+          "my_global_player_id",
+          "get_my_profile"
+        ],
+        "side_text": "AuditPlayer\n♛\nCURRENT RANK\nMASTER\n1777 RP\nPROGRESS TO NEXT RANK11%\n\nPeak Rating: 1815 RP"
+      }
+    },
+    {
+      "test": "PLAY safe profile access: unranked",
+      "passed": true,
+      "detail": {
+        "mode": "unranked",
+        "tables": [
+          "tournaments"
+        ],
+        "RPCs": [
+          "my_global_player_id",
+          "my_global_player_id",
+          "get_my_profile"
+        ],
+        "side_text": "AuditPlayer\n○\nCURRENT RANK\nUNRANKED\n7 / 15\nPLACEMENTS47%\n\nNach 15 Competitive-Runden erhältst du deinen ersten Rang."
+      }
+    },
+    {
+      "test": "PLAY safe profile access: cup",
+      "passed": true,
+      "detail": {
+        "mode": "cup",
+        "tables": [
+          "tournaments",
+          "tournaments",
+          "teams",
+          "players",
+          "rating_rounds",
+          "events",
+          "player_directory"
+        ],
+        "RPCs": [
+          "my_global_player_id",
+          "my_global_player_id",
+          "get_my_profile"
+        ],
+        "side_text": "#1\nAuditPlayer\n+\nPartner\n1PTS"
+      }
+    },
+    {
+      "test": "Only modified script entry points receive new cache versions",
+      "passed": true,
+      "detail": {
+        "play.js": 1,
+        "play-presence.js": 1,
+        "play-ui-runtime.js": 1,
+        "profile-live-guard.js": 1,
+        "pending-hub.js": 1
+      }
+    }
+  ]
+}

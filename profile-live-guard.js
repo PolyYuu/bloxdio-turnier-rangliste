@@ -94,7 +94,14 @@
     if (!page || !gate) return;
     page.classList.remove('hub-profile-live-loading', 'hub-profile-live-error');
     if (mode) page.classList.add(mode === 'error' ? 'hub-profile-live-error' : 'hub-profile-live-loading');
-    gate.innerHTML = `<div class="hub-profile-gate-card"><strong>${title}</strong><span>${text}</span></div>`;
+    const card = document.createElement('div');
+    card.className = 'hub-profile-gate-card';
+    const heading = document.createElement('strong');
+    const detail = document.createElement('span');
+    heading.textContent = String(title ?? '');
+    detail.textContent = String(text ?? '');
+    card.append(heading, detail);
+    gate.replaceChildren(card);
   }
 
   function clearGate() {

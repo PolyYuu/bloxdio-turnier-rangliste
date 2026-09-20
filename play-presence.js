@@ -27,7 +27,7 @@
     if (stopped) return;
     try {
       const { data: { session } } = await db.auth.getSession();
-      if (!session) return;
+      if (!session || stopped) return;
       await db.rpc('heartbeat_presence', {
         p_session_id: getSessionId(),
         p_page: 'play'
@@ -43,6 +43,7 @@
   }
 
   function start() {
+    if (timer && !stopped) return;
     clearInterval(timer);
     stopped = false;
     heartbeat();
@@ -60,7 +61,10 @@
     if (!document.hidden) heartbeat();
   });
   window.addEventListener('focus', heartbeat);
-  window.addEventListener('pagehide', stop, { once: true });
+  window.addEventListener('pagehide', stop);
+  window.addEventListener('pageshow', () => {
+    if (stopped) start();
+  });
 
   start();
 })();
