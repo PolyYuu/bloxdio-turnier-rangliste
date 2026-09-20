@@ -1,0 +1,64 @@
+name: Audit phase 1 - isolated repair and regression tests
+on:
+  workflow_dispatch:
+  push:
+    branches: ['fix/audit-phase1-20260920']
+    paths:
+      - '.github/workflows/audit-phase1-fix.yml'
+      - '.github/scripts/audit_phase1_patch.py'
+      - '.github/scripts/audit_phase1_tests.py'
+permissions:
+  contents: write
+concurrency:
+  group: audit-phase1-20260920
+  cancel-in-progress: false
+jobs:
+  repair:
+    if: github.ref == 'refs/heads/fix/audit-phase1-20260920'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install isolated browser test dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Apply source-hash-guarded changes to this branch only
+        run: |
+          python .github/scripts/audit_phase1_patch.py --backup-dir "$RUNNER_TEMP/audit-before" --output "$RUNNER_TEMP/audit-results/source-manifest.json"
+          git diff --check
+          git diff --stat
+      - name: Reproduce the original defects without production requests
+        run: python .github/scripts/audit_phase1_tests.py --root "$RUNNER_TEMP/audit-before" --mode baseline --output "$RUNNER_TEMP/audit-results/baseline-tests.json"
+      - name: Run repaired behavior and regression controls
+        run: python .github/scripts/audit_phase1_tests.py --root "$GITHUB_WORKSPACE" --mode fixed --output "$RUNNER_TEMP/audit-results/fixed-tests.json"
+      - name: Store tested changes and evidence on the repair branch
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          BRANCH=fix/audit-phase1-20260920
+          ACTUAL_HEAD=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          mkdir -p docs/audit-phase1
+          cp "$RUNNER_TEMP/audit-results/"*.json docs/audit-phase1/
+          git diff > "$RUNNER_TEMP/audit-results/frontend.patch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add play-ui-runtime.js profile-live-guard.js play-presence.js play.js play.html pending-hub.js index.html docs/audit-phase1/
+          git commit -m 'Fix audited PLAY translation, profile read paths, safe text and presence lifecycle'
+          git push origin "HEAD:refs/heads/$BRANCH"
+          git rev-parse HEAD > "$RUNNER_TEMP/audit-results/tested-commit.txt"
+          mkdir -p "$RUNNER_TEMP/audit-results/patched-source"
+          cp play-ui-runtime.js profile-live-guard.js play-presence.js play.js play.html pending-hub.js index.html "$RUNNER_TEMP/audit-results/patched-source/"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-phase1-evidence
+          path: ${{ runner.temp }}/audit-results/
+          retention-days: 14
