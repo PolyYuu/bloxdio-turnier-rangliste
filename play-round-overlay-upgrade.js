@@ -354,9 +354,19 @@
     closeButton.setAttribute('title',label);
   }
 
+  function releaseBloxdPointerLock() {
+    try {
+      bloxdFrame?.contentWindow?.postMessage(
+        {type:'HUB_ROUND_OVERLAY_POINTER_RELEASE',version:1},
+        'https://bloxd.io'
+      );
+    } catch (_) {}
+  }
+
   function forceOverlayFocus() {
     try { window.focus(); } catch (_) {}
     try { document.exitPointerLock?.(); } catch (_) {}
+    releaseBloxdPointerLock();
     try { overlay.focus({preventScroll:true}); } catch (_) {}
     try { closeButton.focus({preventScroll:true}); }
     catch (_) { try { closeButton.focus(); } catch (_) {} }
