@@ -3426,7 +3426,21 @@ window.HubAPI = (() => {
   }
   async function renderAdminAccountPlayers(fetchFresh=true){
     if(!live.isAdmin)return;ensureAdminPrimaryNav();
-    try{if(fetchFresh||!real.adminAccounts.length)real.adminAccounts=await api.adminGetAccountPlayers();const q=String($('#v3AdminAccountSearch')?.value||'').trim().toLowerCase();const rows=real.adminAccounts.filter(p=>!q||String(p.current_name||'').toLowerCase().includes(q));const on=rows.filter(p=>p.is_online),off=rows.filter(p=>!p.is_online);$('#v3AdminOnlineBadge').textContent=String(real.adminAccounts.filter(p=>p.is_online).length||'');$('#v3AdminAccountOnlineCount').textContent=String(on.length);$('#v3AdminAccountOfflineCount').textContent=String(off.length);$('#v3AdminAccountOnline').innerHTML=on.length?on.map(adminAccountRow).join(''):`<p class="v3-empty">${copy('No logged-in players are online right now.','Gerade ist kein eingeloggter Spieler online.','Aucun joueur en ligne.')}</p>`;$('#v3AdminAccountOffline').innerHTML=off.length?off.map(adminAccountRow).join(''):`<p class="v3-empty">${copy('No offline accounts match the search.','Keine Offline-Accounts passen zur Suche.','Aucun compte hors ligne.')}</p>`;}catch(e){const w=$('#v3AdminAccountOffline');if(w)w.innerHTML=`<p class="v3-empty">${esc(e.message)}</p>`;}
+    try{
+      if(fetchFresh||!real.adminAccounts.length){
+        const [globals,accounts]=await Promise.all([api.adminGetGlobalPlayers(),api.adminGetAccountPlayers()]);
+        const accountMap=new Map((accounts||[]).map(p=>[p.id,p]));
+        real.adminAccounts=(globals||[]).map(g=>({...g,...(accountMap.get(g.id)||{}),id:g.id,current_name:g.current_name,is_online:!!accountMap.get(g.id)?.is_online,last_seen:accountMap.get(g.id)?.last_seen||null,has_hub_account:accountMap.has(g.id)}));
+      }
+      const q=String($('#v3AdminAccountSearch')?.value||'').trim().toLowerCase();
+      const rows=real.adminAccounts.filter(p=>!q||String(p.current_name||'').toLowerCase().includes(q));
+      const on=rows.filter(p=>p.is_online),off=rows.filter(p=>!p.is_online);
+      $('#v3AdminOnlineBadge').textContent=String(real.adminAccounts.filter(p=>p.is_online).length||'');
+      $('#v3AdminAccountOnlineCount').textContent=String(on.length);
+      $('#v3AdminAccountOfflineCount').textContent=String(off.length);
+      $('#v3AdminAccountOnline').innerHTML=on.length?on.map(adminAccountRow).join(''):`<p class="v3-empty">${copy('No logged-in players are online right now.','Gerade ist kein eingeloggter Spieler online.','Aucun joueur en ligne.')}</p>`;
+      $('#v3AdminAccountOffline').innerHTML=off.length?off.map(adminAccountRow).join(''):`<p class="v3-empty">${copy('No player profiles match the search.','Keine Spielerprofile passen zur Suche.','Aucun profil ne correspond à la recherche.')}</p>`;
+    }catch(e){const w=$('#v3AdminAccountOffline');if(w)w.innerHTML=`<p class="v3-empty">${esc(e.message)}</p>`;}
   }
 function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const hero=$('[data-page="admin"] .admin-hero-v2');if(!hero)return null;s=document.createElement('select');s.id='v3AdminCupSelect';s.className='v3-admin-cup-select';hero.appendChild(s);s.addEventListener('change',()=>{real.adminCupId=s.value;real.adminRound=adminCup()?.editing_round||1;renderAdminLive();});return s;}
   async function renderAdminLive(){
