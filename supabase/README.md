@@ -1,0 +1,1 @@
+Backend schema and Edge Functions for HUB V3 are deployed in Supabase project `nxzrgbpaxukgjyzwupjp`. This directory documents the frontend contract so the static GitHub Pages UI can call the same production backend safely without a service-role key in the browser.

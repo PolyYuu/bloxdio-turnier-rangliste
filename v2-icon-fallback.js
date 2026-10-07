@@ -1,0 +1,1 @@
+if(typeof RANK_ICONS!=='undefined'){Object.assign(RANK_ICONS,{wood:'v2-assets/ranks/holz.svg',iron:'v2-assets/ranks/eisen.svg',gold:'v2-assets/ranks/gold.svg',emerald:'v2-assets/ranks/emerald.svg',diamond:'v2-assets/ranks/diamant.svg',master:'v2-assets/ranks/meister.svg',grandmaster:'v2-assets/ranks/grossmeister.svg'});}
