@@ -2184,6 +2184,12 @@ window.HubAPI = (() => {
   async function adminGetGlobalPlayers() { const data=await rpc('admin_get_global_players'); return data||[]; }
   async function adminGetAccountPlayers() { const data=await rpc('admin_get_account_players'); return data||[]; }
   async function searchPlayers(query) { const q=String(query||'').trim(); if(!q)return []; const { data,error }=await client.from('player_directory').select('*').ilike('current_name',`%${q.replace(/[%_]/g,'\\$&')}%`).limit(12); if(error)throw error; return data||[]; }
+  async function searchHubFriendCandidates(query) {
+    const q=String(query||'').trim();
+    if(!q||Array.from(q).length>64||!await currentSession())return [];
+    const data=await rpc('search_hub_friend_candidates',{p_query:q});
+    return data||[];
+  }
 
   async function changePassword(currentPassword, newPassword, repeatPassword) {
     const session = await currentSession(); if (!session) throw new Error('Login required');
@@ -2297,7 +2303,7 @@ window.HubAPI = (() => {
     .on('postgres_changes',{event:'*',schema:'public',table:'global_players'},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'ranking_fake_profiles'},onChange).subscribe(); }
 
-  return { client,signUp,login,logout,currentSession,currentPlayerId,getPlayer,getMyProfile,getCareerStatsFor,getRatingHistory,getMyCompetitiveHistory,getCompetitiveHistoryForPlayer,getGlobalPlayers,adminGetGlobalPlayers,adminGetAccountPlayers,searchPlayers,
+  return { client,signUp,login,logout,currentSession,currentPlayerId,getPlayer,getMyProfile,getCareerStatsFor,getRatingHistory,getMyCompetitiveHistory,getCompetitiveHistoryForPlayer,getGlobalPlayers,adminGetGlobalPlayers,adminGetAccountPlayers,searchPlayers,searchHubFriendCandidates,
     changePassword,changeMyName,setRankingExperience,saveAvatar,acknowledgeAvatarReset,getTournaments,getCupData,getSocialState,
     sendFriendRequest,respondFriendRequest,removeFriend,createCupRegistration,respondCupInvite,cancelCupRegistration,getMyCupRegistrationState,getCupRegistrationOverview,
     finalizeRoundRating,recalculateRoundRating,recalculateRatingFromRound,uploadCupIcon,adminCreateCup,adminUpdateCup,adminDeleteCup,adminSetCupStatus,adminCreateTeam,
@@ -2970,9 +2976,15 @@ window.HubAPI = (() => {
   }
 
   // ---------- social ----------
+  let socialRequest=0;
   async function refreshSocial(){
+    const request=++socialRequest,userId=live.session?.user?.id,playerId=live.player?.id;
     if(!live.session||!live.player){real.social=null;renderSocial();return;}
-    try{real.social=await api.getSocialState();renderSocial();renderMateHint();}catch(err){console.error(err);}
+    try{
+      const social=await api.getSocialState();
+      if(request!==socialRequest||!live.session||live.session.user?.id!==userId||live.player?.id!==playerId)return;
+      real.social=social;renderSocial();renderMateHint();
+    }catch(err){console.error(err);}
   }
   function socialMeta(p){if(!viewerCanSeeRank())return ''; if(!p?.is_ranked)return `${copy('Unranked','Unranked','Unranked')} · ${Number(p?.placement_games||0)}/15`;return `${rankName(p)} · ${Math.round(Number(p.rating))}`;}
   function socialRow(p,actions=''){
@@ -2991,13 +3003,26 @@ window.HubAPI = (() => {
     if(ci){ci.textContent=s.cup_invites.length||'';ci.hidden=!s.cup_invites.length;}
     if($('#communityNoticeDot'))$('#communityNoticeDot').hidden=!(s.incoming_friend_requests.length||s.cup_invites.length);
   }
+  let friendSearchRequest=0,friendSearchTimer=0;
   async function renderFriendSearch(q){
-    const wrap=$('#friendSearchResults');if(!wrap)return; q=String(q||'').trim();if(!q){wrap.innerHTML='';return;}
+    const request=++friendSearchRequest;clearTimeout(friendSearchTimer);
+    const wrap=$('#friendSearchResults');if(!wrap)return;q=String(q||'').trim();
+    wrap.innerHTML='';
+    if(!q||Array.from(q).length>64||!live.session||!live.player)return;
+    const playerId=live.player.id,userId=live.session.user?.id;
+    const isCurrent=()=>request===friendSearchRequest&&live.session&&live.session.user?.id===userId&&live.player?.id===playerId;
     try{
-      const results=(await api.searchPlayers(q)).filter(p=>p.id!==live.player?.id);
+      const results=(await api.searchHubFriendCandidates(q)).filter(p=>p.id!==playerId);
+      if(!isCurrent())return;
       const friends=new Set((real.social?.friends||[]).map(p=>p.id)); const outgoing=new Set((real.social?.outgoing_friend_requests||[]).map(r=>r.receiver_id));
       wrap.innerHTML=results.length?results.map(p=>socialRow(p,friends.has(p.id)?`<span class="v3-social-status">${copy('Friend','Freund','Ami')}</span>`:`<button class="social-add" type="button" data-v3-friend-add="${p.id}" ${outgoing.has(p.id)?'disabled':''}>${outgoing.has(p.id)?copy('Request sent','Anfrage gesendet','Demande envoyée'):copy('Add','Hinzufügen','Ajouter')}</button>`)).join(''):'<p class="empty-social">—</p>';
-    }catch(err){wrap.innerHTML=`<p class="empty-social">${esc(err.message)}</p>`;}
+    }catch(err){if(isCurrent())wrap.innerHTML=`<p class="empty-social">${esc(err.message)}</p>`;}
+  }
+  function scheduleFriendSearch(q){
+    clearTimeout(friendSearchTimer);++friendSearchRequest;
+    const wrap=$('#friendSearchResults');if(wrap)wrap.innerHTML='';
+    if(!String(q||'').trim()||!live.session||!live.player)return;
+    friendSearchTimer=setTimeout(()=>renderFriendSearch(q),180);
   }
   function openSocial(){if(!ensureLogin())return;const d=$('#communityDrawer'),b=$('#communityBackdrop');d?.classList.add('open');d?.setAttribute('aria-hidden','false');if(b)b.hidden=false;$('#communityButton')?.setAttribute('aria-expanded','true');refreshSocial();}
   function closeSocial(){const d=$('#communityDrawer'),b=$('#communityBackdrop');d?.classList.remove('open');d?.setAttribute('aria-hidden','true');if(b)b.hidden=true;$('#communityButton')?.setAttribute('aria-expanded','false');}
@@ -3424,13 +3449,16 @@ window.HubAPI = (() => {
     const ranked=!!p.is_ranked,rankText=ranked?`${core.rankLabel(core.rankKey(Number(p.rating)))} · ${Math.round(Number(p.rating))}`:`Unranked · ${Number(p.placement_games||0)}/15 · Hidden Elo ${Math.round(Number(p.rating||0))}`;
     return `<div class="v3-admin-account-row ${p.is_online?'online':''}"><span class="v3-admin-account-player">${avatarImg(p,'social-avatar pixel-avatar')}<div><strong>${esc(p.current_name)}</strong><small>${rankText}</small></div></span><span class="v3-account-status ${p.is_online?'online':'offline'}">${p.is_online?'● ONLINE':'OFFLINE'}</span><span class="v3-account-metric"><span>${copy('Rating','Rating','Rating')}</span><b>${Math.round(Number(p.rating||0))}</b></span><span class="v3-account-metric"><span>${copy('Last seen','Zuletzt gesehen','Dernière activité')}</span><b>${esc(relativeSeen(p.last_seen))}</b></span><button class="ghost-button" type="button" data-v3-manage-global="${p.id}">${copy('Edit','Bearbeiten','Modifier')}</button></div>`;
   }
+  let adminAccountRequest=0;
   async function renderAdminAccountPlayers(fetchFresh=true){
-    if(!live.isAdmin)return;ensureAdminPrimaryNav();
+    if(!live.session||!live.isAdmin)return;ensureAdminPrimaryNav();
+    const request=++adminAccountRequest,userId=live.session.user?.id;
+    const isCurrent=()=>request===adminAccountRequest&&live.session&&live.isAdmin&&live.session.user?.id===userId;
     try{
       if(fetchFresh||!real.adminAccounts.length){
-        const [globals,accounts]=await Promise.all([api.adminGetGlobalPlayers(),api.adminGetAccountPlayers()]);
-        const accountMap=new Map((accounts||[]).map(p=>[p.id,p]));
-        real.adminAccounts=(globals||[]).map(g=>({...g,...(accountMap.get(g.id)||{}),id:g.id,current_name:g.current_name,is_online:!!accountMap.get(g.id)?.is_online,last_seen:accountMap.get(g.id)?.last_seen||null,has_hub_account:accountMap.has(g.id)}));
+        const accounts=await api.adminGetAccountPlayers();
+        if(!isCurrent())return;
+        real.adminAccounts=accounts||[];
       }
       const q=String($('#v3AdminAccountSearch')?.value||'').trim().toLowerCase();
       const rows=real.adminAccounts.filter(p=>!q||String(p.current_name||'').toLowerCase().includes(q));
@@ -3440,7 +3468,13 @@ window.HubAPI = (() => {
       $('#v3AdminAccountOfflineCount').textContent=String(off.length);
       $('#v3AdminAccountOnline').innerHTML=on.length?on.map(adminAccountRow).join(''):`<p class="v3-empty">${copy('No logged-in players are online right now.','Gerade ist kein eingeloggter Spieler online.','Aucun joueur en ligne.')}</p>`;
       $('#v3AdminAccountOffline').innerHTML=off.length?off.map(adminAccountRow).join(''):`<p class="v3-empty">${copy('No player profiles match the search.','Keine Spielerprofile passen zur Suche.','Aucun profil ne correspond à la recherche.')}</p>`;
-    }catch(e){const w=$('#v3AdminAccountOffline');if(w)w.innerHTML=`<p class="v3-empty">${esc(e.message)}</p>`;}
+    }catch(e){
+      if(!isCurrent())return;real.adminAccounts=[];
+      $('#v3AdminAccountOnline').innerHTML='';
+      $('#v3AdminOnlineBadge').textContent='';
+      $('#v3AdminAccountOnlineCount').textContent='0';$('#v3AdminAccountOfflineCount').textContent='0';
+      $('#v3AdminAccountOffline').innerHTML=`<p class="v3-empty">${esc(e.message)}</p>`;
+    }
   }
 function ensureAdminSelector(){let s=$('#v3AdminCupSelect');if(s)return s;const hero=$('[data-page="admin"] .admin-hero-v2');if(!hero)return null;s=document.createElement('select');s.id='v3AdminCupSelect';s.className='v3-admin-cup-select';hero.appendChild(s);s.addEventListener('change',()=>{real.adminCupId=s.value;real.adminRound=adminCup()?.editing_round||1;renderAdminLive();});return s;}
   async function renderAdminLive(){
@@ -3688,9 +3722,13 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
   }
 
   async function openManageGlobalPlayer(globalPlayerId){
+    if(!live.session||!live.isAdmin)return;
+    const userId=live.session.user?.id;
     let gp=null;try{gp=(await api.adminGetGlobalPlayers()).find(x=>x.id===globalPlayerId)||null;}catch(_){}
+    if(!live.session||!live.isAdmin||live.session.user?.id!==userId)return;
     if(!gp)return toast(copy('Global player profile not found.','Globales Spielerprofil nicht gefunden.','Profil global introuvable.'),true);
     let stats=null;try{stats=await api.getCareerStatsFor(gp.id);}catch(_){stats={};}
+    if(!live.session||!live.isAdmin||live.session.user?.id!==userId)return;
     const fields=['ranked_rounds','kills','deathmatches','wins','deaths','cups','cup_wins','total_points','most_cup_points','most_round_points'];
     const label={ranked_rounds:'Ranked Games',kills:'Kills',deathmatches:'Deathmatches',wins:'Wins',deaths:'Deaths',cups:'Cups',cup_wins:'Cup Wins',total_points:'Total Points',most_cup_points:'Most Cup Points',most_round_points:'Most Round Points'};
     const m=document.createElement('div');m.className='v3-modal-backdrop';m.innerHTML=`<section class="v3-modal v3-player-admin-modal"><button class="modal-close" data-v3-close>×</button><span class="eyebrow">ADMIN · PLAYER</span><div class="v3-admin-player-head">${avatarImg(gp,'v3-admin-avatar pixel-avatar')}<div><h2>${esc(gp.current_name)}</h2><small>${gp.is_ranked?`${rankName(gp)} · ${Math.round(Number(gp.rating))}`:`Unranked · ${gp.placement_games}/15`}</small>${!gp.is_ranked?`<small class="v3-hidden-elo">Hidden Elo: ${Number(gp.rating).toFixed(1)}</small>`:''}</div></div>
@@ -3771,7 +3809,15 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
     if(own&&live.session)setTimeout(()=>renderProfileLive(live.player.current_name),140);
   });
 
-  $('#friendSearchInput')?.addEventListener('input',e=>renderFriendSearch(e.target.value),true);$('#friendSearchButton')?.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();renderFriendSearch($('#friendSearchInput')?.value||'');},true);
+  $('#friendSearchInput')?.addEventListener('input',e=>{e.stopImmediatePropagation();scheduleFriendSearch(e.target.value);},true);$('#friendSearchButton')?.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();renderFriendSearch($('#friendSearchInput')?.value||'');},true);
+  function invalidateAccountViews(){
+    clearTimeout(friendSearchTimer);++friendSearchRequest;++adminAccountRequest;++socialRequest;real.adminAccounts=[];real.social=null;
+    const results=$('#friendSearchResults');if(results)results.innerHTML='';
+    renderSocial();
+    for(const id of ['v3AdminAccountOnline','v3AdminAccountOffline','v3AdminOnlineBadge']){const el=$('#'+id);if(el)el.textContent='';}
+    for(const id of ['v3AdminAccountOnlineCount','v3AdminAccountOfflineCount']){const el=$('#'+id);if(el)el.textContent='0';}
+  }
+  document.addEventListener('hub:auth-restored',invalidateAccountViews);
   $('#cupSelect')?.addEventListener('change',e=>{e.stopImmediatePropagation();const cup=real.cups.find(c=>sameId(c.id,e.target.value));real.selectedCupId=cup?.id??e.target.value;renderSelectedCup();},true);
   $('#rankingSearch')?.addEventListener('input',renderRealRanking);$('#rankFilter')?.addEventListener('change',renderRealRanking);
 
@@ -3866,6 +3912,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
   async function refreshForAuth(){
     try{live.globalPlayers=await api.getGlobalPlayers();await refreshFakeProfiles();}catch(_){}
     renderRealRanking();await renderOwnOverview();await refreshSocial();await refreshCups();ensureFinalizeButton();
+    if(live.session&&live.player&&$('#friendSearchInput')?.value.trim())await renderFriendSearch($('#friendSearchInput').value);
     if(location.hash==='#profile'&&live.player){
       const requested=state?.profilePlayer;
       const exists=requested&&(requested===live.player.current_name||live.globalPlayers.some(p=>p.current_name===requested));
@@ -3880,7 +3927,7 @@ Player3: k:1 dm:0 w:1, Player4: k:2 dm:1 w:0"></textarea><div class="v3-form-err
       try{await core.restoreAuth(false);}catch(_){}
       await refreshForAuth();
       document.addEventListener('hub:auth-restored',()=>setTimeout(()=>refreshForAuth(),0));
-      api.client.auth.onAuthStateChange(()=>setTimeout(()=>refreshForAuth(),120));
+      api.client.auth.onAuthStateChange(()=>{invalidateAccountViews();setTimeout(()=>refreshForAuth(),120);});
       setInterval(()=>{if(live.isAdmin&&real.adminSection==='players')renderAdminAccountPlayers(true);},15000);
     }finally{
       requestAnimationFrame(()=>document.documentElement.classList.remove('hub-live-booting'));
